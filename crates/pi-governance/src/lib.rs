@@ -1,3 +1,6 @@
 pub mod engine;
 
-pub use engine::{DoctorReport, GovernanceEngine, ProposalInput, ProposalResult};
+pub use engine::{
+    ApplyPatchResult, DoctorReport, GovernanceEngine, PatchInspection, PatchSummary,
+    ProposalInput, ProposalResult,
+};

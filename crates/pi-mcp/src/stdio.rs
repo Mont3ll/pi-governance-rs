@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use pi_core::{EvidenceKind, EvidenceRef, RecordClass, Scope};
 use pi_governance::{GovernanceEngine, ProposalInput};
 use pi_retrieval::render_markdown;
@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "0.1.0";
+const SERVER_VERSION: &str = "0.2.0";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -112,6 +112,7 @@ impl McpStdioServer {
             "PI Governance exposes governed memory tools for coding agents.",
             "Use pi.retrieve_context before making project-sensitive changes.",
             "Use pi.propose_record for durable memory updates instead of directly mutating the store.",
+            "Use pi.list_patches and pi.inspect_patch before applying queued patches.",
             "Identity-level records and risky mutations may require force/manual review.",
         ]
         .join("\n");
@@ -255,6 +256,36 @@ impl McpStdioServer {
                 }
             },
             {
+                "name": "pi.list_patches",
+                "description": "List latest patch state, one row per patch id.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "limit": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 200,
+                            "default": 20
+                        }
+                    }
+                }
+            },
+            {
+                "name": "pi.inspect_patch",
+                "description": "Inspect full patch history and whether the latest version can be applied.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "patch_id": {
+                            "type": "string"
+                        }
+                    },
+                    "required": ["patch_id"]
+                }
+            },
+            {
                 "name": "pi.doctor",
                 "description": "Inspect PI store health, patch state, warnings, and governance errors.",
                 "inputSchema": {
@@ -290,6 +321,8 @@ impl McpStdioServer {
             "pi.retrieve_context" => self.tool_retrieve_context(arguments),
             "pi.propose_record" => self.tool_propose_record(arguments),
             "pi.apply_patch" => self.tool_apply_patch(arguments),
+            "pi.list_patches" => self.tool_list_patches(arguments),
+            "pi.inspect_patch" => self.tool_inspect_patch(arguments),
             "pi.doctor" => self.tool_doctor(),
             "pi.list_records" => self.tool_list_records(arguments),
             other => bail!("unknown PI MCP tool: {other}"),
@@ -369,16 +402,45 @@ impl McpStdioServer {
         let patch_id = required_string(&args, "patch_id")?;
         let force = optional_bool(&args, "force").unwrap_or(false);
 
-        let applied = self.engine.apply_patch_by_id(&patch_id, force)?;
+        match self.engine.apply_patch_by_id(&patch_id, force) {
+            Ok(result) => {
+                let text = serde_json::to_string_pretty(&result)?;
+                Ok(tool_result(text, serde_json::to_value(result)?))
+            }
+            Err(error) => Ok(tool_error(
+                error.to_string(),
+                json!({
+                    "code": "apply_patch_failed",
+                    "patch_id": patch_id
+                }),
+            )),
+        }
+    }
 
-        let structured = json!({
-            "patch_id": patch_id,
-            "applied": applied
-        });
+    fn tool_list_patches(&self, args: Value) -> Result<Value> {
+        let limit = optional_usize(&args, "limit").unwrap_or(20);
+        let patches = self.engine.list_patches(limit)?;
+        let text = serde_json::to_string_pretty(&patches)?;
 
-        let text = serde_json::to_string_pretty(&structured)?;
+        Ok(tool_result(text, serde_json::to_value(patches)?))
+    }
 
-        Ok(tool_result(text, structured))
+    fn tool_inspect_patch(&self, args: Value) -> Result<Value> {
+        let patch_id = required_string(&args, "patch_id")?;
+
+        match self.engine.inspect_patch(&patch_id) {
+            Ok(inspection) => {
+                let text = serde_json::to_string_pretty(&inspection)?;
+                Ok(tool_result(text, serde_json::to_value(inspection)?))
+            }
+            Err(error) => Ok(tool_error(
+                error.to_string(),
+                json!({
+                    "code": "inspect_patch_failed",
+                    "patch_id": patch_id
+                }),
+            )),
+        }
     }
 
     fn tool_doctor(&self) -> Result<Value> {
@@ -407,6 +469,19 @@ fn tool_result(text: String, structured_content: Value) -> Value {
         ],
         "structuredContent": structured_content,
         "isError": false
+    })
+}
+
+fn tool_error(text: String, structured_content: Value) -> Value {
+    json!({
+        "content": [
+            {
+                "type": "text",
+                "text": text
+            }
+        ],
+        "structuredContent": structured_content,
+        "isError": true
     })
 }
 
@@ -445,7 +520,7 @@ fn write_json_line<W: Write>(writer: &mut W, value: &Value) -> Result<()> {
 fn args_object(value: &Value) -> Result<&Map<String, Value>> {
     value
         .as_object()
-        .ok_or_else(|| anyhow!("arguments must be a JSON object"))
+        .ok_or_else(|| anyhow::anyhow!("arguments must be a JSON object"))
 }
 
 fn required_string(value: &Value, key: &str) -> Result<String> {
@@ -455,7 +530,7 @@ fn required_string(value: &Value, key: &str) -> Result<String> {
         .get(key)
         .and_then(Value::as_str)
         .map(ToString::to_string)
-        .ok_or_else(|| anyhow!("missing required string argument: {key}"))
+        .ok_or_else(|| anyhow::anyhow!("missing required string argument: {key}"))
 }
 
 fn optional_string(value: &Value, key: &str) -> Option<String> {
@@ -496,7 +571,7 @@ fn optional_string_array(value: &Value, key: &str) -> Result<Option<Vec<String>>
 
     let array = raw
         .as_array()
-        .ok_or_else(|| anyhow!("{key} must be an array of strings"))?;
+        .ok_or_else(|| anyhow::anyhow!("{key} must be an array of strings"))?;
 
     let mut output = Vec::with_capacity(array.len());
 

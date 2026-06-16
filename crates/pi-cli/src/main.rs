@@ -10,7 +10,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "0.1.0",
+    version = "0.2.0",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -81,6 +81,23 @@ enum Commands {
 
         #[arg(long)]
         force: bool,
+    },
+
+    /// List latest patch state, one row per patch id.
+    ListPatches {
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Inspect full history and current applyability for one patch.
+    InspectPatch {
+        patch_id: String,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Inspect store health and governance state.
@@ -168,12 +185,66 @@ fn main() -> Result<()> {
         }
 
         Commands::Apply { patch_id, force } => {
-            let applied = engine.apply_patch_by_id(&patch_id, force)?;
+            let result = engine.apply_patch_by_id(&patch_id, force)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
 
-            if applied {
-                println!("Patch applied: {patch_id}");
+        Commands::ListPatches { limit, json } => {
+            let patches = engine.list_patches(limit)?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&patches)?);
             } else {
-                println!("Patch not applied: {patch_id}");
+                for patch in patches {
+                    println!(
+                        "- [{}] status={:?} operation={:?} history={} claim={}",
+                        patch.patch_id,
+                        patch.latest_status,
+                        patch.operation,
+                        patch.history_entries,
+                        patch
+                            .proposed_record_claim
+                            .as_deref()
+                            .unwrap_or("<no proposed record>")
+                    );
+                }
+            }
+        }
+
+        Commands::InspectPatch { patch_id, json } => {
+            let inspection = engine.inspect_patch(&patch_id)?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&inspection)?);
+            } else {
+                println!("Patch: {}", inspection.summary.patch_id);
+                println!("Status: {:?}", inspection.summary.latest_status);
+                println!("Operation: {:?}", inspection.summary.operation);
+                println!("History entries: {}", inspection.summary.history_entries);
+                println!("Can apply without force: {}", inspection.can_apply_without_force);
+                println!("Can apply with force: {}", inspection.can_apply_with_force);
+
+                if let Some(claim) = inspection.summary.proposed_record_claim {
+                    println!("Claim: {claim}");
+                }
+
+                if let Some(decision) = inspection.current_decision {
+                    println!("Decision: {:?}", decision.status);
+
+                    if !decision.reasons.is_empty() {
+                        println!("Reasons:");
+                        for reason in decision.reasons {
+                            println!("- {reason}");
+                        }
+                    }
+
+                    if !decision.warnings.is_empty() {
+                        println!("Warnings:");
+                        for warning in decision.warnings {
+                            println!("- {warning}");
+                        }
+                    }
+                }
             }
         }
 
