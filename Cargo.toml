@@ -1,0 +1,30 @@
+[workspace]
+members = [
+  "crates/pi-core",
+  "crates/pi-store",
+  "crates/pi-retrieval",
+  "crates/pi-governance",
+  "crates/pi-mcp",
+  "crates/pi-cli",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://example.invalid/pi-governance-rs"
+
+[workspace.dependencies]
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+pi-core = { path = "crates/pi-core" }
+pi-store = { path = "crates/pi-store" }
+pi-retrieval = { path = "crates/pi-retrieval" }
+pi-governance = { path = "crates/pi-governance" }
+pi-mcp = { path = "crates/pi-mcp" }
