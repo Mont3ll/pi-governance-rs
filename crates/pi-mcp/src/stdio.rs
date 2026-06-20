@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "0.2.0";
+const SERVER_VERSION: &str = "0.3.0";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -113,6 +113,7 @@ impl McpStdioServer {
             "Use pi.retrieve_context before making project-sensitive changes.",
             "Use pi.propose_record for durable memory updates instead of directly mutating the store.",
             "Use pi.list_patches and pi.inspect_patch before applying queued patches.",
+        "The JSONL store now uses a local store.lock file to serialize mutating operations.",
             "Identity-level records and risky mutations may require force/manual review.",
         ]
         .join("\n");

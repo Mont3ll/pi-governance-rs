@@ -1,3 +1,5 @@
 pub mod jsonl;
+pub mod lock;
 
-pub use jsonl::JsonlStore;
+pub use jsonl::*;
+pub use lock::*;

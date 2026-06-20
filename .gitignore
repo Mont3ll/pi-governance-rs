@@ -6,6 +6,9 @@
 # Rust build output
 /target/
 
+# Keep Cargo.lock for this workspace because it contains a CLI binary.
+!Cargo.lock
+
 # Local PI stores / governed memory data
 .pi/
 *.pi/
@@ -15,6 +18,7 @@
 *.jsonl
 *.jsonl.tmp
 *.lock
+!Cargo.lock
 *.pid
 
 # Environment / secrets

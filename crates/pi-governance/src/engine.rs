@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use pi_core::{
     validate_patch, validate_record, ContextBundle, DecisionStatus, EvidenceRef,
     GovernanceDecision, Patch, PatchOperation, PatchStatus, Record, RecordClass, RecordStatus,
-    RetrievalBudget, Scope, StoreEvent,
+    RetrievalBudget, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
 };
 use pi_retrieval::retrieve;
 use pi_store::JsonlStore;
@@ -66,6 +66,9 @@ pub struct PatchInspection {
 #[derive(Debug, Clone, Serialize)]
 pub struct DoctorReport {
     pub store_dir: String,
+    pub lock_path: String,
+    pub schema_version: u32,
+    pub schema_audits: Vec<SchemaFileAudit>,
     pub total_records: usize,
     pub active_records: usize,
     pub superseded_records: usize,
@@ -100,6 +103,7 @@ impl GovernanceEngine {
         force: bool,
     ) -> Result<ProposalResult> {
         self.store.init()?;
+        let session = self.store.write_session()?;
 
         let record = Record::new(
             input.class,
@@ -117,12 +121,12 @@ impl GovernanceEngine {
                 .unwrap_or_else(|| "proposed by coding agent".to_string()),
         );
 
-        let existing = self.store.load_records()?;
+        let existing = session.load_records()?;
         let decision = validate_patch(&patch, &existing);
 
         if decision.status == DecisionStatus::Reject {
-            self.store.append_patch(&patch.rejected_copy())?;
-            self.store.append_event(&StoreEvent::warning(
+            session.append_patch(&patch.rejected_copy())?;
+            session.append_event(&StoreEvent::warning(
                 "patch rejected by governance policy",
                 Some(patch.id.clone()),
             ))?;
@@ -136,12 +140,12 @@ impl GovernanceEngine {
             });
         }
 
-        self.store.append_patch(&patch)?;
+        session.append_patch(&patch)?;
 
         let mut applied = false;
 
         if apply_now {
-            self.apply_patch_object(&patch, force)?;
+            Self::apply_patch_object_locked(&session, &patch, force)?;
             applied = true;
         }
 
@@ -156,8 +160,9 @@ impl GovernanceEngine {
 
     pub fn apply_patch_by_id(&self, patch_id: &str, force: bool) -> Result<ApplyPatchResult> {
         self.store.init()?;
+        let session = self.store.write_session()?;
 
-        let patches = self.store.load_patches()?;
+        let patches = session.load_patches()?;
         let history: Vec<&Patch> = patches.iter().filter(|patch| patch.id == patch_id).collect();
 
         let Some(latest) = history.last().copied() else {
@@ -175,7 +180,7 @@ impl GovernanceEngine {
             );
         }
 
-        self.apply_patch_object(latest, force)?;
+        Self::apply_patch_object_locked(&session, latest, force)?;
 
         Ok(ApplyPatchResult {
             patch_id: patch_id.to_string(),
@@ -185,8 +190,12 @@ impl GovernanceEngine {
         })
     }
 
-    fn apply_patch_object(&self, patch: &Patch, force: bool) -> Result<()> {
-        let mut records = self.store.load_records()?;
+    fn apply_patch_object_locked(
+        session: &pi_store::JsonlStoreWriteSession<'_>,
+        patch: &Patch,
+        force: bool,
+    ) -> Result<()> {
+        let mut records = session.load_records()?;
         let decision = validate_patch(patch, &records);
 
         if !decision.can_apply(force) {
@@ -264,10 +273,9 @@ impl GovernanceEngine {
             }
         }
 
-        self.store.overwrite_records_atomic(&records)?;
-        self.store.append_patch(&patch.applied_copy())?;
-        self.store
-            .append_event(&StoreEvent::info("patch applied", Some(patch.id.clone())))?;
+        session.overwrite_records_atomic(&records)?;
+        session.append_patch(&patch.applied_copy())?;
+        session.append_event(&StoreEvent::info("patch applied", Some(patch.id.clone())))?;
 
         Ok(())
     }
@@ -376,6 +384,7 @@ impl GovernanceEngine {
         let records = self.store.load_records()?;
         let patches = self.store.load_patches()?;
         let events = self.store.load_events()?;
+        let schema_audits = self.store.audit_schema_versions(CURRENT_SCHEMA_VERSION)?;
 
         let mut warnings = Vec::new();
         let mut errors = Vec::new();
@@ -442,8 +451,34 @@ impl GovernanceEngine {
             ));
         }
 
+        for audit in &schema_audits {
+            if audit.missing_schema_version > 0 {
+                warnings.push(format!(
+                    "{} has {} entrie(s) without schema_version; they will load with the current default but should be migrated later",
+                    audit.file_name, audit.missing_schema_version
+                ));
+            }
+
+            if audit.mismatched_schema_version > 0 {
+                warnings.push(format!(
+                    "{} has {} entrie(s) with a non-current schema_version",
+                    audit.file_name, audit.mismatched_schema_version
+                ));
+            }
+
+            if audit.invalid_json_lines > 0 {
+                errors.push(format!(
+                    "{} has {} invalid JSONL entrie(s)",
+                    audit.file_name, audit.invalid_json_lines
+                ));
+            }
+        }
+
         Ok(DoctorReport {
             store_dir: self.store.root().display().to_string(),
+            lock_path: self.store.lock_path().display().to_string(),
+            schema_version: CURRENT_SCHEMA_VERSION,
+            schema_audits,
             total_records: records.len(),
             active_records,
             superseded_records,

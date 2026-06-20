@@ -1,3 +1,4 @@
+use crate::schema::current_schema_version;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -163,6 +164,8 @@ impl FromStr for EvidenceKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvidenceRef {
+    #[serde(default = "current_schema_version")]
+    pub schema_version: u32,
     pub kind: EvidenceKind,
     pub uri: String,
     pub note: Option<String>,
@@ -171,6 +174,7 @@ pub struct EvidenceRef {
 impl EvidenceRef {
     pub fn new(kind: EvidenceKind, uri: impl Into<String>) -> Self {
         Self {
+            schema_version: current_schema_version(),
             kind,
             uri: uri.into(),
             note: None,
@@ -180,6 +184,8 @@ impl EvidenceRef {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
+    #[serde(default = "current_schema_version")]
+    pub schema_version: u32,
     pub id: String,
     pub class: RecordClass,
     pub claim: String,
@@ -205,6 +211,7 @@ impl Record {
         let now = Utc::now();
 
         Self {
+            schema_version: current_schema_version(),
             id: format!("rec_{}", Uuid::new_v4()),
             class,
             claim: claim.into(),
@@ -239,6 +246,8 @@ pub enum PatchStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Patch {
+    #[serde(default = "current_schema_version")]
+    pub schema_version: u32,
     pub id: String,
     pub operation: PatchOperation,
     pub status: PatchStatus,
@@ -255,6 +264,7 @@ impl Patch {
         let now = Utc::now();
 
         Self {
+            schema_version: current_schema_version(),
             id: format!("patch_{}", Uuid::new_v4()),
             operation: PatchOperation::ProposeRecord,
             status: PatchStatus::Proposed,
@@ -368,6 +378,8 @@ pub struct ContextBundle {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreEvent {
+    #[serde(default = "current_schema_version")]
+    pub schema_version: u32,
     pub id: String,
     pub severity: String,
     pub message: String,
@@ -378,6 +390,7 @@ pub struct StoreEvent {
 impl StoreEvent {
     pub fn info(message: impl Into<String>, object_id: Option<String>) -> Self {
         Self {
+            schema_version: current_schema_version(),
             id: format!("evt_{}", Uuid::new_v4()),
             severity: "info".to_string(),
             message: message.into(),
@@ -388,6 +401,7 @@ impl StoreEvent {
 
     pub fn warning(message: impl Into<String>, object_id: Option<String>) -> Self {
         Self {
+            schema_version: current_schema_version(),
             id: format!("evt_{}", Uuid::new_v4()),
             severity: "warning".to_string(),
             message: message.into(),

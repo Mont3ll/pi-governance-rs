@@ -10,7 +10,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "0.2.0",
+    version = "0.3.0",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -256,6 +256,8 @@ fn main() -> Result<()> {
             } else {
                 println!("PI Doctor Report");
                 println!("Store: {}", report.store_dir);
+                println!("Lock: {}", report.lock_path);
+                println!("Schema version: {}", report.schema_version);
                 println!("Records: {}", report.total_records);
                 println!("Active: {}", report.active_records);
                 println!("Superseded: {}", report.superseded_records);
@@ -265,6 +267,20 @@ fn main() -> Result<()> {
                 println!("Latest applied patches: {}", report.applied_patches_latest);
                 println!("Latest rejected patches: {}", report.rejected_patches_latest);
                 println!("Events: {}", report.total_events);
+
+                if !report.schema_audits.is_empty() {
+                    println!("\nSchema audit:");
+                    for audit in &report.schema_audits {
+                        println!(
+                            "- {}: entries={} missing_schema_version={} mismatched_schema_version={} invalid_json_lines={}",
+                            audit.file_name,
+                            audit.entries,
+                            audit.missing_schema_version,
+                            audit.mismatched_schema_version,
+                            audit.invalid_json_lines
+                        );
+                    }
+                }
 
                 if !report.warnings.is_empty() {
                     println!("\nWarnings:");
