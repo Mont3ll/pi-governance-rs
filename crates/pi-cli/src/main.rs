@@ -1,7 +1,9 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use pi_core::{EvidenceKind, EvidenceRef, RecordClass, Scope};
-use pi_governance::{GovernanceEngine, MigrationInput, ProposalInput};
+use pi_governance::{
+    GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, SupersedeInput, TombstoneInput,
+};
 use pi_mcp::McpStdioServer;
 use pi_retrieval::render_markdown;
 use pi_store::JsonlStore;
@@ -10,7 +12,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "0.4.0",
+    version = "0.5.0",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -98,6 +100,81 @@ enum Commands {
 
         #[arg(long)]
         json: bool,
+    },
+
+    /// Supersede an active record with a replacement claim.
+    Supersede {
+        target_id: String,
+
+        #[arg(long = "class")]
+        class: RecordClass,
+
+        #[arg(long)]
+        claim: String,
+
+        #[arg(long, default_value_t = 0.75)]
+        confidence: f32,
+
+        #[arg(long)]
+        project: Option<String>,
+
+        #[arg(long = "tag")]
+        tags: Vec<String>,
+
+        #[arg(long = "evidence-uri")]
+        evidence_uri: Option<String>,
+
+        #[arg(long = "evidence-kind", default_value = "conversation")]
+        evidence_kind: EvidenceKind,
+
+        #[arg(long)]
+        reason: String,
+
+        #[arg(long)]
+        apply: bool,
+
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Tombstone an active record while retaining auditable history.
+    Tombstone {
+        target_id: String,
+
+        #[arg(long = "evidence-uri")]
+        evidence_uri: Option<String>,
+
+        #[arg(long = "evidence-kind", default_value = "conversation")]
+        evidence_kind: EvidenceKind,
+
+        #[arg(long)]
+        reason: String,
+
+        #[arg(long)]
+        apply: bool,
+
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Reinforce an active record with additional evidence and a confidence bump.
+    Reinforce {
+        target_id: String,
+
+        #[arg(long = "evidence-uri")]
+        evidence_uri: String,
+
+        #[arg(long = "evidence-kind", default_value = "conversation")]
+        evidence_kind: EvidenceKind,
+
+        #[arg(long, default_value = "reinforce record with new evidence")]
+        reason: String,
+
+        #[arg(long)]
+        apply: bool,
+
+        #[arg(long)]
+        force: bool,
     },
 
     /// Migrate legacy JSONL entries to the current schema version.
@@ -260,6 +337,94 @@ fn main() -> Result<()> {
                     }
                 }
             }
+        }
+
+        Commands::Supersede {
+            target_id,
+            class,
+            claim,
+            confidence,
+            project,
+            tags,
+            evidence_uri,
+            evidence_kind,
+            reason,
+            apply,
+            force,
+        } => {
+            let scope = match project {
+                Some(project) => Scope::project(project),
+                None => Scope::global(),
+            };
+
+            let evidence_refs = match evidence_uri {
+                Some(uri) => vec![EvidenceRef::new(evidence_kind, uri)],
+                None => Vec::new(),
+            };
+
+            let result = engine.supersede_record(
+                SupersedeInput {
+                    target_id,
+                    class,
+                    claim,
+                    confidence,
+                    scope,
+                    tags,
+                    evidence_refs,
+                    reason,
+                },
+                apply,
+                force,
+            )?;
+
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+
+        Commands::Tombstone {
+            target_id,
+            evidence_uri,
+            evidence_kind,
+            reason,
+            apply,
+            force,
+        } => {
+            let evidence_refs = match evidence_uri {
+                Some(uri) => vec![EvidenceRef::new(evidence_kind, uri)],
+                None => Vec::new(),
+            };
+
+            let result = engine.tombstone_record(
+                TombstoneInput {
+                    target_id,
+                    evidence_refs,
+                    reason,
+                },
+                apply,
+                force,
+            )?;
+
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+
+        Commands::Reinforce {
+            target_id,
+            evidence_uri,
+            evidence_kind,
+            reason,
+            apply,
+            force,
+        } => {
+            let result = engine.reinforce_record(
+                ReinforceInput {
+                    target_id,
+                    evidence_refs: vec![EvidenceRef::new(evidence_kind, evidence_uri)],
+                    reason,
+                },
+                apply,
+                force,
+            )?;
+
+            println!("{}", serde_json::to_string_pretty(&result)?);
         }
 
         Commands::Migrate {

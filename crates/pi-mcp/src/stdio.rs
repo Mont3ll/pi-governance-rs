@@ -1,6 +1,8 @@
 use anyhow::{bail, Context, Result};
 use pi_core::{EvidenceKind, EvidenceRef, RecordClass, Scope};
-use pi_governance::{GovernanceEngine, MigrationInput, ProposalInput};
+use pi_governance::{
+    GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, SupersedeInput, TombstoneInput,
+};
 use pi_retrieval::render_markdown;
 use serde_json::{json, Map, Value};
 use std::io::{self, BufRead, Write};
@@ -8,7 +10,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "0.4.0";
+const SERVER_VERSION: &str = "0.5.0";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -113,7 +115,8 @@ impl McpStdioServer {
             "Use pi.retrieve_context before making project-sensitive changes.",
             "Use pi.propose_record for durable memory updates instead of directly mutating the store.",
             "Use pi.list_patches and pi.inspect_patch before applying queued patches.",
-        "The JSONL store now uses a local store.lock file to serialize mutating operations.",
+            "Use pi.supersede_record, pi.tombstone_record, and pi.reinforce_record for belief revision.",
+            "The JSONL store now uses a local store.lock file to serialize mutating operations.",
             "Identity-level records and risky mutations may require force/manual review.",
         ]
         .join("\n");
@@ -239,6 +242,122 @@ impl McpStdioServer {
                 }
             },
             {
+                "name": "pi.supersede_record",
+                "description": "Propose a supersession patch that replaces an active record with a new governed claim.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "target_id": { "type": "string" },
+                        "class": {
+                            "type": "string",
+                            "enum": [
+                                "identity_rule",
+                                "preference",
+                                "project_state",
+                                "requirement",
+                                "correction",
+                                "workflow",
+                                "observation",
+                                "evidence_note"
+                            ]
+                        },
+                        "claim": { "type": "string" },
+                        "confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.75
+                        },
+                        "project": { "type": "string" },
+                        "tags": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "default": []
+                        },
+                        "evidence_uri": { "type": "string" },
+                        "evidence_kind": {
+                            "type": "string",
+                            "enum": [
+                                "conversation",
+                                "file",
+                                "url",
+                                "test",
+                                "commit",
+                                "user_correction",
+                                "human_review"
+                            ],
+                            "default": "conversation"
+                        },
+                        "reason": { "type": "string" },
+                        "apply": { "type": "boolean", "default": false },
+                        "force": { "type": "boolean", "default": false }
+                    },
+                    "required": ["target_id", "class", "claim", "reason"]
+                }
+            },
+            {
+                "name": "pi.tombstone_record",
+                "description": "Propose a tombstone patch for an active record while preserving audit history.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "target_id": { "type": "string" },
+                        "evidence_uri": { "type": "string" },
+                        "evidence_kind": {
+                            "type": "string",
+                            "enum": [
+                                "conversation",
+                                "file",
+                                "url",
+                                "test",
+                                "commit",
+                                "user_correction",
+                                "human_review"
+                            ],
+                            "default": "conversation"
+                        },
+                        "reason": { "type": "string" },
+                        "apply": { "type": "boolean", "default": false },
+                        "force": { "type": "boolean", "default": false }
+                    },
+                    "required": ["target_id", "reason"]
+                }
+            },
+            {
+                "name": "pi.reinforce_record",
+                "description": "Propose a reinforcement patch that adds evidence and increases confidence for an active record.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "target_id": { "type": "string" },
+                        "evidence_uri": { "type": "string" },
+                        "evidence_kind": {
+                            "type": "string",
+                            "enum": [
+                                "conversation",
+                                "file",
+                                "url",
+                                "test",
+                                "commit",
+                                "user_correction",
+                                "human_review"
+                            ],
+                            "default": "conversation"
+                        },
+                        "reason": {
+                            "type": "string",
+                            "default": "reinforce record with new evidence"
+                        },
+                        "apply": { "type": "boolean", "default": false },
+                        "force": { "type": "boolean", "default": false }
+                    },
+                    "required": ["target_id", "evidence_uri"]
+                }
+            },
+            {
                 "name": "pi.apply_patch",
                 "description": "Apply an existing proposed PI patch by ID.",
                 "inputSchema": {
@@ -339,6 +458,9 @@ impl McpStdioServer {
         match name.as_str() {
             "pi.retrieve_context" => self.tool_retrieve_context(arguments),
             "pi.propose_record" => self.tool_propose_record(arguments),
+            "pi.supersede_record" => self.tool_supersede_record(arguments),
+            "pi.tombstone_record" => self.tool_tombstone_record(arguments),
+            "pi.reinforce_record" => self.tool_reinforce_record(arguments),
             "pi.apply_patch" => self.tool_apply_patch(arguments),
             "pi.list_patches" => self.tool_list_patches(arguments),
             "pi.inspect_patch" => self.tool_inspect_patch(arguments),
@@ -416,6 +538,136 @@ impl McpStdioServer {
         let text = serde_json::to_string_pretty(&result)?;
 
         Ok(tool_result(text, serde_json::to_value(result)?))
+    }
+
+    fn tool_supersede_record(&self, args: Value) -> Result<Value> {
+        let target_id = required_string(&args, "target_id")?;
+        let class_raw = required_string(&args, "class")?;
+        let class = RecordClass::from_str(&class_raw).map_err(anyhow::Error::msg)?;
+        let claim = required_string(&args, "claim")?;
+        let confidence = optional_f32(&args, "confidence").unwrap_or(0.75);
+        let project = optional_string(&args, "project");
+        let tags = optional_string_array(&args, "tags")?.unwrap_or_default();
+        let reason = required_string(&args, "reason")?;
+        let apply = optional_bool(&args, "apply").unwrap_or(false);
+        let force = optional_bool(&args, "force").unwrap_or(false);
+
+        let evidence_refs = match optional_string(&args, "evidence_uri") {
+            Some(uri) => {
+                let evidence_kind_raw = optional_string(&args, "evidence_kind")
+                    .unwrap_or_else(|| "conversation".to_string());
+                let evidence_kind =
+                    EvidenceKind::from_str(&evidence_kind_raw).map_err(anyhow::Error::msg)?;
+                vec![EvidenceRef::new(evidence_kind, uri)]
+            }
+            None => Vec::new(),
+        };
+
+        let scope = match project {
+            Some(project_key) => Scope::project(project_key),
+            None => Scope::global(),
+        };
+
+        match self.engine.supersede_record(
+            SupersedeInput {
+                target_id: target_id.clone(),
+                class,
+                claim,
+                confidence,
+                scope,
+                tags,
+                evidence_refs,
+                reason,
+            },
+            apply,
+            force,
+        ) {
+            Ok(result) => {
+                let text = serde_json::to_string_pretty(&result)?;
+                Ok(tool_result(text, serde_json::to_value(result)?))
+            }
+            Err(error) => Ok(tool_error(
+                error.to_string(),
+                json!({
+                    "code": "supersede_record_failed",
+                    "target_id": target_id
+                }),
+            )),
+        }
+    }
+
+    fn tool_tombstone_record(&self, args: Value) -> Result<Value> {
+        let target_id = required_string(&args, "target_id")?;
+        let reason = required_string(&args, "reason")?;
+        let apply = optional_bool(&args, "apply").unwrap_or(false);
+        let force = optional_bool(&args, "force").unwrap_or(false);
+
+        let evidence_refs = match optional_string(&args, "evidence_uri") {
+            Some(uri) => {
+                let evidence_kind_raw = optional_string(&args, "evidence_kind")
+                    .unwrap_or_else(|| "conversation".to_string());
+                let evidence_kind =
+                    EvidenceKind::from_str(&evidence_kind_raw).map_err(anyhow::Error::msg)?;
+                vec![EvidenceRef::new(evidence_kind, uri)]
+            }
+            None => Vec::new(),
+        };
+
+        match self.engine.tombstone_record(
+            TombstoneInput {
+                target_id: target_id.clone(),
+                evidence_refs,
+                reason,
+            },
+            apply,
+            force,
+        ) {
+            Ok(result) => {
+                let text = serde_json::to_string_pretty(&result)?;
+                Ok(tool_result(text, serde_json::to_value(result)?))
+            }
+            Err(error) => Ok(tool_error(
+                error.to_string(),
+                json!({
+                    "code": "tombstone_record_failed",
+                    "target_id": target_id
+                }),
+            )),
+        }
+    }
+
+    fn tool_reinforce_record(&self, args: Value) -> Result<Value> {
+        let target_id = required_string(&args, "target_id")?;
+        let evidence_uri = required_string(&args, "evidence_uri")?;
+        let evidence_kind_raw =
+            optional_string(&args, "evidence_kind").unwrap_or_else(|| "conversation".to_string());
+        let evidence_kind = EvidenceKind::from_str(&evidence_kind_raw).map_err(anyhow::Error::msg)?;
+        let reason = optional_string(&args, "reason")
+            .unwrap_or_else(|| "reinforce record with new evidence".to_string());
+        let apply = optional_bool(&args, "apply").unwrap_or(false);
+        let force = optional_bool(&args, "force").unwrap_or(false);
+
+        match self.engine.reinforce_record(
+            ReinforceInput {
+                target_id: target_id.clone(),
+                evidence_refs: vec![EvidenceRef::new(evidence_kind, evidence_uri)],
+                reason,
+            },
+            apply,
+            force,
+        ) {
+            Ok(result) => {
+                let text = serde_json::to_string_pretty(&result)?;
+                Ok(tool_result(text, serde_json::to_value(result)?))
+            }
+            Err(error) => Ok(tool_error(
+                error.to_string(),
+                json!({
+                    "code": "reinforce_record_failed",
+                    "target_id": target_id
+                }),
+            )),
+        }
     }
 
     fn tool_apply_patch(&self, args: Value) -> Result<Value> {

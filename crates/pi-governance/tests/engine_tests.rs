@@ -1,5 +1,7 @@
 use pi_core::{EvidenceKind, EvidenceRef, RecordClass, Scope};
-use pi_governance::{GovernanceEngine, MigrationInput, ProposalInput};
+use pi_governance::{
+    GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, SupersedeInput, TombstoneInput,
+};
 use pi_store::JsonlStore;
 use std::fs;
 use std::path::PathBuf;
@@ -69,6 +71,105 @@ fn migration_dry_run_reports_legacy_store_without_rewriting() -> anyhow::Result<
     assert!(report.migration_needed);
     assert!(report.backup.is_none());
     assert!(!fs::read_to_string(root.join("events.jsonl"))?.contains("schema_version"));
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Result<()> {
+    let root = temp_store_dir("belief-revision");
+    let engine = GovernanceEngine::new(JsonlStore::new(&root));
+    engine.init()?;
+
+    let original = engine.propose_record(
+        ProposalInput {
+            class: RecordClass::Requirement,
+            claim: "Belief revision should be represented through governed patches.".to_string(),
+            confidence: 0.70,
+            scope: Scope::project("pi-governance-rs"),
+            tags: vec!["belief-revision".to_string()],
+            evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:original")],
+            reason: Some("original claim".to_string()),
+        },
+        true,
+        false,
+    )?;
+
+    let original_id = original.record_id.expect("original record id");
+
+    let reinforce = engine.reinforce_record(
+        ReinforceInput {
+            target_id: original_id.clone(),
+            evidence_refs: vec![EvidenceRef::new(EvidenceKind::Test, "test:reinforcement")],
+            reason: "additional evidence supports the claim".to_string(),
+        },
+        true,
+        false,
+    )?;
+
+    assert!(reinforce.applied);
+
+    let reinforced = engine
+        .list_records(10)?
+        .into_iter()
+        .find(|record| record.id == original_id)
+        .expect("reinforced record should exist");
+
+    assert!(reinforced.confidence > 0.70);
+    assert_eq!(reinforced.evidence.len(), 2);
+
+    let supersede = engine.supersede_record(
+        SupersedeInput {
+            target_id: original_id.clone(),
+            class: RecordClass::Requirement,
+            claim: "Belief revision should support reinforcement, supersession, and tombstones."
+                .to_string(),
+            confidence: 0.82,
+            scope: Scope::project("pi-governance-rs"),
+            tags: vec!["belief-revision".to_string(), "supersession".to_string()],
+            evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:supersede")],
+            reason: "the claim has been refined after implementation".to_string(),
+        },
+        true,
+        true,
+    )?;
+
+    assert!(supersede.applied);
+    let replacement_id = supersede.record_id.expect("replacement record id");
+
+    let records = engine.list_records(20)?;
+    let old = records
+        .iter()
+        .find(|record| record.id == original_id)
+        .expect("old record should still be auditable");
+    let replacement = records
+        .iter()
+        .find(|record| record.id == replacement_id)
+        .expect("replacement record should exist");
+
+    assert!(matches!(old.status, pi_core::RecordStatus::Superseded));
+    assert!(replacement.supersedes.contains(&original_id));
+
+    let tombstone = engine.tombstone_record(
+        TombstoneInput {
+            target_id: replacement_id.clone(),
+            evidence_refs: vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:tombstone")],
+            reason: "remove refined test record after validating tombstone flow".to_string(),
+        },
+        true,
+        true,
+    )?;
+
+    assert!(tombstone.applied);
+
+    let tombstoned = engine
+        .list_records(20)?
+        .into_iter()
+        .find(|record| record.id == replacement_id)
+        .expect("replacement should remain in audit history");
+
+    assert!(matches!(tombstoned.status, pi_core::RecordStatus::Tombstoned));
 
     fs::remove_dir_all(root)?;
     Ok(())

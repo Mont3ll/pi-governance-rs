@@ -27,6 +27,32 @@ pub struct MigrationInput {
     pub backup: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct SupersedeInput {
+    pub target_id: String,
+    pub class: RecordClass,
+    pub claim: String,
+    pub confidence: f32,
+    pub scope: Scope,
+    pub tags: Vec<String>,
+    pub evidence_refs: Vec<EvidenceRef>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct TombstoneInput {
+    pub target_id: String,
+    pub evidence_refs: Vec<EvidenceRef>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReinforceInput {
+    pub target_id: String,
+    pub evidence_refs: Vec<EvidenceRef>,
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ProposalResult {
     pub patch_id: String,
@@ -159,6 +185,158 @@ impl GovernanceEngine {
         Ok(ProposalResult {
             patch_id: patch.id,
             record_id: Some(record.id),
+            decision,
+            queued: true,
+            applied,
+        })
+    }
+
+    pub fn supersede_record(
+        &self,
+        input: SupersedeInput,
+        apply_now: bool,
+        force: bool,
+    ) -> Result<ProposalResult> {
+        self.store.init()?;
+        let session = self.store.write_session()?;
+
+        let replacement = Record::new(
+            input.class,
+            input.claim,
+            input.confidence,
+            input.scope,
+            input.tags,
+            input.evidence_refs,
+        );
+
+        let patch = Patch::supersede_record(input.target_id, replacement.clone(), input.reason);
+        let existing = session.load_records()?;
+        let decision = validate_patch(&patch, &existing);
+
+        if decision.status == DecisionStatus::Reject {
+            session.append_patch(&patch.rejected_copy())?;
+            session.append_event(&StoreEvent::warning(
+                "supersede patch rejected by governance policy",
+                Some(patch.id.clone()),
+            ))?;
+
+            return Ok(ProposalResult {
+                patch_id: patch.id,
+                record_id: Some(replacement.id),
+                decision,
+                queued: false,
+                applied: false,
+            });
+        }
+
+        session.append_patch(&patch)?;
+
+        let mut applied = false;
+
+        if apply_now {
+            Self::apply_patch_object_locked(&session, &patch, force)?;
+            applied = true;
+        }
+
+        Ok(ProposalResult {
+            patch_id: patch.id,
+            record_id: Some(replacement.id),
+            decision,
+            queued: true,
+            applied,
+        })
+    }
+
+    pub fn tombstone_record(
+        &self,
+        input: TombstoneInput,
+        apply_now: bool,
+        force: bool,
+    ) -> Result<ProposalResult> {
+        self.store.init()?;
+        let session = self.store.write_session()?;
+
+        let target_id = input.target_id.clone();
+        let patch = Patch::tombstone_record(input.target_id, input.evidence_refs, input.reason);
+        let existing = session.load_records()?;
+        let decision = validate_patch(&patch, &existing);
+
+        if decision.status == DecisionStatus::Reject {
+            session.append_patch(&patch.rejected_copy())?;
+            session.append_event(&StoreEvent::warning(
+                "tombstone patch rejected by governance policy",
+                Some(patch.id.clone()),
+            ))?;
+
+            return Ok(ProposalResult {
+                patch_id: patch.id,
+                record_id: Some(target_id),
+                decision,
+                queued: false,
+                applied: false,
+            });
+        }
+
+        session.append_patch(&patch)?;
+
+        let mut applied = false;
+
+        if apply_now {
+            Self::apply_patch_object_locked(&session, &patch, force)?;
+            applied = true;
+        }
+
+        Ok(ProposalResult {
+            patch_id: patch.id,
+            record_id: Some(target_id),
+            decision,
+            queued: true,
+            applied,
+        })
+    }
+
+    pub fn reinforce_record(
+        &self,
+        input: ReinforceInput,
+        apply_now: bool,
+        force: bool,
+    ) -> Result<ProposalResult> {
+        self.store.init()?;
+        let session = self.store.write_session()?;
+
+        let target_id = input.target_id.clone();
+        let patch = Patch::reinforce_record(input.target_id, input.evidence_refs, input.reason);
+        let existing = session.load_records()?;
+        let decision = validate_patch(&patch, &existing);
+
+        if decision.status == DecisionStatus::Reject {
+            session.append_patch(&patch.rejected_copy())?;
+            session.append_event(&StoreEvent::warning(
+                "reinforce patch rejected by governance policy",
+                Some(patch.id.clone()),
+            ))?;
+
+            return Ok(ProposalResult {
+                patch_id: patch.id,
+                record_id: Some(target_id),
+                decision,
+                queued: false,
+                applied: false,
+            });
+        }
+
+        session.append_patch(&patch)?;
+
+        let mut applied = false;
+
+        if apply_now {
+            Self::apply_patch_object_locked(&session, &patch, force)?;
+            applied = true;
+        }
+
+        Ok(ProposalResult {
+            patch_id: patch.id,
+            record_id: Some(target_id),
             decision,
             queued: true,
             applied,

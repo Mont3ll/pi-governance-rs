@@ -1,5 +1,5 @@
 use pi_core::{
-    validate_record, DecisionStatus, EvidenceKind, EvidenceRef, Record, RecordClass, Scope,
+    validate_patch, validate_record, DecisionStatus, EvidenceKind, EvidenceRef, Patch, Record, RecordClass, Scope,
 };
 
 #[test]
@@ -36,4 +36,30 @@ fn identity_level_records_require_manual_review() {
         .reasons
         .iter()
         .any(|reason| reason.contains("identity-level")));
+}
+
+#[test]
+fn tombstone_patches_require_manual_review() {
+    let record = Record::new(
+        RecordClass::Requirement,
+        "Records should be tombstoned rather than physically deleted from the audit trail.",
+        0.80,
+        Scope::global(),
+        vec!["audit".to_string()],
+        vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:test")],
+    );
+
+    let patch = Patch::tombstone_record(
+        record.id.clone(),
+        vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:test")],
+        "human requested removal while retaining audit history",
+    );
+
+    let decision = validate_patch(&patch, &[record]);
+
+    assert_eq!(decision.status, DecisionStatus::ManualReview);
+    assert!(decision
+        .reasons
+        .iter()
+        .any(|reason| reason.contains("tombstone requires review")));
 }

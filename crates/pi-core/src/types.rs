@@ -277,6 +277,69 @@ impl Patch {
         }
     }
 
+    pub fn supersede_record(
+        target_id: impl Into<String>,
+        replacement: Record,
+        reason: impl Into<String>,
+    ) -> Self {
+        let now = Utc::now();
+
+        Self {
+            schema_version: current_schema_version(),
+            id: format!("patch_{}", Uuid::new_v4()),
+            operation: PatchOperation::SupersedeRecord,
+            status: PatchStatus::Proposed,
+            target_id: Some(target_id.into()),
+            evidence: replacement.evidence.clone(),
+            proposed_record: Some(replacement),
+            reason: reason.into(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    pub fn tombstone_record(
+        target_id: impl Into<String>,
+        evidence: Vec<EvidenceRef>,
+        reason: impl Into<String>,
+    ) -> Self {
+        let now = Utc::now();
+
+        Self {
+            schema_version: current_schema_version(),
+            id: format!("patch_{}", Uuid::new_v4()),
+            operation: PatchOperation::TombstoneRecord,
+            status: PatchStatus::Proposed,
+            target_id: Some(target_id.into()),
+            evidence,
+            proposed_record: None,
+            reason: reason.into(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    pub fn reinforce_record(
+        target_id: impl Into<String>,
+        evidence: Vec<EvidenceRef>,
+        reason: impl Into<String>,
+    ) -> Self {
+        let now = Utc::now();
+
+        Self {
+            schema_version: current_schema_version(),
+            id: format!("patch_{}", Uuid::new_v4()),
+            operation: PatchOperation::ReinforceRecord,
+            status: PatchStatus::Proposed,
+            target_id: Some(target_id.into()),
+            evidence,
+            proposed_record: None,
+            reason: reason.into(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
     pub fn applied_copy(&self) -> Self {
         let mut patch = self.clone();
         patch.status = PatchStatus::Applied;

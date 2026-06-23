@@ -1,6 +1,6 @@
 # PI Governance Rust Port
 
-Current milestone: `0.4.0`.
+Current milestone: `0.5.0`.
 
 This workspace is a portable Rust implementation of a PI-style governance layer for coding agents. It exposes a CLI and an MCP stdio server around a governed JSONL store.
 
@@ -11,15 +11,16 @@ crates/
   pi-core/        Core records, patches, evidence, policy, schema constants
   pi-store/       JSONL store, file locking, backups, schema migrations
   pi-retrieval/   Deterministic context retrieval
-  pi-governance/  Runtime engine: propose, apply, retrieve, doctor, migrate
+  pi-governance/  Runtime engine: propose, apply, retrieve, doctor, migrate, revise beliefs
   pi-mcp/         MCP stdio adapter
   pi-cli/         `pi` command-line interface
 ```
 
-## Build
+## Build and test
 
 ```bash
 cargo check --workspace
+cargo test --workspace
 cargo build -p pi-cli
 ```
 
@@ -51,6 +52,55 @@ The store is local runtime data and should not be committed.
   "React preview fidelity requirements" \
   --project figma-landing \
   --budget 900
+```
+
+## Belief revision
+
+v0.5.0 adds governed belief-revision commands. These create normal patches, so each operation is visible through `list-patches`, inspectable with `inspect-patch`, and applied with `apply` unless `--apply` is provided.
+
+### Reinforce a record
+
+Reinforcement adds new evidence to an active record and increases confidence by a bounded amount.
+
+```bash
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi reinforce <record_id> \
+  --evidence-uri test:reinforcement \
+  --evidence-kind test \
+  --reason "new tests support this stored claim" \
+  --apply
+```
+
+### Supersede a record
+
+Supersession marks the target record as `Superseded` and creates a replacement record that references the old record in `supersedes`.
+
+Supersession requires manual review by policy, so use `--force` only when explicitly approved.
+
+```bash
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi supersede <record_id> \
+  --class requirement \
+  --claim "Belief revision must support reinforcement, supersession, and tombstones." \
+  --project pi-governance-rs \
+  --tag belief-revision \
+  --evidence-uri conversation:v0.5.0 \
+  --reason "the original claim was refined after implementation" \
+  --apply \
+  --force
+```
+
+### Tombstone a record
+
+Tombstoning marks an active record as `Tombstoned` while retaining it in the audit trail.
+
+Tombstones require manual review by policy, so applying immediately requires `--force`.
+
+```bash
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi tombstone <record_id> \
+  --evidence-uri review:v0.5.0 \
+  --evidence-kind human-review \
+  --reason "record is no longer valid but must remain auditable" \
+  --apply \
+  --force
 ```
 
 ## Patch visibility
@@ -99,7 +149,7 @@ warnings/errors
 
 ## Migrations
 
-v0.4.0 adds schema migration support for legacy JSONL files. Older records created before v0.3.0 may be missing `schema_version`. That is expected until they are migrated.
+v0.4.0 added schema migration support for legacy JSONL files. Older records created before v0.3.0 may be missing `schema_version`. That is expected until they are migrated.
 
 Preview migration changes without rewriting files:
 
@@ -160,6 +210,9 @@ MCP tools exposed:
 ```text
 pi.retrieve_context
 pi.propose_record
+pi.supersede_record
+pi.tombstone_record
+pi.reinforce_record
 pi.apply_patch
 pi.list_patches
 pi.inspect_patch
@@ -168,17 +221,16 @@ pi.doctor
 pi.list_records
 ```
 
-## v0.4.0 changes
+## v0.5.0 changes
 
-- Adds `pi migrate`.
-- Adds `pi migrate --dry-run`.
-- Adds `pi migrate --backup`.
-- Adds `pi doctor --json` documentation and migration-needed reporting.
-- Adds `pi.migrate_schema` MCP tool.
-- Adds schema migration reports with per-file counts.
-- Adds timestamped store backups under `.pi/backups/`.
-- Adds test scaffolding for policy, store migrations, governance engine flows, and MCP server construction.
-- Updates package, CLI, and MCP server version to `0.4.0`.
+- Adds `pi reinforce`.
+- Adds `pi supersede`.
+- Adds `pi tombstone`.
+- Adds MCP tools `pi.reinforce_record`, `pi.supersede_record`, and `pi.tombstone_record`.
+- Adds patch constructors for reinforcement, supersession, and tombstoning.
+- Adds governance engine methods for belief revision.
+- Adds tests covering reinforcement, supersession, and tombstone flows.
+- Updates package, CLI, and MCP server version to `0.5.0`.
 
 ## Git safety
 
