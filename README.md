@@ -1,6 +1,6 @@
 # pi-governance-rs
 
-Current milestone: `1.0.0-rc.1`.
+Current milestone: `1.0.0-rc.2`.
 
 A Rust port of the PI governance layer for coding agents. The runtime exposes governed memory operations through a CLI and an MCP stdio server while keeping mutations patch-governed, inspectable, and auditable.
 
@@ -377,3 +377,7 @@ cargo build -p pi-cli
 ./target/debug/pi smoke-test
 ./target/debug/pi release-audit
 ```
+
+## v1.0.0-rc.2 release-candidate soak and compatibility pass
+
+This release candidate verifies fresh-user install, README examples, MCP client config, MCP smoke flows, clean-store import/export portability, namespace and policy behavior after fresh init, JSON diagnostics, and release-audit output. It adds no new governance semantics and preserves the frozen CLI command names and MCP tool names from `v1.0.0-rc.1`.

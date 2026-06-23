@@ -1,5 +1,10 @@
 # Release candidate notes
 
+
+## v1.0.0-rc.2 compatibility notes
+
+`v1.0.0-rc.2` is a release-candidate soak and compatibility pass. It verifies fresh-user clean clone installation, README examples, MCP client configuration, MCP smoke flows, clean-store import/export portability, namespace and policy behavior after fresh init, JSON diagnostics, and release-audit output. It adds no new governance semantics and does not remove or rename any CLI commands or MCP tools.
+
 ## v1.0.0-rc.1 — first release candidate
 
 This sprint is a release-candidate packaging sprint only. It adds no new governance semantics and preserves the JSONL store, existing CLI behavior, and existing MCP behavior.

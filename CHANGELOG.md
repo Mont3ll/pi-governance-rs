@@ -1,5 +1,13 @@
 # Changelog
 
+- v1.0.0-rc.2 — release-candidate soak and compatibility pass
+  - Verifies fresh-user clean clone installation.
+  - Verifies README and release documentation examples.
+  - Verifies MCP client configuration and MCP smoke flows.
+  - Verifies clean-store import/export portability.
+  - Verifies namespace and policy behavior after fresh init.
+  - Verifies JSON diagnostics and release-audit output.
+  - Adds no new governance semantics.
 - v1.0.0-rc.1 — first release candidate
   - Freezes the public CLI command-name surface for the release candidate.
   - Freezes MCP tool names for the release candidate.
