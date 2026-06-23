@@ -1,5 +1,6 @@
 # Changelog
 
+- v0.10.1 audit and release-candidate cleanup
 - v0.10.0 release hardening and adapter polish
 - v0.9.0 policy profiles and operating modes
 - v0.8.0 namespace isolation

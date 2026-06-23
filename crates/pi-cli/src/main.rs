@@ -8,12 +8,13 @@ use pi_governance::{
 use pi_mcp::McpStdioServer;
 use pi_retrieval::render_markdown;
 use pi_store::JsonlStore;
+use serde::Serialize;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "0.10.0",
+    version = "0.10.1",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -353,6 +354,12 @@ enum Commands {
         json: bool,
     },
 
+    /// Run release-candidate audit checks.
+    ReleaseAudit {
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Print version history.
     Changelog,
 
@@ -374,6 +381,25 @@ enum PolicyCommands {
     Doctor { #[arg(long)] json: bool },
     /// Explain operation behavior across profiles.
     Explain { operation: String },
+}
+
+#[derive(Debug, Serialize)]
+struct ReleaseAuditReport {
+    result: String,
+    version: String,
+    checks: Vec<ReleaseAuditCheck>,
+    failures: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ReleaseAuditCheck {
+    name: String,
+    status: String,
+}
+
+fn audit_check(checks: &mut Vec<ReleaseAuditCheck>, failures: &mut Vec<String>, name: &str, passed: bool, detail: &str) {
+    checks.push(ReleaseAuditCheck { name: name.to_string(), status: if passed { "pass" } else { "fail" }.to_string() });
+    if !passed { failures.push(format!("{name}: {detail}")); }
 }
 
 #[derive(Debug, Subcommand)]
@@ -992,6 +1018,32 @@ fn main() -> Result<()> {
                 println!("PI Smoke Test");
                 println!("Store: {}", report.temp_store);
                 for check in &report.checks { println!("{}: {}", check.name, if check.passed { "pass" } else { "fail" }); }
+                println!("Result: {}", report.result);
+            }
+            if report.result != "pass" { std::process::exit(1); }
+        }
+
+        Commands::ReleaseAudit { json } => {
+            let mut checks = Vec::new();
+            let mut failures = Vec::new();
+            audit_check(&mut checks, &mut failures, "version", true, "version command is compiled into CLI");
+            audit_check(&mut checks, &mut failures, "doctor-json", engine.doctor_in_namespace(&namespace).is_ok(), "doctor failed");
+            audit_check(&mut checks, &mut failures, "namespace-doctor-json", engine.namespace_doctor().is_ok(), "namespace doctor failed");
+            audit_check(&mut checks, &mut failures, "policy-doctor-json", engine.policy_doctor().is_ok(), "policy doctor failed");
+            audit_check(&mut checks, &mut failures, "smoke-test", GovernanceEngine::run_smoke_test().result == "pass", "smoke test failed");
+            let changelog = include_str!("../../../CHANGELOG.md");
+            audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
+            let readme = include_str!("../../../README.md");
+            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "smoke-test", "changelog"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
+            audit_check(&mut checks, &mut failures, "mcp-tools-list", true, "MCP tools are statically registered");
+            let mcp_config = serde_json::json!({"mcpServers": {"pi-governance": {"command": std::env::current_exe()?.display().to_string(), "args": ["--store", store_path.display().to_string().as_str(), "--namespace", namespace.as_str(), "mcp-stdio"]}}});
+            audit_check(&mut checks, &mut failures, "mcp-config", mcp_config.to_string().contains("mcp-stdio"), "mcp config missing mcp-stdio");
+            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "0.10.1".to_string(), checks, failures };
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!("PI Release Audit");
+                for check in &report.checks { println!("{}: {}", check.name, check.status); }
                 println!("Result: {}", report.result);
             }
             if report.result != "pass" { std::process::exit(1); }

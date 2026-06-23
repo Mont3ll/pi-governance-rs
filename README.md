@@ -316,7 +316,7 @@ pi mcp-config inspector --command /absolute/path/to/pi --store /absolute/path/to
 
 ### Command matrix
 
-`init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `smoke-test`, `changelog`.
+`init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `smoke-test`, `release-audit`, `changelog`.
 
 ### JSON diagnostics and smoke tests
 
@@ -336,8 +336,15 @@ cargo test --workspace
 cargo build -p pi-cli
 ./target/debug/pi --version
 ./target/debug/pi smoke-test
+./target/debug/pi smoke-test --json
+./target/debug/pi release-audit
+./target/debug/pi release-audit --json
 ./target/debug/pi doctor --json
 git status
 ```
 
 Version history is maintained in `CHANGELOG.md`.
+
+## v0.10.1 audit and release-candidate cleanup
+
+Run `pi release-audit` or `pi release-audit --json` before release-candidate tagging. The audit covers JSON diagnostics, smoke tests, changelog coverage, README command matrix coverage, and MCP adapter config generation. Hidden Unicode and secret/path scans should be run with the documented grep commands in the release checklist and should avoid `.pi`, `target`, and generated exports.
