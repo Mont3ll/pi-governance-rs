@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Utc};
 use pi_core::{
-    validate_patch, validate_record, ContextBundle, DecisionStatus, EvidenceRef,
+    validate_patch, validate_record, ContestResolution, ContextBundle, DecisionStatus, EvidenceRef,
     GovernanceDecision, Patch, PatchOperation, PatchStatus, Record, RecordClass, RecordStatus,
     RetrievalBudget, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
 };
@@ -49,6 +49,26 @@ pub struct TombstoneInput {
 #[derive(Debug, Clone)]
 pub struct ReinforceInput {
     pub target_id: String,
+    pub evidence_refs: Vec<EvidenceRef>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ContestInput {
+    pub target_id: String,
+    pub evidence_refs: Vec<EvidenceRef>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolveContestInput {
+    pub target_id: String,
+    pub resolution: ContestResolution,
+    pub class: Option<RecordClass>,
+    pub claim: Option<String>,
+    pub confidence: f32,
+    pub scope: Scope,
+    pub tags: Vec<String>,
     pub evidence_refs: Vec<EvidenceRef>,
     pub reason: String,
 }
@@ -106,6 +126,7 @@ pub struct DoctorReport {
     pub active_records: usize,
     pub superseded_records: usize,
     pub tombstoned_records: usize,
+    pub contested_records: usize,
     pub total_patches: usize,
     pub proposed_patches_latest: usize,
     pub applied_patches_latest: usize,
@@ -343,6 +364,131 @@ impl GovernanceEngine {
         })
     }
 
+    pub fn contest_record(
+        &self,
+        input: ContestInput,
+        apply_now: bool,
+        force: bool,
+    ) -> Result<ProposalResult> {
+        self.store.init()?;
+        let session = self.store.write_session()?;
+
+        let target_id = input.target_id.clone();
+        let patch = Patch::contest_record(input.target_id, input.evidence_refs, input.reason);
+        let existing = session.load_records()?;
+        let decision = validate_patch(&patch, &existing);
+
+        if decision.status == DecisionStatus::Reject {
+            session.append_patch(&patch.rejected_copy())?;
+            session.append_event(&StoreEvent::warning(
+                "contest patch rejected by governance policy",
+                Some(patch.id.clone()),
+            ))?;
+
+            return Ok(ProposalResult {
+                patch_id: patch.id,
+                record_id: Some(target_id),
+                decision,
+                queued: false,
+                applied: false,
+            });
+        }
+
+        session.append_patch(&patch)?;
+
+        let mut applied = false;
+
+        if apply_now {
+            Self::apply_patch_object_locked(&session, &patch, force)?;
+            applied = true;
+        }
+
+        Ok(ProposalResult {
+            patch_id: patch.id,
+            record_id: Some(target_id),
+            decision,
+            queued: true,
+            applied,
+        })
+    }
+
+    pub fn resolve_contest(
+        &self,
+        input: ResolveContestInput,
+        apply_now: bool,
+        force: bool,
+    ) -> Result<ProposalResult> {
+        self.store.init()?;
+        let session = self.store.write_session()?;
+
+        let target_id = input.target_id.clone();
+        let replacement = match input.resolution {
+            ContestResolution::Supersede => {
+                let class = input
+                    .class
+                    .context("resolve_contest supersede requires --class")?;
+                let claim = input
+                    .claim
+                    .clone()
+                    .context("resolve_contest supersede requires --claim")?;
+
+                Some(Record::new(
+                    class,
+                    claim,
+                    input.confidence,
+                    input.scope.clone(),
+                    input.tags.clone(),
+                    input.evidence_refs.clone(),
+                ))
+            }
+            ContestResolution::Uphold | ContestResolution::Tombstone => None,
+        };
+
+        let replacement_id = replacement.as_ref().map(|record| record.id.clone());
+        let patch = Patch::resolve_contest(
+            input.target_id,
+            input.resolution,
+            replacement,
+            input.evidence_refs,
+            input.reason,
+        );
+        let existing = session.load_records()?;
+        let decision = validate_patch(&patch, &existing);
+
+        if decision.status == DecisionStatus::Reject {
+            session.append_patch(&patch.rejected_copy())?;
+            session.append_event(&StoreEvent::warning(
+                "contest resolution patch rejected by governance policy",
+                Some(patch.id.clone()),
+            ))?;
+
+            return Ok(ProposalResult {
+                patch_id: patch.id,
+                record_id: replacement_id.or(Some(target_id)),
+                decision,
+                queued: false,
+                applied: false,
+            });
+        }
+
+        session.append_patch(&patch)?;
+
+        let mut applied = false;
+
+        if apply_now {
+            Self::apply_patch_object_locked(&session, &patch, force)?;
+            applied = true;
+        }
+
+        Ok(ProposalResult {
+            patch_id: patch.id,
+            record_id: replacement_id.or(Some(target_id)),
+            decision,
+            queued: true,
+            applied,
+        })
+    }
+
     pub fn apply_patch_by_id(&self, patch_id: &str, force: bool) -> Result<ApplyPatchResult> {
         self.store.init()?;
         let session = self.store.write_session()?;
@@ -453,6 +599,66 @@ impl GovernanceEngine {
                         record.confidence = (record.confidence + 0.05).min(1.0);
                         record.evidence.extend(patch.evidence.clone());
                         record.updated_at = Utc::now();
+                    }
+                }
+            }
+
+            PatchOperation::ContestRecord => {
+                let target_id = patch
+                    .target_id
+                    .as_ref()
+                    .context("contest patch missing target_id")?;
+
+                for record in &mut records {
+                    if &record.id == target_id {
+                        record.status = RecordStatus::Contested;
+                        record.updated_at = Utc::now();
+                    }
+                }
+            }
+
+            PatchOperation::ResolveContest => {
+                let target_id = patch
+                    .target_id
+                    .as_ref()
+                    .context("resolve contest patch missing target_id")?;
+                let resolution = patch
+                    .contest_resolution
+                    .as_ref()
+                    .context("resolve contest patch missing contest_resolution")?;
+
+                match resolution {
+                    ContestResolution::Uphold => {
+                        for record in &mut records {
+                            if &record.id == target_id {
+                                record.status = RecordStatus::Active;
+                                record.updated_at = Utc::now();
+                            }
+                        }
+                    }
+                    ContestResolution::Tombstone => {
+                        for record in &mut records {
+                            if &record.id == target_id {
+                                record.status = RecordStatus::Tombstoned;
+                                record.updated_at = Utc::now();
+                            }
+                        }
+                    }
+                    ContestResolution::Supersede => {
+                        for record in &mut records {
+                            if &record.id == target_id {
+                                record.status = RecordStatus::Superseded;
+                                record.updated_at = Utc::now();
+                            }
+                        }
+
+                        let mut replacement = patch
+                            .proposed_record
+                            .clone()
+                            .context("resolve contest supersede patch missing replacement record")?;
+
+                        replacement.supersedes.push(target_id.clone());
+                        records.push(replacement);
                     }
                 }
             }
@@ -601,6 +807,11 @@ impl GovernanceEngine {
             .filter(|record| record.status == RecordStatus::Tombstoned)
             .count();
 
+        let contested_records = records
+            .iter()
+            .filter(|record| record.status == RecordStatus::Contested)
+            .count();
+
         for record in &records {
             let decision = validate_record(record, &[]);
 
@@ -681,6 +892,7 @@ impl GovernanceEngine {
             active_records,
             superseded_records,
             tombstoned_records,
+            contested_records,
             total_patches: patches.len(),
             proposed_patches_latest,
             applied_patches_latest,

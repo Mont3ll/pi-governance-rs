@@ -1,6 +1,7 @@
 pub mod engine;
 
 pub use engine::{
-    ApplyPatchResult, DoctorReport, GovernanceEngine, MigrationInput, PatchInspection, PatchSummary,
-    ProposalInput, ProposalResult, ReinforceInput, SupersedeInput, TombstoneInput,
+    ApplyPatchResult, ContestInput, DoctorReport, GovernanceEngine, MigrationInput, PatchInspection,
+    PatchSummary, ProposalInput, ProposalResult, ReinforceInput, ResolveContestInput,
+    SupersedeInput, TombstoneInput,
 };

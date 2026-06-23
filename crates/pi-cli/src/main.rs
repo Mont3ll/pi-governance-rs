@@ -1,8 +1,9 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use pi_core::{EvidenceKind, EvidenceRef, RecordClass, Scope};
+use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, Scope};
 use pi_governance::{
-    GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, SupersedeInput, TombstoneInput,
+    ContestInput, GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
+    SupersedeInput, TombstoneInput,
 };
 use pi_mcp::McpStdioServer;
 use pi_retrieval::render_markdown;
@@ -12,7 +13,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "0.5.0",
+    version = "0.5.1",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -168,6 +169,64 @@ enum Commands {
         evidence_kind: EvidenceKind,
 
         #[arg(long, default_value = "reinforce record with new evidence")]
+        reason: String,
+
+        #[arg(long)]
+        apply: bool,
+
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Contest an active or already contested record with evidence.
+    Contest {
+        target_id: String,
+
+        #[arg(long = "evidence-uri")]
+        evidence_uri: String,
+
+        #[arg(long = "evidence-kind", default_value = "conversation")]
+        evidence_kind: EvidenceKind,
+
+        #[arg(long)]
+        reason: String,
+
+        #[arg(long)]
+        apply: bool,
+
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Resolve a contested record by upholding, tombstoning, or superseding it.
+    ResolveContest {
+        target_id: String,
+
+        #[arg(long)]
+        resolution: ContestResolution,
+
+        #[arg(long = "class")]
+        class: Option<RecordClass>,
+
+        #[arg(long)]
+        claim: Option<String>,
+
+        #[arg(long, default_value_t = 0.75)]
+        confidence: f32,
+
+        #[arg(long)]
+        project: Option<String>,
+
+        #[arg(long = "tag")]
+        tags: Vec<String>,
+
+        #[arg(long = "evidence-uri")]
+        evidence_uri: Option<String>,
+
+        #[arg(long = "evidence-kind", default_value = "conversation")]
+        evidence_kind: EvidenceKind,
+
+        #[arg(long)]
         reason: String,
 
         #[arg(long)]
@@ -427,6 +486,70 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
 
+        Commands::Contest {
+            target_id,
+            evidence_uri,
+            evidence_kind,
+            reason,
+            apply,
+            force,
+        } => {
+            let result = engine.contest_record(
+                ContestInput {
+                    target_id,
+                    evidence_refs: vec![EvidenceRef::new(evidence_kind, evidence_uri)],
+                    reason,
+                },
+                apply,
+                force,
+            )?;
+
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+
+        Commands::ResolveContest {
+            target_id,
+            resolution,
+            class,
+            claim,
+            confidence,
+            project,
+            tags,
+            evidence_uri,
+            evidence_kind,
+            reason,
+            apply,
+            force,
+        } => {
+            let scope = match project {
+                Some(project) => Scope::project(project),
+                None => Scope::global(),
+            };
+
+            let evidence_refs = match evidence_uri {
+                Some(uri) => vec![EvidenceRef::new(evidence_kind, uri)],
+                None => Vec::new(),
+            };
+
+            let result = engine.resolve_contest(
+                ResolveContestInput {
+                    target_id,
+                    resolution,
+                    class,
+                    claim,
+                    confidence,
+                    scope,
+                    tags,
+                    evidence_refs,
+                    reason,
+                },
+                apply,
+                force,
+            )?;
+
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+
         Commands::Migrate {
             dry_run,
             backup,
@@ -488,6 +611,7 @@ fn main() -> Result<()> {
                 println!("Active: {}", report.active_records);
                 println!("Superseded: {}", report.superseded_records);
                 println!("Tombstoned: {}", report.tombstoned_records);
+                println!("Contested: {}", report.contested_records);
                 println!("Patches: {}", report.total_patches);
                 println!("Latest proposed patches: {}", report.proposed_patches_latest);
                 println!("Latest applied patches: {}", report.applied_patches_latest);

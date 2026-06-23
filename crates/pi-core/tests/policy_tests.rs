@@ -1,5 +1,5 @@
 use pi_core::{
-    validate_patch, validate_record, DecisionStatus, EvidenceKind, EvidenceRef, Patch, Record, RecordClass, Scope,
+    validate_patch, validate_record, ContestResolution, DecisionStatus, EvidenceKind, EvidenceRef, Patch, Record, RecordClass, Scope,
 };
 
 #[test]
@@ -62,4 +62,37 @@ fn tombstone_patches_require_manual_review() {
         .reasons
         .iter()
         .any(|reason| reason.contains("tombstone requires review")));
+}
+
+
+#[test]
+fn contest_and_resolution_patches_require_manual_review() {
+    let record = Record::new(
+        RecordClass::Requirement,
+        "Contested beliefs should remain auditable until they are resolved.",
+        0.80,
+        Scope::global(),
+        vec!["contest".to_string()],
+        vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:test")],
+    );
+
+    let contest = Patch::contest_record(
+        record.id.clone(),
+        vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:contest")],
+        "human reviewer disputes this record",
+    );
+
+    let decision = validate_patch(&contest, &[record.clone()]);
+    assert_eq!(decision.status, DecisionStatus::ManualReview);
+
+    let resolve = Patch::resolve_contest(
+        record.id.clone(),
+        ContestResolution::Uphold,
+        None,
+        vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:resolve")],
+        "review concluded this record should remain active",
+    );
+
+    let decision = validate_patch(&resolve, &[record]);
+    assert_eq!(decision.status, DecisionStatus::ManualReview);
 }

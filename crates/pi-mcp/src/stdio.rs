@@ -1,7 +1,8 @@
 use anyhow::{bail, Context, Result};
-use pi_core::{EvidenceKind, EvidenceRef, RecordClass, Scope};
+use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, Scope};
 use pi_governance::{
-    GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, SupersedeInput, TombstoneInput,
+    ContestInput, GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
+    SupersedeInput, TombstoneInput,
 };
 use pi_retrieval::render_markdown;
 use serde_json::{json, Map, Value};
@@ -10,7 +11,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "0.5.0";
+const SERVER_VERSION: &str = "0.5.1";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -115,7 +116,8 @@ impl McpStdioServer {
             "Use pi.retrieve_context before making project-sensitive changes.",
             "Use pi.propose_record for durable memory updates instead of directly mutating the store.",
             "Use pi.list_patches and pi.inspect_patch before applying queued patches.",
-            "Use pi.supersede_record, pi.tombstone_record, and pi.reinforce_record for belief revision.",
+            "Use pi.supersede_record, pi.tombstone_record, and pi.reinforce_record for direct belief revision.",
+            "Use pi.contest_record and pi.resolve_contest when a claim is disputed but not yet ready to supersede or tombstone.",
             "The JSONL store now uses a local store.lock file to serialize mutating operations.",
             "Identity-level records and risky mutations may require force/manual review.",
         ]
@@ -358,6 +360,94 @@ impl McpStdioServer {
                 }
             },
             {
+                "name": "pi.contest_record",
+                "description": "Contest an active or already contested record with evidence while preserving audit history.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "target_id": { "type": "string" },
+                        "evidence_uri": { "type": "string" },
+                        "evidence_kind": {
+                            "type": "string",
+                            "enum": [
+                                "conversation",
+                                "file",
+                                "url",
+                                "test",
+                                "commit",
+                                "user_correction",
+                                "human_review"
+                            ],
+                            "default": "conversation"
+                        },
+                        "reason": { "type": "string" },
+                        "apply": { "type": "boolean", "default": false },
+                        "force": { "type": "boolean", "default": false }
+                    },
+                    "required": ["target_id", "evidence_uri", "reason"]
+                }
+            },
+            {
+                "name": "pi.resolve_contest",
+                "description": "Resolve a contested record by upholding, tombstoning, or superseding it.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "target_id": { "type": "string" },
+                        "resolution": {
+                            "type": "string",
+                            "enum": ["uphold", "tombstone", "supersede"]
+                        },
+                        "class": {
+                            "type": "string",
+                            "enum": [
+                                "identity_rule",
+                                "preference",
+                                "project_state",
+                                "requirement",
+                                "correction",
+                                "workflow",
+                                "observation",
+                                "evidence_note"
+                            ]
+                        },
+                        "claim": { "type": "string" },
+                        "confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.75
+                        },
+                        "project": { "type": "string" },
+                        "tags": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "default": []
+                        },
+                        "evidence_uri": { "type": "string" },
+                        "evidence_kind": {
+                            "type": "string",
+                            "enum": [
+                                "conversation",
+                                "file",
+                                "url",
+                                "test",
+                                "commit",
+                                "user_correction",
+                                "human_review"
+                            ],
+                            "default": "conversation"
+                        },
+                        "reason": { "type": "string" },
+                        "apply": { "type": "boolean", "default": false },
+                        "force": { "type": "boolean", "default": false }
+                    },
+                    "required": ["target_id", "resolution", "reason"]
+                }
+            },
+            {
                 "name": "pi.apply_patch",
                 "description": "Apply an existing proposed PI patch by ID.",
                 "inputSchema": {
@@ -461,6 +551,8 @@ impl McpStdioServer {
             "pi.supersede_record" => self.tool_supersede_record(arguments),
             "pi.tombstone_record" => self.tool_tombstone_record(arguments),
             "pi.reinforce_record" => self.tool_reinforce_record(arguments),
+            "pi.contest_record" => self.tool_contest_record(arguments),
+            "pi.resolve_contest" => self.tool_resolve_contest(arguments),
             "pi.apply_patch" => self.tool_apply_patch(arguments),
             "pi.list_patches" => self.tool_list_patches(arguments),
             "pi.inspect_patch" => self.tool_inspect_patch(arguments),
@@ -665,6 +757,102 @@ impl McpStdioServer {
                 json!({
                     "code": "reinforce_record_failed",
                     "target_id": target_id
+                }),
+            )),
+        }
+    }
+
+    fn tool_contest_record(&self, args: Value) -> Result<Value> {
+        let target_id = required_string(&args, "target_id")?;
+        let evidence_uri = required_string(&args, "evidence_uri")?;
+        let evidence_kind_raw =
+            optional_string(&args, "evidence_kind").unwrap_or_else(|| "conversation".to_string());
+        let evidence_kind = EvidenceKind::from_str(&evidence_kind_raw).map_err(anyhow::Error::msg)?;
+        let reason = required_string(&args, "reason")?;
+        let apply = optional_bool(&args, "apply").unwrap_or(false);
+        let force = optional_bool(&args, "force").unwrap_or(false);
+
+        match self.engine.contest_record(
+            ContestInput {
+                target_id: target_id.clone(),
+                evidence_refs: vec![EvidenceRef::new(evidence_kind, evidence_uri)],
+                reason,
+            },
+            apply,
+            force,
+        ) {
+            Ok(result) => {
+                let text = serde_json::to_string_pretty(&result)?;
+                Ok(tool_result(text, serde_json::to_value(result)?))
+            }
+            Err(error) => Ok(tool_error(
+                error.to_string(),
+                json!({
+                    "code": "contest_record_failed",
+                    "target_id": target_id
+                }),
+            )),
+        }
+    }
+
+    fn tool_resolve_contest(&self, args: Value) -> Result<Value> {
+        let target_id = required_string(&args, "target_id")?;
+        let resolution_raw = required_string(&args, "resolution")?;
+        let resolution =
+            ContestResolution::from_str(&resolution_raw).map_err(anyhow::Error::msg)?;
+        let class = match optional_string(&args, "class") {
+            Some(raw) => Some(RecordClass::from_str(&raw).map_err(anyhow::Error::msg)?),
+            None => None,
+        };
+        let claim = optional_string(&args, "claim");
+        let confidence = optional_f32(&args, "confidence").unwrap_or(0.75);
+        let project = optional_string(&args, "project");
+        let tags = optional_string_array(&args, "tags")?.unwrap_or_default();
+        let reason = required_string(&args, "reason")?;
+        let apply = optional_bool(&args, "apply").unwrap_or(false);
+        let force = optional_bool(&args, "force").unwrap_or(false);
+
+        let evidence_refs = match optional_string(&args, "evidence_uri") {
+            Some(uri) => {
+                let evidence_kind_raw = optional_string(&args, "evidence_kind")
+                    .unwrap_or_else(|| "conversation".to_string());
+                let evidence_kind =
+                    EvidenceKind::from_str(&evidence_kind_raw).map_err(anyhow::Error::msg)?;
+                vec![EvidenceRef::new(evidence_kind, uri)]
+            }
+            None => Vec::new(),
+        };
+
+        let scope = match project {
+            Some(project_key) => Scope::project(project_key),
+            None => Scope::global(),
+        };
+
+        match self.engine.resolve_contest(
+            ResolveContestInput {
+                target_id: target_id.clone(),
+                resolution,
+                class,
+                claim,
+                confidence,
+                scope,
+                tags,
+                evidence_refs,
+                reason,
+            },
+            apply,
+            force,
+        ) {
+            Ok(result) => {
+                let text = serde_json::to_string_pretty(&result)?;
+                Ok(tool_result(text, serde_json::to_value(result)?))
+            }
+            Err(error) => Ok(tool_error(
+                error.to_string(),
+                json!({
+                    "code": "resolve_contest_failed",
+                    "target_id": target_id,
+                    "resolution": resolution_raw
                 }),
             )),
         }

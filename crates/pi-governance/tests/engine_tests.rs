@@ -1,6 +1,6 @@
-use pi_core::{EvidenceKind, EvidenceRef, RecordClass, Scope};
+use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, Scope, RecordStatus};
 use pi_governance::{
-    GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, SupersedeInput, TombstoneInput,
+    ContestInput, GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput, SupersedeInput, TombstoneInput,
 };
 use pi_store::JsonlStore;
 use std::fs;
@@ -170,6 +170,80 @@ fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Res
         .expect("replacement should remain in audit history");
 
     assert!(matches!(tombstoned.status, pi_core::RecordStatus::Tombstoned));
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+
+#[test]
+fn contest_and_resolve_belief_revision_flow() -> anyhow::Result<()> {
+    let root = temp_store_dir("contest-resolution");
+    let engine = GovernanceEngine::new(JsonlStore::new(&root));
+    engine.init()?;
+
+    let original = engine.propose_record(
+        ProposalInput {
+            class: RecordClass::Requirement,
+            claim: "Contest workflows should preserve disputed records until review resolution."
+                .to_string(),
+            confidence: 0.70,
+            scope: Scope::project("pi-governance-rs"),
+            tags: vec!["contest".to_string()],
+            evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:contest")],
+            reason: Some("original contested claim".to_string()),
+        },
+        true,
+        false,
+    )?;
+
+    let record_id = original.record_id.expect("record id");
+
+    let contest = engine.contest_record(
+        ContestInput {
+            target_id: record_id.clone(),
+            evidence_refs: vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:contest")],
+            reason: "reviewer found evidence that disputes this record".to_string(),
+        },
+        true,
+        true,
+    )?;
+
+    assert!(contest.applied);
+
+    let contested = engine
+        .list_records(20)?
+        .into_iter()
+        .find(|record| record.id == record_id)
+        .expect("contested record should remain present");
+
+    assert!(matches!(contested.status, RecordStatus::Contested));
+
+    let resolved = engine.resolve_contest(
+        ResolveContestInput {
+            target_id: record_id.clone(),
+            resolution: ContestResolution::Uphold,
+            class: None,
+            claim: None,
+            confidence: 0.75,
+            scope: Scope::project("pi-governance-rs"),
+            tags: Vec::new(),
+            evidence_refs: vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:uphold")],
+            reason: "review confirmed this record remains valid".to_string(),
+        },
+        true,
+        true,
+    )?;
+
+    assert!(resolved.applied);
+
+    let upheld = engine
+        .list_records(20)?
+        .into_iter()
+        .find(|record| record.id == record_id)
+        .expect("upheld record should remain present");
+
+    assert!(matches!(upheld.status, RecordStatus::Active));
 
     fs::remove_dir_all(root)?;
     Ok(())

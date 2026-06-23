@@ -124,5 +124,89 @@ pub fn validate_patch(patch: &Patch, existing: &[Record]) -> GovernanceDecision 
 
             GovernanceDecision::allow()
         }
+
+        PatchOperation::ContestRecord => {
+            let Some(target_id) = patch.target_id.as_ref() else {
+                return GovernanceDecision::reject("contest_record patch requires target_id");
+            };
+
+            let target_exists = existing.iter().any(|record| {
+                record.id == *target_id
+                    && matches!(record.status, RecordStatus::Active | RecordStatus::Contested)
+            });
+
+            if !target_exists {
+                return GovernanceDecision::reject(
+                    "contest target does not exist or is not active/contested",
+                );
+            }
+
+            if patch.reason.trim().len() < 8 {
+                return GovernanceDecision::reject("contest requires a meaningful reason");
+            }
+
+            if patch.evidence.is_empty() {
+                return GovernanceDecision::reject(
+                    "contest requires at least one evidence reference",
+                );
+            }
+
+            GovernanceDecision::manual("contesting a record requires review")
+        }
+
+        PatchOperation::ResolveContest => {
+            let Some(target_id) = patch.target_id.as_ref() else {
+                return GovernanceDecision::reject("resolve_contest patch requires target_id");
+            };
+
+            let target_exists = existing.iter().any(|record| {
+                record.id == *target_id
+                    && matches!(record.status, RecordStatus::Active | RecordStatus::Contested)
+            });
+
+            if !target_exists {
+                return GovernanceDecision::reject(
+                    "contest resolution target does not exist or is not active/contested",
+                );
+            }
+
+            if patch.reason.trim().len() < 8 {
+                return GovernanceDecision::reject("contest resolution requires a meaningful reason");
+            }
+
+            let Some(resolution) = patch.contest_resolution.as_ref() else {
+                return GovernanceDecision::reject("resolve_contest patch requires contest_resolution");
+            };
+
+            match resolution {
+                ContestResolution::Uphold => {
+                    if patch.proposed_record.is_some() {
+                        return GovernanceDecision::reject(
+                            "uphold resolution must not include proposed_record",
+                        );
+                    }
+                }
+                ContestResolution::Tombstone => {
+                    if patch.proposed_record.is_some() {
+                        return GovernanceDecision::reject(
+                            "tombstone resolution must not include proposed_record",
+                        );
+                    }
+                }
+                ContestResolution::Supersede => {
+                    let Some(record) = patch.proposed_record.as_ref() else {
+                        return GovernanceDecision::reject(
+                            "supersede resolution requires replacement proposed_record",
+                        );
+                    };
+
+                    let mut decision = validate_record(record, existing);
+                    decision.escalate_to_manual("contest supersession resolution requires review");
+                    return decision;
+                }
+            }
+
+            GovernanceDecision::manual("contest resolution requires review")
+        }
     }
 }

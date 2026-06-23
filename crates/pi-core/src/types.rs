@@ -75,6 +75,7 @@ impl FromStr for RecordClass {
 #[serde(rename_all = "snake_case")]
 pub enum RecordStatus {
     Active,
+    Contested,
     Superseded,
     Tombstoned,
 }
@@ -234,6 +235,47 @@ pub enum PatchOperation {
     SupersedeRecord,
     TombstoneRecord,
     ReinforceRecord,
+    ContestRecord,
+    ResolveContest,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ContestResolution {
+    Uphold,
+    Tombstone,
+    Supersede,
+}
+
+impl fmt::Display for ContestResolution {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match self {
+            ContestResolution::Uphold => "uphold",
+            ContestResolution::Tombstone => "tombstone",
+            ContestResolution::Supersede => "supersede",
+        };
+
+        write!(f, "{value}")
+    }
+}
+
+impl FromStr for ContestResolution {
+    type Err = String;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        let key = input
+            .trim()
+            .to_lowercase()
+            .replace('_', "-")
+            .replace(' ', "-");
+
+        match key.as_str() {
+            "uphold" | "keep" | "restore" => Ok(Self::Uphold),
+            "tombstone" | "delete" | "remove" => Ok(Self::Tombstone),
+            "supersede" | "replace" => Ok(Self::Supersede),
+            _ => Err(format!("unknown contest resolution: {input}")),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -253,6 +295,7 @@ pub struct Patch {
     pub status: PatchStatus,
     pub target_id: Option<String>,
     pub proposed_record: Option<Record>,
+    pub contest_resolution: Option<ContestResolution>,
     pub evidence: Vec<EvidenceRef>,
     pub reason: String,
     pub created_at: DateTime<Utc>,
@@ -271,6 +314,7 @@ impl Patch {
             target_id: None,
             evidence: record.evidence.clone(),
             proposed_record: Some(record),
+            contest_resolution: None,
             reason: reason.into(),
             created_at: now,
             updated_at: now,
@@ -292,6 +336,7 @@ impl Patch {
             target_id: Some(target_id.into()),
             evidence: replacement.evidence.clone(),
             proposed_record: Some(replacement),
+            contest_resolution: None,
             reason: reason.into(),
             created_at: now,
             updated_at: now,
@@ -313,6 +358,7 @@ impl Patch {
             target_id: Some(target_id.into()),
             evidence,
             proposed_record: None,
+            contest_resolution: None,
             reason: reason.into(),
             created_at: now,
             updated_at: now,
@@ -334,6 +380,53 @@ impl Patch {
             target_id: Some(target_id.into()),
             evidence,
             proposed_record: None,
+            contest_resolution: None,
+            reason: reason.into(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    pub fn contest_record(
+        target_id: impl Into<String>,
+        evidence: Vec<EvidenceRef>,
+        reason: impl Into<String>,
+    ) -> Self {
+        let now = Utc::now();
+
+        Self {
+            schema_version: current_schema_version(),
+            id: format!("patch_{}", Uuid::new_v4()),
+            operation: PatchOperation::ContestRecord,
+            status: PatchStatus::Proposed,
+            target_id: Some(target_id.into()),
+            evidence,
+            proposed_record: None,
+            contest_resolution: None,
+            reason: reason.into(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    pub fn resolve_contest(
+        target_id: impl Into<String>,
+        resolution: ContestResolution,
+        replacement: Option<Record>,
+        evidence: Vec<EvidenceRef>,
+        reason: impl Into<String>,
+    ) -> Self {
+        let now = Utc::now();
+
+        Self {
+            schema_version: current_schema_version(),
+            id: format!("patch_{}", Uuid::new_v4()),
+            operation: PatchOperation::ResolveContest,
+            status: PatchStatus::Proposed,
+            target_id: Some(target_id.into()),
+            evidence,
+            proposed_record: replacement,
+            contest_resolution: Some(resolution),
             reason: reason.into(),
             created_at: now,
             updated_at: now,

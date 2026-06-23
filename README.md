@@ -1,6 +1,6 @@
 # PI Governance Rust Port
 
-Current milestone: `0.5.0`.
+Current milestone: `0.5.1`.
 
 This workspace is a portable Rust implementation of a PI-style governance layer for coding agents. It exposes a CLI and an MCP stdio server around a governed JSONL store.
 
@@ -56,7 +56,7 @@ The store is local runtime data and should not be committed.
 
 ## Belief revision
 
-v0.5.0 adds governed belief-revision commands. These create normal patches, so each operation is visible through `list-patches`, inspectable with `inspect-patch`, and applied with `apply` unless `--apply` is provided.
+v0.5.0 added direct governed belief-revision commands. v0.5.1 completes the contested-claim half of the workflow. These create normal patches, so each operation is visible through `list-patches`, inspectable with `inspect-patch`, and applied with `apply` unless `--apply` is provided.
 
 ### Reinforce a record
 
@@ -99,6 +99,63 @@ Tombstones require manual review by policy, so applying immediately requires `--
   --evidence-uri review:v0.5.0 \
   --evidence-kind human-review \
   --reason "record is no longer valid but must remain auditable" \
+  --apply \
+  --force
+```
+
+
+### Contest a record
+
+Contesting marks an active record as `Contested` while preserving it in the audit trail. Contested records are excluded from active retrieval until resolved. Contesting requires evidence and manual-review force when applying immediately.
+
+```bash
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi contest <record_id> \
+  --evidence-uri review:v0.5.1-contest \
+  --evidence-kind human-review \
+  --reason "new evidence disputes this stored claim" \
+  --apply \
+  --force
+```
+
+### Resolve a contest
+
+A contested record can be resolved by upholding it, tombstoning it, or superseding it with a replacement claim. Resolution requires manual review, so immediate application requires `--force`.
+
+Uphold the record and return it to `Active`:
+
+```bash
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi resolve-contest <record_id> \
+  --resolution uphold \
+  --evidence-uri review:v0.5.1-uphold \
+  --evidence-kind human-review \
+  --reason "review confirmed this claim should remain active" \
+  --apply \
+  --force
+```
+
+Supersede the contested record:
+
+```bash
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi resolve-contest <record_id> \
+  --resolution supersede \
+  --class requirement \
+  --claim "Belief revision must support contested claims and explicit resolutions." \
+  --project pi-governance-rs \
+  --tag belief-revision \
+  --evidence-uri conversation:v0.5.1 \
+  --reason "review found the older claim should be replaced" \
+  --apply \
+  --force
+```
+
+Tombstone the contested record:
+
+```bash
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi resolve-contest <record_id> \
+  --resolution tombstone \
+  --evidence-uri review:v0.5.1-tombstone \
+  --evidence-kind human-review \
+  --reason "review confirmed this claim is invalid but auditable" \
   --apply \
   --force
 ```
@@ -213,6 +270,8 @@ pi.propose_record
 pi.supersede_record
 pi.tombstone_record
 pi.reinforce_record
+pi.contest_record
+pi.resolve_contest
 pi.apply_patch
 pi.list_patches
 pi.inspect_patch
@@ -220,6 +279,16 @@ pi.migrate_schema
 pi.doctor
 pi.list_records
 ```
+
+## v0.5.1 changes
+
+- Adds `pi contest`.
+- Adds `pi resolve-contest`.
+- Adds MCP tools `pi.contest_record` and `pi.resolve_contest`.
+- Adds `RecordStatus::Contested`.
+- Adds contest and resolution patch operations.
+- Adds policy and engine tests for contested claims and review resolution.
+- Updates package, CLI, and MCP server version to `0.5.1`.
 
 ## v0.5.0 changes
 
