@@ -10,3 +10,6 @@ serde_json.workspace = true
 pi-core.workspace = true
 pi-governance.workspace = true
 pi-retrieval.workspace = true
+
+[dev-dependencies]
+pi-store.workspace = true

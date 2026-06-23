@@ -1,36 +1,40 @@
-# pi-governance-rs
+# PI Governance Rust Port
 
-Portable Rust MVP for a PI-style governance layer usable by coding agents.
+Current milestone: `0.4.0`.
 
-Current milestone: `0.3.0`.
+This workspace is a portable Rust implementation of a PI-style governance layer for coding agents. It exposes a CLI and an MCP stdio server around a governed JSONL store.
 
-This workspace includes:
+## Workspace layout
 
-- `pi-core`: record, patch, evidence, schema, policy, and context types.
-- `pi-store`: append-only JSONL persistence with atomic record rewrite and write locking.
-- `pi-retrieval`: simple deterministic lexical retrieval and context rendering.
-- `pi-governance`: policy-enforced proposal, application, retrieval, patch inspection, and doctor engine.
-- `pi-mcp`: stdio JSON-RPC MCP-style adapter exposing PI tools.
-- `pi-cli`: command-line binary for agents, scripts, and local testing.
+```text
+crates/
+  pi-core/        Core records, patches, evidence, policy, schema constants
+  pi-store/       JSONL store, file locking, backups, schema migrations
+  pi-retrieval/   Deterministic context retrieval
+  pi-governance/  Runtime engine: propose, apply, retrieve, doctor, migrate
+  pi-mcp/         MCP stdio adapter
+  pi-cli/         `pi` command-line interface
+```
 
 ## Build
 
 ```bash
+cargo check --workspace
 cargo build -p pi-cli
 ```
 
-## Run
-
-Initialize a local store:
+## Initialize a local store
 
 ```bash
-cargo run -p pi-cli -- --store .pi init
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi init
 ```
 
-Propose and immediately apply a record:
+The store is local runtime data and should not be committed.
+
+## Propose a record
 
 ```bash
-cargo run -p pi-cli -- --store .pi propose \
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi propose \
   --class preference \
   --claim "User prefers exact React preview fidelity over reinterpretation." \
   --project figma-landing \
@@ -40,94 +44,153 @@ cargo run -p pi-cli -- --store .pi propose \
   --apply
 ```
 
-Retrieve context:
+## Retrieve context
 
 ```bash
-cargo run -p pi-cli -- --store .pi retrieve \
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi retrieve \
   "React preview fidelity requirements" \
   --project figma-landing \
   --budget 900
 ```
 
-Create a pending patch without applying it:
+## Patch visibility
 
 ```bash
-cargo run -p pi-cli -- --store .pi propose \
-  --class requirement \
-  --claim "Patch visibility must expose pending, applied, and rejected patch states." \
-  --project pi-governance-rs \
-  --tag patch-visibility \
-  --evidence-uri conversation:v0.3.0
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi list-patches
 ```
 
-List patch state:
-
 ```bash
-cargo run -p pi-cli -- --store .pi list-patches
-```
-
-Inspect a patch:
-
-```bash
-cargo run -p pi-cli -- --store .pi inspect-patch <patch_id>
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi inspect-patch <patch_id>
 ```
 
 Apply a pending patch:
 
 ```bash
-cargo run -p pi-cli -- --store .pi apply <patch_id>
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi apply <patch_id>
 ```
 
-Run doctor:
+Do not include angle brackets when using a real patch id.
+
+## Doctor
+
+Human-readable:
 
 ```bash
-cargo run -p pi-cli -- --store .pi doctor
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi doctor
 ```
 
-Doctor now includes the active schema version, lock path, and a raw JSONL schema audit.
-Existing v0.1.0/v0.2.0 records without `schema_version` still deserialize because the current schema version is applied as a default during load.
-
-Run MCP stdio mode:
+JSON:
 
 ```bash
-cargo run -p pi-cli -- --store .pi mcp-stdio
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi doctor --json
 ```
 
-For MCP clients, prefer the compiled binary directly:
+`doctor` reports:
+
+```text
+store path
+lock path
+current schema version
+schema migration_needed
+record/patch/event counts
+schema audit per JSONL file
+warnings/errors
+```
+
+## Migrations
+
+v0.4.0 adds schema migration support for legacy JSONL files. Older records created before v0.3.0 may be missing `schema_version`. That is expected until they are migrated.
+
+Preview migration changes without rewriting files:
 
 ```bash
-./target/debug/pi --store /absolute/path/to/pi-governance-rs/.pi mcp-stdio
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi migrate --dry-run
 ```
 
-## MCP tools
+Run a migration with a backup:
 
-- `pi.retrieve_context`
-- `pi.propose_record`
-- `pi.apply_patch`
-- `pi.list_patches`
-- `pi.inspect_patch`
-- `pi.doctor`
-- `pi.list_records`
+```bash
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi migrate --backup
+```
 
-## v0.3.0 changes
+Get machine-readable output:
 
-- Adds explicit `schema_version` fields to `EvidenceRef`, `Record`, `Patch`, and `StoreEvent`.
-- Adds `pi-core/src/schema.rs` with `CURRENT_SCHEMA_VERSION` and schema audit types.
-- Adds `pi-store/src/lock.rs` with a local `store.lock` guard for mutating operations.
-- Adds store-level write sessions so proposal and apply flows are locked across read/validate/write sequences.
-- Adds doctor schema audit output for `records.jsonl`, `patches.jsonl`, and `events.jsonl`.
-- Adds `.gitignore` covering `target/`, `.pi/`, lock files, secrets, local MCP configs, and agent/editor caches.
-- Updates package, CLI, and MCP server version to `0.3.0`.
+```bash
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi migrate --dry-run --json
+```
 
-## v0.2.0 changes
+Backups are written under:
 
-- Adds patch summaries and patch inspection.
-- Adds CLI commands: `list-patches`, `inspect-patch`.
-- Adds MCP tools: `pi.list_patches`, `pi.inspect_patch`.
-- Makes `apply_patch` check latest patch status instead of any historical proposed entry.
-- Returns structured tool errors for expected MCP apply/inspect failures.
-- Updates package and server version to `0.2.0`.
+```text
+.pi/backups/
+```
 
-## Status
+The migration currently adds or corrects `schema_version` on:
 
-This is still a portable porting skeleton, not the full PI system. It is intentionally minimal and inspectable so additional PI features can be migrated module by module.
+```text
+records.jsonl root records
+records.jsonl evidence refs
+patches.jsonl root patches
+patches.jsonl patch evidence refs
+patches.jsonl proposed_record
+patches.jsonl proposed_record evidence refs
+events.jsonl root events
+```
+
+Invalid JSONL lines are preserved during migration and reported instead of being deleted.
+
+## MCP stdio
+
+Build first:
+
+```bash
+cargo build -p pi-cli
+```
+
+Run the MCP server directly:
+
+```bash
+./target/debug/pi --store /home/mel/Documents/Projects/pi-governance-rs/.pi mcp-stdio
+```
+
+A blank terminal is expected. The server is waiting for JSON-RPC messages on stdin.
+
+MCP tools exposed:
+
+```text
+pi.retrieve_context
+pi.propose_record
+pi.apply_patch
+pi.list_patches
+pi.inspect_patch
+pi.migrate_schema
+pi.doctor
+pi.list_records
+```
+
+## v0.4.0 changes
+
+- Adds `pi migrate`.
+- Adds `pi migrate --dry-run`.
+- Adds `pi migrate --backup`.
+- Adds `pi doctor --json` documentation and migration-needed reporting.
+- Adds `pi.migrate_schema` MCP tool.
+- Adds schema migration reports with per-file counts.
+- Adds timestamped store backups under `.pi/backups/`.
+- Adds test scaffolding for policy, store migrations, governance engine flows, and MCP server construction.
+- Updates package, CLI, and MCP server version to `0.4.0`.
+
+## Git safety
+
+The `.gitignore` intentionally excludes:
+
+```text
+.pi/
+target/
+local MCP configs
+agent/editor local folders
+secrets and env files
+archives and temporary output
+```
+
+`Cargo.lock` should be committed because this workspace contains a CLI binary.

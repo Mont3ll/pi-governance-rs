@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use pi_core::{EvidenceKind, EvidenceRef, RecordClass, Scope};
-use pi_governance::{GovernanceEngine, ProposalInput};
+use pi_governance::{GovernanceEngine, MigrationInput, ProposalInput};
 use pi_mcp::McpStdioServer;
 use pi_retrieval::render_markdown;
 use pi_store::JsonlStore;
@@ -10,7 +10,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "0.3.0",
+    version = "0.4.0",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -95,6 +95,20 @@ enum Commands {
     /// Inspect full history and current applyability for one patch.
     InspectPatch {
         patch_id: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Migrate legacy JSONL entries to the current schema version.
+    Migrate {
+        /// Report planned migration changes without rewriting files.
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Create a timestamped backup under the store before rewriting.
+        #[arg(long)]
+        backup: bool,
 
         #[arg(long)]
         json: bool,
@@ -248,6 +262,52 @@ fn main() -> Result<()> {
             }
         }
 
+        Commands::Migrate {
+            dry_run,
+            backup,
+            json,
+        } => {
+            let report = engine.migrate_store(MigrationInput { dry_run, backup })?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!("PI Migration Report");
+                println!("Schema version: {}", report.schema_version);
+                println!("Dry run: {}", report.dry_run);
+                println!("Backup requested: {}", report.backup_requested);
+                println!("Migration needed: {}", report.migration_needed);
+                println!("Changed files: {}", report.changed_files);
+                println!("Changed entries: {}", report.changed_entries);
+                println!("Invalid JSONL lines: {}", report.invalid_json_lines);
+
+                if let Some(backup) = &report.backup {
+                    println!("Backup: {}", backup.backup_dir);
+                    if !backup.copied_files.is_empty() {
+                        println!("Backup files: {}", backup.copied_files.join(", "));
+                    }
+                }
+
+                if !report.files.is_empty() {
+                    println!("\nFiles:");
+                    for file in &report.files {
+                        println!(
+                            "- {}: entries={} changed_entries={} root_added={} root_updated={} nested_added={} nested_updated={} invalid_json_lines={} rewritten={}",
+                            file.file_name,
+                            file.entries,
+                            file.changed_entries,
+                            file.root_schema_version_added,
+                            file.root_schema_version_updated,
+                            file.nested_schema_version_added,
+                            file.nested_schema_version_updated,
+                            file.invalid_json_lines,
+                            file.rewritten
+                        );
+                    }
+                }
+            }
+        }
+
         Commands::Doctor { json } => {
             let report = engine.doctor()?;
 
@@ -258,6 +318,7 @@ fn main() -> Result<()> {
                 println!("Store: {}", report.store_dir);
                 println!("Lock: {}", report.lock_path);
                 println!("Schema version: {}", report.schema_version);
+                println!("Migration needed: {}", report.migration_needed);
                 println!("Records: {}", report.total_records);
                 println!("Active: {}", report.active_records);
                 println!("Superseded: {}", report.superseded_records);

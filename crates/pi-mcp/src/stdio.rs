@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use pi_core::{EvidenceKind, EvidenceRef, RecordClass, Scope};
-use pi_governance::{GovernanceEngine, ProposalInput};
+use pi_governance::{GovernanceEngine, MigrationInput, ProposalInput};
 use pi_retrieval::render_markdown;
 use serde_json::{json, Map, Value};
 use std::io::{self, BufRead, Write};
@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "0.3.0";
+const SERVER_VERSION: &str = "0.4.0";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -287,6 +287,24 @@ impl McpStdioServer {
                 }
             },
             {
+                "name": "pi.migrate_schema",
+                "description": "Migrate legacy JSONL entries to the current PI schema version. Defaults to dry-run for safety.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "dry_run": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "backup": {
+                            "type": "boolean",
+                            "default": true
+                        }
+                    }
+                }
+            },
+            {
                 "name": "pi.doctor",
                 "description": "Inspect PI store health, patch state, warnings, and governance errors.",
                 "inputSchema": {
@@ -324,6 +342,7 @@ impl McpStdioServer {
             "pi.apply_patch" => self.tool_apply_patch(arguments),
             "pi.list_patches" => self.tool_list_patches(arguments),
             "pi.inspect_patch" => self.tool_inspect_patch(arguments),
+            "pi.migrate_schema" => self.tool_migrate_schema(arguments),
             "pi.doctor" => self.tool_doctor(),
             "pi.list_records" => self.tool_list_records(arguments),
             other => bail!("unknown PI MCP tool: {other}"),
@@ -442,6 +461,16 @@ impl McpStdioServer {
                 }),
             )),
         }
+    }
+
+    fn tool_migrate_schema(&self, args: Value) -> Result<Value> {
+        let dry_run = optional_bool(&args, "dry_run").unwrap_or(true);
+        let backup = optional_bool(&args, "backup").unwrap_or(true);
+
+        let report = self.engine.migrate_store(MigrationInput { dry_run, backup })?;
+        let text = serde_json::to_string_pretty(&report)?;
+
+        Ok(tool_result(text, serde_json::to_value(report)?))
     }
 
     fn tool_doctor(&self) -> Result<Value> {

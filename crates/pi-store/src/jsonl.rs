@@ -11,11 +11,11 @@ use crate::lock::{StoreLockConfig, StoreLockGuard};
 
 #[derive(Debug, Clone)]
 pub struct JsonlStore {
-    root: PathBuf,
-    records_path: PathBuf,
-    patches_path: PathBuf,
-    events_path: PathBuf,
-    lock_path: PathBuf,
+    pub(crate) root: PathBuf,
+    pub(crate) records_path: PathBuf,
+    pub(crate) patches_path: PathBuf,
+    pub(crate) events_path: PathBuf,
+    pub(crate) lock_path: PathBuf,
 }
 
 #[derive(Debug)]

@@ -6,7 +6,7 @@ use pi_core::{
     RetrievalBudget, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
 };
 use pi_retrieval::retrieve;
-use pi_store::JsonlStore;
+use pi_store::{JsonlStore, SchemaMigrationOptions, SchemaMigrationReport};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
@@ -19,6 +19,12 @@ pub struct ProposalInput {
     pub tags: Vec<String>,
     pub evidence_refs: Vec<EvidenceRef>,
     pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MigrationInput {
+    pub dry_run: bool,
+    pub backup: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -69,6 +75,7 @@ pub struct DoctorReport {
     pub lock_path: String,
     pub schema_version: u32,
     pub schema_audits: Vec<SchemaFileAudit>,
+    pub migration_needed: bool,
     pub total_records: usize,
     pub active_records: usize,
     pub superseded_records: usize,
@@ -280,6 +287,15 @@ impl GovernanceEngine {
         Ok(())
     }
 
+    pub fn migrate_store(&self, input: MigrationInput) -> Result<SchemaMigrationReport> {
+        self.store.init()?;
+
+        self.store.migrate_schema_versions(SchemaMigrationOptions {
+            dry_run: input.dry_run,
+            backup: input.backup,
+        })
+    }
+
     pub fn retrieve_context(
         &self,
         query: impl Into<String>,
@@ -385,6 +401,9 @@ impl GovernanceEngine {
         let patches = self.store.load_patches()?;
         let events = self.store.load_events()?;
         let schema_audits = self.store.audit_schema_versions(CURRENT_SCHEMA_VERSION)?;
+        let migration_needed = schema_audits.iter().any(|audit| {
+            audit.missing_schema_version > 0 || audit.mismatched_schema_version > 0
+        });
 
         let mut warnings = Vec::new();
         let mut errors = Vec::new();
@@ -479,6 +498,7 @@ impl GovernanceEngine {
             lock_path: self.store.lock_path().display().to_string(),
             schema_version: CURRENT_SCHEMA_VERSION,
             schema_audits,
+            migration_needed,
             total_records: records.len(),
             active_records,
             superseded_records,

@@ -1,6 +1,6 @@
 pub mod engine;
 
 pub use engine::{
-    ApplyPatchResult, DoctorReport, GovernanceEngine, PatchInspection, PatchSummary,
+    ApplyPatchResult, DoctorReport, GovernanceEngine, MigrationInput, PatchInspection, PatchSummary,
     ProposalInput, ProposalResult,
 };
