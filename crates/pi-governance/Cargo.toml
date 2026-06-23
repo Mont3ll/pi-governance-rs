@@ -8,6 +8,7 @@ license.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 pi-core.workspace = true
 pi-store.workspace = true
 pi-retrieval.workspace = true

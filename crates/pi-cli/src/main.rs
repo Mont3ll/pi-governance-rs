@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, Scope};
 use pi_governance::{
-    ContestInput, GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
+    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput,
 };
 use pi_mcp::McpStdioServer;
@@ -13,7 +13,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "0.5.1",
+    version = "0.6.0",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -234,6 +234,38 @@ enum Commands {
 
         #[arg(long)]
         force: bool,
+    },
+
+
+    /// Export the PI store as a portable JSON bundle.
+    Export {
+        /// Optional output path. If omitted, the export bundle is printed to stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+
+        /// Optional project filter. Global records are included with matching project records.
+        #[arg(long)]
+        project: Option<String>,
+
+        /// Redact evidence URIs and event messages in the exported bundle.
+        #[arg(long)]
+        redacted: bool,
+    },
+
+    /// Import a portable PI JSON bundle. Duplicate ids are skipped, not overwritten.
+    Import {
+        path: PathBuf,
+
+        /// Report planned import changes without rewriting files.
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Create a timestamped backup under the store before rewriting.
+        #[arg(long)]
+        backup: bool,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Migrate legacy JSONL entries to the current schema version.
@@ -548,6 +580,74 @@ fn main() -> Result<()> {
             )?;
 
             println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+
+
+        Commands::Export {
+            output,
+            project,
+            redacted,
+        } => {
+            let input = ExportInput { project, redacted };
+
+            match output {
+                Some(path) => {
+                    let bundle = engine.export_store_to_path(&path, input)?;
+                    println!("PI export written: {}", path.display());
+                    println!("Schema version: {}", bundle.schema_version);
+                    println!("Redacted: {}", bundle.redacted);
+                    println!("Project: {}", bundle.project.as_deref().unwrap_or("<all>"));
+                    println!("Records: {}", bundle.records.len());
+                    println!("Patches: {}", bundle.patches.len());
+                    println!("Events: {}", bundle.events.len());
+                }
+                None => {
+                    let bundle = engine.export_store(input)?;
+                    println!("{}", serde_json::to_string_pretty(&bundle)?);
+                }
+            }
+        }
+
+        Commands::Import {
+            path,
+            dry_run,
+            backup,
+            json,
+        } => {
+            let report = engine.import_store_from_path(&path, ImportInput { dry_run, backup })?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!("PI Import Report");
+                println!("Schema version: {}", report.schema_version);
+                println!("Dry run: {}", report.dry_run);
+                println!("Backup requested: {}", report.backup_requested);
+                println!("Changed: {}", report.changed);
+                println!("Records in bundle: {}", report.records_in_bundle);
+                println!("Patches in bundle: {}", report.patches_in_bundle);
+                println!("Events in bundle: {}", report.events_in_bundle);
+                println!("Imported records: {}", report.imported_records);
+                println!("Imported patches: {}", report.imported_patches);
+                println!("Imported events: {}", report.imported_events);
+                println!("Skipped records: {}", report.skipped_records);
+                println!("Skipped patches: {}", report.skipped_patches);
+                println!("Skipped events: {}", report.skipped_events);
+
+                if let Some(backup) = &report.backup {
+                    println!("Backup: {}", backup.backup_dir);
+                    if !backup.copied_files.is_empty() {
+                        println!("Backup files: {}", backup.copied_files.join(", "));
+                    }
+                }
+
+                if !report.warnings.is_empty() {
+                    println!("\nWarnings:");
+                    for warning in &report.warnings {
+                        println!("- {warning}");
+                    }
+                }
+            }
         }
 
         Commands::Migrate {

@@ -1,6 +1,6 @@
 use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, Scope, RecordStatus};
 use pi_governance::{
-    ContestInput, GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput, SupersedeInput, TombstoneInput,
+    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput, SupersedeInput, TombstoneInput,
 };
 use pi_store::JsonlStore;
 use std::fs;
@@ -247,4 +247,77 @@ fn contest_and_resolve_belief_revision_flow() -> anyhow::Result<()> {
 
     fs::remove_dir_all(root)?;
     Ok(())
+}
+
+
+#[test]
+fn engine_exports_and_imports_portable_bundle() -> anyhow::Result<()> {
+    let source_root = temp_store_dir("engine-export-source");
+    let target_root = temp_store_dir("engine-export-target");
+    let source = GovernanceEngine::new(JsonlStore::new(&source_root));
+    let target = GovernanceEngine::new(JsonlStore::new(&target_root));
+    source.init()?;
+    target.init()?;
+
+    let proposal = source.propose_record(
+        ProposalInput {
+            class: RecordClass::Requirement,
+            claim: "Engine export should carry governed records into another store.".to_string(),
+            confidence: 0.8,
+            scope: Scope::project("pi-governance-rs"),
+            tags: vec!["portable".to_string()],
+            evidence_refs: vec![EvidenceRef::new(EvidenceKind::Test, "test:engine-export")],
+            reason: Some("engine export fixture".to_string()),
+        },
+        true,
+        false,
+    )?;
+
+    let bundle = source.export_store(ExportInput {
+        project: Some("pi-governance-rs".to_string()),
+        redacted: true,
+    })?;
+
+    assert!(bundle.redacted);
+    assert_eq!(bundle.records.len(), 1);
+    assert_eq!(bundle.records[0].evidence[0].uri, "redacted:evidence");
+
+    let dry_run = target.import_store_from_path(
+        &write_bundle_fixture(&target_root, &bundle)?,
+        ImportInput {
+            dry_run: true,
+            backup: true,
+        },
+    )?;
+
+    assert!(dry_run.changed);
+    assert_eq!(dry_run.imported_records, 1);
+    assert!(target.list_records(20)?.is_empty());
+
+    let import_path = write_bundle_fixture(&target_root, &bundle)?;
+    let imported = target.import_store_from_path(
+        &import_path,
+        ImportInput {
+            dry_run: false,
+            backup: true,
+        },
+    )?;
+
+    assert!(imported.changed);
+    assert_eq!(imported.imported_records, 1);
+    assert_eq!(target.list_records(20)?.len(), 1);
+    assert_eq!(target.list_records(20)?[0].id, proposal.record_id.expect("record id"));
+
+    fs::remove_dir_all(source_root)?;
+    fs::remove_dir_all(target_root)?;
+    Ok(())
+}
+
+fn write_bundle_fixture(
+    root: &std::path::Path,
+    bundle: &pi_store::StoreExportBundle,
+) -> anyhow::Result<PathBuf> {
+    let path = root.join("bundle.json");
+    fs::write(&path, serde_json::to_string_pretty(bundle)?)?;
+    Ok(path)
 }

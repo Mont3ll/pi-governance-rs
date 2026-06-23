@@ -6,7 +6,10 @@ use pi_core::{
     RetrievalBudget, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
 };
 use pi_retrieval::retrieve;
-use pi_store::{JsonlStore, SchemaMigrationOptions, SchemaMigrationReport};
+use pi_store::{
+    JsonlStore, SchemaMigrationOptions, SchemaMigrationReport, StoreExportBundle,
+    StoreExportOptions, StoreImportOptions, StoreImportReport,
+};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
@@ -23,6 +26,18 @@ pub struct ProposalInput {
 
 #[derive(Debug, Clone)]
 pub struct MigrationInput {
+    pub dry_run: bool,
+    pub backup: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExportInput {
+    pub project: Option<String>,
+    pub redacted: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportInput {
     pub dry_run: bool,
     pub backup: bool,
 }
@@ -678,6 +693,47 @@ impl GovernanceEngine {
             dry_run: input.dry_run,
             backup: input.backup,
         })
+    }
+
+    pub fn export_store(&self, input: ExportInput) -> Result<StoreExportBundle> {
+        self.store.init()?;
+
+        self.store.export_bundle(StoreExportOptions {
+            project: input.project,
+            redacted: input.redacted,
+        })
+    }
+
+    pub fn export_store_to_path(
+        &self,
+        path: &std::path::Path,
+        input: ExportInput,
+    ) -> Result<StoreExportBundle> {
+        self.store.init()?;
+
+        self.store.export_bundle_to_path(
+            path,
+            StoreExportOptions {
+                project: input.project,
+                redacted: input.redacted,
+            },
+        )
+    }
+
+    pub fn import_store_from_path(
+        &self,
+        path: &std::path::Path,
+        input: ImportInput,
+    ) -> Result<StoreImportReport> {
+        self.store.init()?;
+
+        self.store.import_bundle_from_path(
+            path,
+            StoreImportOptions {
+                dry_run: input.dry_run,
+                backup: input.backup,
+            },
+        )
     }
 
     pub fn retrieve_context(

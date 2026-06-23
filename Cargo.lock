@@ -355,7 +355,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "pi-cli"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -369,7 +369,7 @@ dependencies = [
 
 [[package]]
 name = "pi-core"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "chrono",
  "serde",
@@ -378,7 +378,7 @@ dependencies = [
 
 [[package]]
 name = "pi-governance"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -386,11 +386,12 @@ dependencies = [
  "pi-retrieval",
  "pi-store",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
 name = "pi-mcp"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "pi-core",
@@ -402,16 +403,17 @@ dependencies = [
 
 [[package]]
 name = "pi-retrieval"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "pi-core",
 ]
 
 [[package]]
 name = "pi-store"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "pi-core",
  "serde",
  "serde_json",

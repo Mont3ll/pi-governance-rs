@@ -191,6 +191,16 @@ impl<'a> JsonlStoreWriteSession<'a> {
         self.store
             .write_jsonl_atomic(&self.store.records_path, records)
     }
+
+    pub fn overwrite_patches_atomic(&self, patches: &[Patch]) -> Result<()> {
+        self.store
+            .write_jsonl_atomic(&self.store.patches_path, patches)
+    }
+
+    pub fn overwrite_events_atomic(&self, events: &[StoreEvent]) -> Result<()> {
+        self.store
+            .write_jsonl_atomic(&self.store.events_path, events)
+    }
 }
 
 fn read_jsonl<T: DeserializeOwned>(path: &Path) -> Result<Vec<T>> {

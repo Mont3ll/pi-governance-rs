@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, Scope};
 use pi_governance::{
-    ContestInput, GovernanceEngine, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
+    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput,
 };
 use pi_retrieval::render_markdown;
@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "0.5.1";
+const SERVER_VERSION: &str = "0.6.0";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -118,6 +118,7 @@ impl McpStdioServer {
             "Use pi.list_patches and pi.inspect_patch before applying queued patches.",
             "Use pi.supersede_record, pi.tombstone_record, and pi.reinforce_record for direct belief revision.",
             "Use pi.contest_record and pi.resolve_contest when a claim is disputed but not yet ready to supersede or tombstone.",
+            "Use pi.export_store and pi.import_store to move governed memory between stores without direct file mutation.",
             "The JSONL store now uses a local store.lock file to serialize mutating operations.",
             "Identity-level records and risky mutations may require force/manual review.",
         ]
@@ -495,6 +496,45 @@ impl McpStdioServer {
                     "required": ["patch_id"]
                 }
             },
+
+            {
+                "name": "pi.export_store",
+                "description": "Export the PI store as a portable JSON bundle. Can optionally filter by project or redact evidence/event details.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "project": {
+                            "type": "string",
+                            "description": "Optional project filter. Global records are included with matching project records."
+                        },
+                        "redacted": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                }
+            },
+            {
+                "name": "pi.import_store",
+                "description": "Import a portable PI JSON bundle from a local path. Defaults to dry-run for safety and skips duplicate ids.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "path": { "type": "string" },
+                        "dry_run": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "backup": {
+                            "type": "boolean",
+                            "default": true
+                        }
+                    },
+                    "required": ["path"]
+                }
+            },
             {
                 "name": "pi.migrate_schema",
                 "description": "Migrate legacy JSONL entries to the current PI schema version. Defaults to dry-run for safety.",
@@ -556,6 +596,8 @@ impl McpStdioServer {
             "pi.apply_patch" => self.tool_apply_patch(arguments),
             "pi.list_patches" => self.tool_list_patches(arguments),
             "pi.inspect_patch" => self.tool_inspect_patch(arguments),
+            "pi.export_store" => self.tool_export_store(arguments),
+            "pi.import_store" => self.tool_import_store(arguments),
             "pi.migrate_schema" => self.tool_migrate_schema(arguments),
             "pi.doctor" => self.tool_doctor(),
             "pi.list_records" => self.tool_list_records(arguments),
@@ -898,6 +940,48 @@ impl McpStdioServer {
                 json!({
                     "code": "inspect_patch_failed",
                     "patch_id": patch_id
+                }),
+            )),
+        }
+    }
+
+
+    fn tool_export_store(&self, args: Value) -> Result<Value> {
+        let project = optional_string(&args, "project");
+        let redacted = optional_bool(&args, "redacted").unwrap_or(false);
+
+        match self.engine.export_store(ExportInput { project, redacted }) {
+            Ok(bundle) => {
+                let text = serde_json::to_string_pretty(&bundle)?;
+                Ok(tool_result(text, serde_json::to_value(bundle)?))
+            }
+            Err(error) => Ok(tool_error(
+                error.to_string(),
+                json!({
+                    "code": "export_store_failed"
+                }),
+            )),
+        }
+    }
+
+    fn tool_import_store(&self, args: Value) -> Result<Value> {
+        let path = required_string(&args, "path")?;
+        let dry_run = optional_bool(&args, "dry_run").unwrap_or(true);
+        let backup = optional_bool(&args, "backup").unwrap_or(true);
+
+        match self.engine.import_store_from_path(
+            std::path::Path::new(&path),
+            ImportInput { dry_run, backup },
+        ) {
+            Ok(report) => {
+                let text = serde_json::to_string_pretty(&report)?;
+                Ok(tool_result(text, serde_json::to_value(report)?))
+            }
+            Err(error) => Ok(tool_error(
+                error.to_string(),
+                json!({
+                    "code": "import_store_failed",
+                    "path": path
                 }),
             )),
         }

@@ -66,3 +66,78 @@ fn migrates_legacy_jsonl_schema_versions_with_backup() -> anyhow::Result<()> {
     fs::remove_dir_all(root)?;
     Ok(())
 }
+
+#[test]
+fn exports_and_imports_portable_bundle_without_overwriting_duplicates() -> anyhow::Result<()> {
+    use pi_core::{EvidenceKind, EvidenceRef, Record, RecordClass, Scope};
+    use pi_store::{StoreExportOptions, StoreImportOptions};
+
+    let source_root = temp_store_dir("export-source");
+    let target_root = temp_store_dir("export-target");
+
+    let source = JsonlStore::new(&source_root);
+    source.init()?;
+
+    let record = Record::new(
+        RecordClass::Requirement,
+        "Portable exports must be importable into a different PI store.",
+        0.82,
+        Scope::project("pi-governance-rs"),
+        vec!["portable".to_string()],
+        vec![EvidenceRef::new(EvidenceKind::Test, "test:portable-export")],
+    );
+
+    source.append_record(&record)?;
+
+    let bundle = source.export_bundle(StoreExportOptions {
+        project: Some("pi-governance-rs".to_string()),
+        redacted: false,
+    })?;
+
+    assert_eq!(bundle.records.len(), 1);
+    assert_eq!(bundle.records[0].id, record.id);
+
+    let target = JsonlStore::new(&target_root);
+    target.init()?;
+
+    let dry_run = target.import_bundle(
+        bundle.clone(),
+        StoreImportOptions {
+            dry_run: true,
+            backup: true,
+        },
+    )?;
+
+    assert!(dry_run.changed);
+    assert_eq!(dry_run.imported_records, 1);
+    assert_eq!(target.load_records()?.len(), 0);
+
+    let imported = target.import_bundle(
+        bundle.clone(),
+        StoreImportOptions {
+            dry_run: false,
+            backup: true,
+        },
+    )?;
+
+    assert!(imported.changed);
+    assert_eq!(imported.imported_records, 1);
+    assert_eq!(target.load_records()?.len(), 1);
+
+    let duplicate = target.import_bundle(
+        bundle,
+        StoreImportOptions {
+            dry_run: false,
+            backup: true,
+        },
+    )?;
+
+    assert!(!duplicate.changed);
+    assert_eq!(duplicate.imported_records, 0);
+    assert_eq!(duplicate.skipped_records, 1);
+    assert_eq!(target.load_records()?.len(), 1);
+
+    fs::remove_dir_all(source_root)?;
+    fs::remove_dir_all(target_root)?;
+    Ok(())
+}
