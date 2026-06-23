@@ -11,12 +11,16 @@ use crate::jsonl::JsonlStore;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreExportOptions {
+    pub namespace: Option<String>,
+    pub all_namespaces: bool,
     pub project: Option<String>,
     pub redacted: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreImportOptions {
+    pub namespace: String,
+    pub preserve_namespaces: bool,
     pub dry_run: bool,
     pub backup: bool,
 }
@@ -26,6 +30,8 @@ pub struct StoreExportBundle {
     pub schema_version: u32,
     pub exported_at: DateTime<Utc>,
     pub redacted: bool,
+    pub namespace: Option<String>,
+    pub all_namespaces: bool,
     pub project: Option<String>,
     pub records: Vec<Record>,
     pub patches: Vec<Patch>,
@@ -59,51 +65,50 @@ impl JsonlStore {
         let patches = self.load_patches()?;
         let events = self.load_events()?;
 
-        let mut selected_records: Vec<Record> = match options.project.as_deref() {
-            Some(project) => records
-                .into_iter()
-                .filter(|record| record.scope.matches_project_filter(Some(project)))
-                .collect(),
-            None => records,
-        };
+        let namespace_filter = if options.all_namespaces { None } else { options.namespace.as_deref() };
+        let mut selected_records: Vec<Record> = records
+            .into_iter()
+            .filter(|record| namespace_filter.map(|namespace| record.namespace == namespace).unwrap_or(true))
+            .filter(|record| options.project.as_deref().map(|project| record.scope.matches_project_filter(Some(project))).unwrap_or(true))
+            .collect();
 
         let selected_record_ids: HashSet<String> = selected_records
             .iter()
             .map(|record| record.id.clone())
             .collect();
 
-        let mut selected_patches: Vec<Patch> = match options.project.as_deref() {
-            Some(project) => patches
-                .into_iter()
-                .filter(|patch| {
-                    patch
-                        .target_id
+        let mut selected_patches: Vec<Patch> = patches
+            .into_iter()
+            .filter(|patch| namespace_filter.map(|namespace| patch.namespace == namespace).unwrap_or(true))
+            .filter(|patch| {
+                patch
+                    .target_id
+                    .as_ref()
+                    .map(|target_id| selected_record_ids.contains(target_id))
+                    .unwrap_or(false)
+                    || patch
+                        .proposed_record
                         .as_ref()
-                        .map(|target_id| selected_record_ids.contains(target_id))
+                        .map(|record| {
+                            selected_record_ids.contains(&record.id)
+                                || options.project.as_deref().map(|project| record.scope.matches_project_filter(Some(project))).unwrap_or(true)
+                        })
                         .unwrap_or(false)
-                        || patch
-                            .proposed_record
-                            .as_ref()
-                            .map(|record| {
-                                selected_record_ids.contains(&record.id)
-                                    || record.scope.matches_project_filter(Some(project))
-                            })
-                            .unwrap_or(false)
-                })
-                .collect(),
-            None => patches,
-        };
+                    || options.project.is_none()
+            })
+            .collect();
 
         let selected_patch_ids: HashSet<String> = selected_patches
             .iter()
             .map(|patch| patch.id.clone())
             .collect();
 
-        let mut selected_events: Vec<StoreEvent> = match options.project.as_deref() {
-            Some(_) => events
-                .into_iter()
-                .filter(|event| {
-                    event
+        let mut selected_events: Vec<StoreEvent> = events
+            .into_iter()
+            .filter(|event| namespace_filter.map(|namespace| event.namespace == namespace).unwrap_or(true))
+            .filter(|event| {
+                options.project.is_none()
+                    || event
                         .object_id
                         .as_ref()
                         .map(|object_id| {
@@ -111,10 +116,8 @@ impl JsonlStore {
                                 || selected_patch_ids.contains(object_id)
                         })
                         .unwrap_or(false)
-                })
-                .collect(),
-            None => events,
-        };
+            })
+            .collect();
 
         if options.redacted {
             redact_records(&mut selected_records);
@@ -126,6 +129,8 @@ impl JsonlStore {
             schema_version: CURRENT_SCHEMA_VERSION,
             exported_at: Utc::now(),
             redacted: options.redacted,
+            namespace: options.namespace,
+            all_namespaces: options.all_namespaces,
             project: options.project,
             records: selected_records,
             patches: selected_patches,
@@ -206,18 +211,39 @@ impl JsonlStore {
             .iter()
             .filter(|record| !existing_record_ids.contains(&record.id))
             .cloned()
+            .map(|mut record| {
+                if !options.preserve_namespaces {
+                    record.namespace = options.namespace.clone();
+                }
+                record
+            })
             .collect();
         let import_patches: Vec<Patch> = bundle
             .patches
             .iter()
             .filter(|patch| !existing_patch_ids.contains(&patch.id))
             .cloned()
+            .map(|mut patch| {
+                if !options.preserve_namespaces {
+                    patch.namespace = options.namespace.clone();
+                    if let Some(record) = &mut patch.proposed_record {
+                        record.namespace = options.namespace.clone();
+                    }
+                }
+                patch
+            })
             .collect();
         let import_events: Vec<StoreEvent> = bundle
             .events
             .iter()
             .filter(|event| !existing_event_ids.contains(&event.id))
             .cloned()
+            .map(|mut event| {
+                if !options.preserve_namespaces {
+                    event.namespace = options.namespace.clone();
+                }
+                event
+            })
             .collect();
 
         let skipped_records = bundle.records.len().saturating_sub(import_records.len());

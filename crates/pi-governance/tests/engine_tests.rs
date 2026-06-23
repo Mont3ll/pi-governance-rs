@@ -27,6 +27,7 @@ fn proposes_inspects_and_applies_patch() -> anyhow::Result<()> {
 
     let proposal = engine.propose_record(
         ProposalInput {
+            namespace: "default".to_string(),
             class: RecordClass::Requirement,
             claim: "Patch visibility should expose proposed and applied states.".to_string(),
             confidence: 0.85,
@@ -84,6 +85,7 @@ fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Res
 
     let original = engine.propose_record(
         ProposalInput {
+            namespace: "default".to_string(),
             class: RecordClass::Requirement,
             claim: "Belief revision should be represented through governed patches.".to_string(),
             confidence: 0.70,
@@ -100,6 +102,7 @@ fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Res
 
     let reinforce = engine.reinforce_record(
         ReinforceInput {
+            namespace: "default".to_string(),
             target_id: original_id.clone(),
             evidence_refs: vec![EvidenceRef::new(EvidenceKind::Test, "test:reinforcement")],
             reason: "additional evidence supports the claim".to_string(),
@@ -121,6 +124,7 @@ fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Res
 
     let supersede = engine.supersede_record(
         SupersedeInput {
+            namespace: "default".to_string(),
             target_id: original_id.clone(),
             class: RecordClass::Requirement,
             claim: "Belief revision should support reinforcement, supersession, and tombstones."
@@ -153,6 +157,7 @@ fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Res
 
     let tombstone = engine.tombstone_record(
         TombstoneInput {
+            namespace: "default".to_string(),
             target_id: replacement_id.clone(),
             evidence_refs: vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:tombstone")],
             reason: "remove refined test record after validating tombstone flow".to_string(),
@@ -184,6 +189,7 @@ fn contest_and_resolve_belief_revision_flow() -> anyhow::Result<()> {
 
     let original = engine.propose_record(
         ProposalInput {
+            namespace: "default".to_string(),
             class: RecordClass::Requirement,
             claim: "Contest workflows should preserve disputed records until review resolution."
                 .to_string(),
@@ -201,6 +207,7 @@ fn contest_and_resolve_belief_revision_flow() -> anyhow::Result<()> {
 
     let contest = engine.contest_record(
         ContestInput {
+            namespace: "default".to_string(),
             target_id: record_id.clone(),
             evidence_refs: vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:contest")],
             reason: "reviewer found evidence that disputes this record".to_string(),
@@ -221,6 +228,7 @@ fn contest_and_resolve_belief_revision_flow() -> anyhow::Result<()> {
 
     let resolved = engine.resolve_contest(
         ResolveContestInput {
+            namespace: "default".to_string(),
             target_id: record_id.clone(),
             resolution: ContestResolution::Uphold,
             class: None,
@@ -261,6 +269,7 @@ fn engine_exports_and_imports_portable_bundle() -> anyhow::Result<()> {
 
     let proposal = source.propose_record(
         ProposalInput {
+            namespace: "default".to_string(),
             class: RecordClass::Requirement,
             claim: "Engine export should carry governed records into another store.".to_string(),
             confidence: 0.8,
@@ -274,6 +283,8 @@ fn engine_exports_and_imports_portable_bundle() -> anyhow::Result<()> {
     )?;
 
     let bundle = source.export_store(ExportInput {
+        namespace: Some("default".to_string()),
+        all_namespaces: false,
         project: Some("pi-governance-rs".to_string()),
         redacted: true,
     })?;
@@ -285,6 +296,8 @@ fn engine_exports_and_imports_portable_bundle() -> anyhow::Result<()> {
     let dry_run = target.import_store_from_path(
         &write_bundle_fixture(&target_root, &bundle)?,
         ImportInput {
+            namespace: "default".to_string(),
+            preserve_namespaces: false,
             dry_run: true,
             backup: true,
         },
@@ -298,6 +311,8 @@ fn engine_exports_and_imports_portable_bundle() -> anyhow::Result<()> {
     let imported = target.import_store_from_path(
         &import_path,
         ImportInput {
+            namespace: "default".to_string(),
+            preserve_namespaces: false,
             dry_run: false,
             backup: true,
         },

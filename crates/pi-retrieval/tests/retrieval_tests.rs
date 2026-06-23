@@ -17,6 +17,7 @@ fn rec(class: RecordClass, claim: &str, project: Option<&str>, tags: Vec<&str>, 
 fn opts(query: &str) -> RetrievalOptions {
     RetrievalOptions {
         query: query.to_string(),
+        namespace: "default".to_string(),
         project: Some("pi-governance-rs".to_string()),
         budget: 1200,
         format: RetrievalFormat::Json,

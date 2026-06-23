@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
+use pi_core::{default_namespace, ContestResolution, EvidenceKind, EvidenceRef, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
 use pi_governance::{
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput,
@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "0.7.0";
+const SERVER_VERSION: &str = "0.8.0";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -155,6 +155,10 @@ impl McpStdioServer {
                         "project": {
                             "type": "string",
                             "description": "Optional project key. Global records are still eligible."
+                        },
+                        "namespace": {
+                            "type": "string",
+                            "default": "default"
                         },
                         "budget": {
                             "type": "integer",
@@ -585,6 +589,24 @@ impl McpStdioServer {
                 }
             },
             {
+                "name": "pi.list_namespaces",
+                "description": "List PI namespace summaries.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {}
+                }
+            },
+            {
+                "name": "pi.namespace_doctor",
+                "description": "Inspect PI namespace isolation health.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {}
+                }
+            },
+            {
                 "name": "pi.list_records",
                 "description": "List recent PI records for inspection.",
                 "inputSchema": {
@@ -622,13 +644,28 @@ impl McpStdioServer {
             "pi.import_store" => self.tool_import_store(arguments),
             "pi.migrate_schema" => self.tool_migrate_schema(arguments),
             "pi.doctor" => self.tool_doctor(),
+            "pi.list_namespaces" => self.tool_list_namespaces(),
+            "pi.namespace_doctor" => self.tool_namespace_doctor(),
             "pi.list_records" => self.tool_list_records(arguments),
             other => bail!("unknown PI MCP tool: {other}"),
         }
     }
 
+    fn tool_list_namespaces(&self) -> Result<Value> {
+        let summaries = self.engine.namespace_summaries()?;
+        let text = serde_json::to_string_pretty(&summaries)?;
+        Ok(tool_result(text, serde_json::to_value(summaries)?))
+    }
+
+    fn tool_namespace_doctor(&self) -> Result<Value> {
+        let report = self.engine.namespace_doctor()?;
+        let text = serde_json::to_string_pretty(&report)?;
+        Ok(tool_result(text, serde_json::to_value(report)?))
+    }
+
     fn tool_retrieve_context(&self, args: Value) -> Result<Value> {
         let query = required_string(&args, "query")?;
+        let namespace = optional_string(&args, "namespace").unwrap_or_else(default_namespace);
         let project = optional_string(&args, "project");
         let budget = optional_usize(&args, "budget").unwrap_or(1200);
         let format = optional_string(&args, "format").unwrap_or_else(|| "markdown".to_string());
@@ -651,6 +688,7 @@ impl McpStdioServer {
             .engine
             .retrieve_context_with_options(RetrievalOptions {
                 query,
+                namespace,
                 project,
                 budget,
                 format: retrieval_format.clone(),
@@ -671,6 +709,7 @@ impl McpStdioServer {
     }
 
     fn tool_propose_record(&self, args: Value) -> Result<Value> {
+        let namespace = optional_string(&args, "namespace").unwrap_or_else(default_namespace);
         let class_raw = required_string(&args, "class")?;
         let class = RecordClass::from_str(&class_raw).map_err(anyhow::Error::msg)?;
 
@@ -702,6 +741,7 @@ impl McpStdioServer {
 
         let result = self.engine.propose_record(
             ProposalInput {
+                namespace,
                 class,
                 claim,
                 confidence,
@@ -720,6 +760,7 @@ impl McpStdioServer {
     }
 
     fn tool_supersede_record(&self, args: Value) -> Result<Value> {
+        let namespace = optional_string(&args, "namespace").unwrap_or_else(default_namespace);
         let target_id = required_string(&args, "target_id")?;
         let class_raw = required_string(&args, "class")?;
         let class = RecordClass::from_str(&class_raw).map_err(anyhow::Error::msg)?;
@@ -749,6 +790,7 @@ impl McpStdioServer {
 
         match self.engine.supersede_record(
             SupersedeInput {
+                namespace,
                 target_id: target_id.clone(),
                 class,
                 claim,
@@ -776,6 +818,7 @@ impl McpStdioServer {
     }
 
     fn tool_tombstone_record(&self, args: Value) -> Result<Value> {
+        let namespace = optional_string(&args, "namespace").unwrap_or_else(default_namespace);
         let target_id = required_string(&args, "target_id")?;
         let reason = required_string(&args, "reason")?;
         let apply = optional_bool(&args, "apply").unwrap_or(false);
@@ -794,6 +837,7 @@ impl McpStdioServer {
 
         match self.engine.tombstone_record(
             TombstoneInput {
+                namespace,
                 target_id: target_id.clone(),
                 evidence_refs,
                 reason,
@@ -816,6 +860,7 @@ impl McpStdioServer {
     }
 
     fn tool_reinforce_record(&self, args: Value) -> Result<Value> {
+        let namespace = optional_string(&args, "namespace").unwrap_or_else(default_namespace);
         let target_id = required_string(&args, "target_id")?;
         let evidence_uri = required_string(&args, "evidence_uri")?;
         let evidence_kind_raw =
@@ -828,6 +873,7 @@ impl McpStdioServer {
 
         match self.engine.reinforce_record(
             ReinforceInput {
+                namespace,
                 target_id: target_id.clone(),
                 evidence_refs: vec![EvidenceRef::new(evidence_kind, evidence_uri)],
                 reason,
@@ -850,6 +896,7 @@ impl McpStdioServer {
     }
 
     fn tool_contest_record(&self, args: Value) -> Result<Value> {
+        let namespace = optional_string(&args, "namespace").unwrap_or_else(default_namespace);
         let target_id = required_string(&args, "target_id")?;
         let evidence_uri = required_string(&args, "evidence_uri")?;
         let evidence_kind_raw =
@@ -861,6 +908,7 @@ impl McpStdioServer {
 
         match self.engine.contest_record(
             ContestInput {
+                namespace,
                 target_id: target_id.clone(),
                 evidence_refs: vec![EvidenceRef::new(evidence_kind, evidence_uri)],
                 reason,
@@ -883,6 +931,7 @@ impl McpStdioServer {
     }
 
     fn tool_resolve_contest(&self, args: Value) -> Result<Value> {
+        let namespace = optional_string(&args, "namespace").unwrap_or_else(default_namespace);
         let target_id = required_string(&args, "target_id")?;
         let resolution_raw = required_string(&args, "resolution")?;
         let resolution =
@@ -917,6 +966,7 @@ impl McpStdioServer {
 
         match self.engine.resolve_contest(
             ResolveContestInput {
+                namespace,
                 target_id: target_id.clone(),
                 resolution,
                 class,
@@ -992,10 +1042,12 @@ impl McpStdioServer {
 
 
     fn tool_export_store(&self, args: Value) -> Result<Value> {
+        let namespace = optional_string(&args, "namespace").or_else(|| Some(default_namespace()));
+        let all_namespaces = optional_bool(&args, "all_namespaces").unwrap_or(false);
         let project = optional_string(&args, "project");
         let redacted = optional_bool(&args, "redacted").unwrap_or(false);
 
-        match self.engine.export_store(ExportInput { project, redacted }) {
+        match self.engine.export_store(ExportInput { namespace, all_namespaces, project, redacted }) {
             Ok(bundle) => {
                 let text = serde_json::to_string_pretty(&bundle)?;
                 Ok(tool_result(text, serde_json::to_value(bundle)?))
@@ -1011,12 +1063,14 @@ impl McpStdioServer {
 
     fn tool_import_store(&self, args: Value) -> Result<Value> {
         let path = required_string(&args, "path")?;
+        let namespace = optional_string(&args, "namespace").unwrap_or_else(default_namespace);
+        let preserve_namespaces = optional_bool(&args, "preserve_namespaces").unwrap_or(false);
         let dry_run = optional_bool(&args, "dry_run").unwrap_or(true);
         let backup = optional_bool(&args, "backup").unwrap_or(true);
 
         match self.engine.import_store_from_path(
             std::path::Path::new(&path),
-            ImportInput { dry_run, backup },
+            ImportInput { namespace, preserve_namespaces, dry_run, backup },
         ) {
             Ok(report) => {
                 let text = serde_json::to_string_pretty(&report)?;

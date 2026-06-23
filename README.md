@@ -236,3 +236,34 @@ Expected:
 ```text
 pi 0.6.0
 ```
+
+## v0.8.0 namespace isolation
+
+PI supports logical namespace isolation while continuing to use the same JSONL store files. Existing records without namespace metadata deserialize into the `default` namespace, and existing CLI/MCP calls without namespace arguments continue to use `default`.
+
+Namespaces are logical filters, not separate physical stores. v0.8.0 does not split files or introduce a database; record IDs remain globally unique in the current implementation, so duplicate imported IDs are skipped even if namespaces differ.
+
+CLI examples:
+
+```bash
+pi --namespace pi-governance-rs propose --class requirement --claim "Namespace isolation prevents cross-project memory leakage." --evidence-uri conversation:v0.8.0 --apply
+
+pi --namespace pi-governance-rs retrieve "namespace isolation" --project pi-governance-rs --explain
+
+pi namespace list
+pi namespace doctor
+
+pi --namespace pi-governance-rs export --output /tmp/pi-governance-export.json
+
+pi --namespace sandbox import /tmp/pi-governance-export.json --dry-run
+```
+
+MCP tools accept an optional `namespace` string argument, defaulting to `default`, including `pi.retrieve_context`, `pi.propose_record`, belief-revision tools, export/import, list, and doctor-style tools. Namespace inspection is available through `pi.list_namespaces` and `pi.namespace_doctor`.
+
+Export/import behavior:
+
+- `pi export` exports the current namespace.
+- `pi --namespace x export` exports namespace `x`.
+- `pi export --all-namespaces` exports all namespaces.
+- `pi import bundle.json` imports records into the current namespace, rewriting bundle record namespaces.
+- `pi import bundle.json --preserve-namespaces` keeps namespaces from the bundle.

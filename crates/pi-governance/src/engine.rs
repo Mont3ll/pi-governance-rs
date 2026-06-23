@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use pi_core::{
     validate_patch, validate_record, ContestResolution, ContextBundle, DecisionStatus, EvidenceRef,
     GovernanceDecision, Patch, PatchOperation, PatchStatus, Record, RecordClass, RecordStatus,
-    RetrievalBudget, RetrievalOptions, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
+    default_namespace, RetrievalBudget, RetrievalOptions, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
 };
 use pi_retrieval::{retrieve, retrieve_with_options};
 use pi_store::{
@@ -15,6 +15,7 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct ProposalInput {
+    pub namespace: String,
     pub class: RecordClass,
     pub claim: String,
     pub confidence: f32,
@@ -32,18 +33,23 @@ pub struct MigrationInput {
 
 #[derive(Debug, Clone)]
 pub struct ExportInput {
+    pub namespace: Option<String>,
+    pub all_namespaces: bool,
     pub project: Option<String>,
     pub redacted: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct ImportInput {
+    pub namespace: String,
+    pub preserve_namespaces: bool,
     pub dry_run: bool,
     pub backup: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct SupersedeInput {
+    pub namespace: String,
     pub target_id: String,
     pub class: RecordClass,
     pub claim: String,
@@ -56,6 +62,7 @@ pub struct SupersedeInput {
 
 #[derive(Debug, Clone)]
 pub struct TombstoneInput {
+    pub namespace: String,
     pub target_id: String,
     pub evidence_refs: Vec<EvidenceRef>,
     pub reason: String,
@@ -63,6 +70,7 @@ pub struct TombstoneInput {
 
 #[derive(Debug, Clone)]
 pub struct ReinforceInput {
+    pub namespace: String,
     pub target_id: String,
     pub evidence_refs: Vec<EvidenceRef>,
     pub reason: String,
@@ -70,6 +78,7 @@ pub struct ReinforceInput {
 
 #[derive(Debug, Clone)]
 pub struct ContestInput {
+    pub namespace: String,
     pub target_id: String,
     pub evidence_refs: Vec<EvidenceRef>,
     pub reason: String,
@@ -77,6 +86,7 @@ pub struct ContestInput {
 
 #[derive(Debug, Clone)]
 pub struct ResolveContestInput {
+    pub namespace: String,
     pub target_id: String,
     pub resolution: ContestResolution,
     pub class: Option<RecordClass>,
@@ -131,8 +141,34 @@ pub struct PatchInspection {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct NamespaceSummary {
+    pub namespace: String,
+    pub records: usize,
+    pub active: usize,
+    pub contested: usize,
+    pub superseded: usize,
+    pub tombstoned: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct NamespaceDoctorReport {
+    pub namespaces: usize,
+    pub default_namespace: String,
+    pub records_without_explicit_namespace: usize,
+    pub cross_namespace_duplicate_ids: usize,
+    pub summaries: Vec<NamespaceSummary>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct DoctorReport {
     pub store_dir: String,
+    pub current_namespace: String,
+    pub namespaces: usize,
+    pub records_in_current_namespace: usize,
+    pub active_in_current_namespace: usize,
+    pub contested_in_current_namespace: usize,
+    pub superseded_in_current_namespace: usize,
+    pub tombstoned_in_current_namespace: usize,
     pub lock_path: String,
     pub schema_version: u32,
     pub schema_audits: Vec<SchemaFileAudit>,
@@ -174,7 +210,7 @@ impl GovernanceEngine {
         self.store.init()?;
         let session = self.store.write_session()?;
 
-        let record = Record::new(
+        let mut record = Record::new(
             input.class,
             input.claim,
             input.confidence,
@@ -182,6 +218,7 @@ impl GovernanceEngine {
             input.tags,
             input.evidence_refs,
         );
+        record.namespace = input.namespace;
 
         let patch = Patch::propose_record(
             record.clone(),
@@ -236,7 +273,9 @@ impl GovernanceEngine {
         self.store.init()?;
         let session = self.store.write_session()?;
 
-        let replacement = Record::new(
+        let namespace = input.namespace.clone();
+        Self::ensure_record_in_namespace_locked(&session, &input.target_id, &namespace)?;
+        let mut replacement = Record::new(
             input.class,
             input.claim,
             input.confidence,
@@ -244,6 +283,7 @@ impl GovernanceEngine {
             input.tags,
             input.evidence_refs,
         );
+        replacement.namespace = namespace.clone();
 
         let patch = Patch::supersede_record(input.target_id, replacement.clone(), input.reason);
         let existing = session.load_records()?;
@@ -292,8 +332,11 @@ impl GovernanceEngine {
         self.store.init()?;
         let session = self.store.write_session()?;
 
+        let namespace = input.namespace.clone();
+        Self::ensure_record_in_namespace_locked(&session, &input.target_id, &namespace)?;
         let target_id = input.target_id.clone();
-        let patch = Patch::tombstone_record(input.target_id, input.evidence_refs, input.reason);
+        let mut patch = Patch::tombstone_record(input.target_id, input.evidence_refs, input.reason);
+        patch.namespace = namespace;
         let existing = session.load_records()?;
         let decision = validate_patch(&patch, &existing);
 
@@ -340,8 +383,11 @@ impl GovernanceEngine {
         self.store.init()?;
         let session = self.store.write_session()?;
 
+        let namespace = input.namespace.clone();
+        Self::ensure_record_in_namespace_locked(&session, &input.target_id, &namespace)?;
         let target_id = input.target_id.clone();
-        let patch = Patch::reinforce_record(input.target_id, input.evidence_refs, input.reason);
+        let mut patch = Patch::reinforce_record(input.target_id, input.evidence_refs, input.reason);
+        patch.namespace = namespace;
         let existing = session.load_records()?;
         let decision = validate_patch(&patch, &existing);
 
@@ -388,8 +434,11 @@ impl GovernanceEngine {
         self.store.init()?;
         let session = self.store.write_session()?;
 
+        let namespace = input.namespace.clone();
+        Self::ensure_record_in_namespace_locked(&session, &input.target_id, &namespace)?;
         let target_id = input.target_id.clone();
-        let patch = Patch::contest_record(input.target_id, input.evidence_refs, input.reason);
+        let mut patch = Patch::contest_record(input.target_id, input.evidence_refs, input.reason);
+        patch.namespace = namespace;
         let existing = session.load_records()?;
         let decision = validate_patch(&patch, &existing);
 
@@ -436,6 +485,8 @@ impl GovernanceEngine {
         self.store.init()?;
         let session = self.store.write_session()?;
 
+        let namespace = input.namespace.clone();
+        Self::ensure_record_in_namespace_locked(&session, &input.target_id, &namespace)?;
         let target_id = input.target_id.clone();
         let replacement = match input.resolution {
             ContestResolution::Supersede => {
@@ -536,6 +587,18 @@ impl GovernanceEngine {
         })
     }
 
+    fn ensure_record_in_namespace_locked(
+        session: &pi_store::JsonlStoreWriteSession<'_>,
+        record_id: &str,
+        namespace: &str,
+    ) -> Result<()> {
+        let records = session.load_records()?;
+        if records.iter().any(|record| record.id == record_id && record.namespace == namespace) {
+            return Ok(());
+        }
+        bail!("record not found in namespace '{namespace}'")
+    }
+
     fn apply_patch_object_locked(
         session: &pi_store::JsonlStoreWriteSession<'_>,
         patch: &Patch,
@@ -574,7 +637,7 @@ impl GovernanceEngine {
                     .context("supersede patch missing target_id")?;
 
                 for record in &mut records {
-                    if &record.id == target_id {
+                    if &record.id == target_id && record.namespace == patch.namespace {
                         record.status = RecordStatus::Superseded;
                         record.updated_at = Utc::now();
                     }
@@ -596,7 +659,7 @@ impl GovernanceEngine {
                     .context("tombstone patch missing target_id")?;
 
                 for record in &mut records {
-                    if &record.id == target_id {
+                    if &record.id == target_id && record.namespace == patch.namespace {
                         record.status = RecordStatus::Tombstoned;
                         record.updated_at = Utc::now();
                     }
@@ -610,7 +673,7 @@ impl GovernanceEngine {
                     .context("reinforce patch missing target_id")?;
 
                 for record in &mut records {
-                    if &record.id == target_id {
+                    if &record.id == target_id && record.namespace == patch.namespace {
                         record.confidence = (record.confidence + 0.05).min(1.0);
                         record.evidence.extend(patch.evidence.clone());
                         record.updated_at = Utc::now();
@@ -625,7 +688,7 @@ impl GovernanceEngine {
                     .context("contest patch missing target_id")?;
 
                 for record in &mut records {
-                    if &record.id == target_id {
+                    if &record.id == target_id && record.namespace == patch.namespace {
                         record.status = RecordStatus::Contested;
                         record.updated_at = Utc::now();
                     }
@@ -645,7 +708,7 @@ impl GovernanceEngine {
                 match resolution {
                     ContestResolution::Uphold => {
                         for record in &mut records {
-                            if &record.id == target_id {
+                            if &record.id == target_id && record.namespace == patch.namespace {
                                 record.status = RecordStatus::Active;
                                 record.updated_at = Utc::now();
                             }
@@ -653,7 +716,7 @@ impl GovernanceEngine {
                     }
                     ContestResolution::Tombstone => {
                         for record in &mut records {
-                            if &record.id == target_id {
+                            if &record.id == target_id && record.namespace == patch.namespace {
                                 record.status = RecordStatus::Tombstoned;
                                 record.updated_at = Utc::now();
                             }
@@ -661,7 +724,7 @@ impl GovernanceEngine {
                     }
                     ContestResolution::Supersede => {
                         for record in &mut records {
-                            if &record.id == target_id {
+                            if &record.id == target_id && record.namespace == patch.namespace {
                                 record.status = RecordStatus::Superseded;
                                 record.updated_at = Utc::now();
                             }
@@ -699,6 +762,8 @@ impl GovernanceEngine {
         self.store.init()?;
 
         self.store.export_bundle(StoreExportOptions {
+            namespace: input.namespace,
+            all_namespaces: input.all_namespaces,
             project: input.project,
             redacted: input.redacted,
         })
@@ -714,6 +779,8 @@ impl GovernanceEngine {
         self.store.export_bundle_to_path(
             path,
             StoreExportOptions {
+                namespace: input.namespace,
+                all_namespaces: input.all_namespaces,
                 project: input.project,
                 redacted: input.redacted,
             },
@@ -730,6 +797,8 @@ impl GovernanceEngine {
         self.store.import_bundle_from_path(
             path,
             StoreImportOptions {
+                namespace: input.namespace,
+                preserve_namespaces: input.preserve_namespaces,
                 dry_run: input.dry_run,
                 backup: input.backup,
             },
@@ -761,9 +830,16 @@ impl GovernanceEngine {
     }
 
     pub fn list_records(&self, limit: usize) -> Result<Vec<Record>> {
+        self.list_records_in_namespace(&default_namespace(), limit)
+    }
+
+    pub fn list_records_in_namespace(&self, namespace: &str, limit: usize) -> Result<Vec<Record>> {
         self.store.init()?;
 
-        let mut records = self.store.load_records()?;
+        let mut records: Vec<Record> = self.store.load_records()?
+            .into_iter()
+            .filter(|record| record.namespace == namespace)
+            .collect();
         records.reverse();
         records.truncate(limit);
 
@@ -840,10 +916,57 @@ impl GovernanceEngine {
         })
     }
 
+    pub fn namespace_summaries(&self) -> Result<Vec<NamespaceSummary>> {
+        self.store.init()?;
+        let records = self.store.load_records()?;
+        let mut namespaces: Vec<String> = records.iter().map(|record| record.namespace.clone()).collect();
+        namespaces.sort();
+        namespaces.dedup();
+        Ok(namespaces.into_iter().map(|namespace| {
+            let in_ns: Vec<&Record> = records.iter().filter(|record| record.namespace == namespace).collect();
+            NamespaceSummary {
+                namespace,
+                records: in_ns.len(),
+                active: in_ns.iter().filter(|record| record.status == RecordStatus::Active).count(),
+                contested: in_ns.iter().filter(|record| record.status == RecordStatus::Contested).count(),
+                superseded: in_ns.iter().filter(|record| record.status == RecordStatus::Superseded).count(),
+                tombstoned: in_ns.iter().filter(|record| record.status == RecordStatus::Tombstoned).count(),
+            }
+        }).collect())
+    }
+
+    pub fn namespace_doctor(&self) -> Result<NamespaceDoctorReport> {
+        let summaries = self.namespace_summaries()?;
+        let records = self.store.load_records()?;
+        let mut by_id: HashMap<String, HashSet<String>> = HashMap::new();
+        for record in &records {
+            by_id.entry(record.id.clone()).or_default().insert(record.namespace.clone());
+        }
+        let cross_namespace_duplicate_ids = by_id.values().filter(|namespaces| namespaces.len() > 1).count();
+        Ok(NamespaceDoctorReport {
+            namespaces: summaries.len(),
+            default_namespace: default_namespace(),
+            records_without_explicit_namespace: 0,
+            cross_namespace_duplicate_ids,
+            summaries,
+        })
+    }
+
     pub fn doctor(&self) -> Result<DoctorReport> {
+        self.doctor_in_namespace(&default_namespace())
+    }
+
+    pub fn doctor_in_namespace(&self, namespace: &str) -> Result<DoctorReport> {
         self.store.init()?;
 
         let records = self.store.load_records()?;
+        let namespace_records: Vec<&Record> = records.iter().filter(|record| record.namespace == namespace).collect();
+        let namespace_count = self.namespace_summaries()?.len();
+        let records_in_current_namespace = namespace_records.len();
+        let active_in_current_namespace = namespace_records.iter().filter(|record| record.status == RecordStatus::Active).count();
+        let contested_in_current_namespace = namespace_records.iter().filter(|record| record.status == RecordStatus::Contested).count();
+        let superseded_in_current_namespace = namespace_records.iter().filter(|record| record.status == RecordStatus::Superseded).count();
+        let tombstoned_in_current_namespace = namespace_records.iter().filter(|record| record.status == RecordStatus::Tombstoned).count();
         let patches = self.store.load_patches()?;
         let events = self.store.load_events()?;
         let schema_audits = self.store.audit_schema_versions(CURRENT_SCHEMA_VERSION)?;
@@ -946,6 +1069,13 @@ impl GovernanceEngine {
 
         Ok(DoctorReport {
             store_dir: self.store.root().display().to_string(),
+            current_namespace: namespace.to_string(),
+            namespaces: namespace_count,
+            records_in_current_namespace,
+            active_in_current_namespace,
+            contested_in_current_namespace,
+            superseded_in_current_namespace,
+            tombstoned_in_current_namespace,
             lock_path: self.store.lock_path().display().to_string(),
             schema_version: CURRENT_SCHEMA_VERSION,
             schema_audits,

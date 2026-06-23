@@ -27,6 +27,7 @@ pub fn retrieve(
 ) -> ContextBundle {
     retrieve_with_options(records, RetrievalOptions {
         query: query.into(),
+        namespace: pi_core::default_namespace(),
         project,
         budget: budget.max_tokens,
         format: RetrievalFormat::Markdown,
@@ -42,6 +43,7 @@ pub fn retrieve_with_options(records: &[Record], options: RetrievalOptions) -> C
     let query_terms = tokenize(&options.query);
     let mut ranked: Vec<RankedRecord> = records
         .iter()
+        .filter(|record| record.namespace == options.namespace)
         .filter(|record| eligible(
             record,
             options.project.as_deref(),
@@ -67,6 +69,7 @@ pub fn retrieve_with_options(records: &[Record], options: RetrievalOptions) -> C
 
     ContextBundle {
         query: options.query,
+        namespace: options.namespace,
         project: options.project,
         budget: RetrievalBudget { max_tokens: options.budget },
         used_estimated_tokens,
@@ -82,6 +85,8 @@ pub fn render_markdown(bundle: &ContextBundle) -> String {
 
     output.push_str("# PI Context Bundle\n\n");
     output.push_str(&format!("Query: `{}`\n\n", bundle.query));
+
+    output.push_str(&format!("Namespace: `{}`\n\n", bundle.namespace));
 
     if let Some(project) = &bundle.project {
         output.push_str(&format!("Project: `{project}`\n\n"));

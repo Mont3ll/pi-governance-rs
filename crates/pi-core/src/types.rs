@@ -5,6 +5,15 @@ use std::fmt;
 use std::str::FromStr;
 use uuid::Uuid;
 
+pub const DEFAULT_NAMESPACE: &str = "default";
+
+pub fn default_namespace() -> String {
+    DEFAULT_NAMESPACE.to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct NamespaceId(pub String);
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordClass {
@@ -187,6 +196,8 @@ impl EvidenceRef {
 pub struct Record {
     #[serde(default = "current_schema_version")]
     pub schema_version: u32,
+    #[serde(default = "default_namespace")]
+    pub namespace: String,
     pub id: String,
     pub class: RecordClass,
     pub claim: String,
@@ -213,6 +224,7 @@ impl Record {
 
         Self {
             schema_version: current_schema_version(),
+            namespace: default_namespace(),
             id: format!("rec_{}", Uuid::new_v4()),
             class,
             claim: claim.into(),
@@ -290,6 +302,8 @@ pub enum PatchStatus {
 pub struct Patch {
     #[serde(default = "current_schema_version")]
     pub schema_version: u32,
+    #[serde(default = "default_namespace")]
+    pub namespace: String,
     pub id: String,
     pub operation: PatchOperation,
     pub status: PatchStatus,
@@ -308,6 +322,7 @@ impl Patch {
 
         Self {
             schema_version: current_schema_version(),
+            namespace: record.namespace.clone(),
             id: format!("patch_{}", Uuid::new_v4()),
             operation: PatchOperation::ProposeRecord,
             status: PatchStatus::Proposed,
@@ -330,6 +345,7 @@ impl Patch {
 
         Self {
             schema_version: current_schema_version(),
+            namespace: replacement.namespace.clone(),
             id: format!("patch_{}", Uuid::new_v4()),
             operation: PatchOperation::SupersedeRecord,
             status: PatchStatus::Proposed,
@@ -352,6 +368,7 @@ impl Patch {
 
         Self {
             schema_version: current_schema_version(),
+            namespace: default_namespace(),
             id: format!("patch_{}", Uuid::new_v4()),
             operation: PatchOperation::TombstoneRecord,
             status: PatchStatus::Proposed,
@@ -374,6 +391,7 @@ impl Patch {
 
         Self {
             schema_version: current_schema_version(),
+            namespace: default_namespace(),
             id: format!("patch_{}", Uuid::new_v4()),
             operation: PatchOperation::ReinforceRecord,
             status: PatchStatus::Proposed,
@@ -396,6 +414,7 @@ impl Patch {
 
         Self {
             schema_version: current_schema_version(),
+            namespace: default_namespace(),
             id: format!("patch_{}", Uuid::new_v4()),
             operation: PatchOperation::ContestRecord,
             status: PatchStatus::Proposed,
@@ -420,6 +439,7 @@ impl Patch {
 
         Self {
             schema_version: current_schema_version(),
+            namespace: default_namespace(),
             id: format!("patch_{}", Uuid::new_v4()),
             operation: PatchOperation::ResolveContest,
             status: PatchStatus::Proposed,
@@ -523,6 +543,8 @@ pub enum RetrievalFormat {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrievalOptions {
     pub query: String,
+    #[serde(default = "default_namespace")]
+    pub namespace: String,
     pub project: Option<String>,
     pub budget: usize,
     pub format: RetrievalFormat,
@@ -567,6 +589,8 @@ pub struct ContextBlock {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextBundle {
     pub query: String,
+    #[serde(default = "default_namespace")]
+    pub namespace: String,
     pub project: Option<String>,
     pub budget: RetrievalBudget,
     pub used_estimated_tokens: usize,
@@ -580,6 +604,8 @@ pub struct ContextBundle {
 pub struct StoreEvent {
     #[serde(default = "current_schema_version")]
     pub schema_version: u32,
+    #[serde(default = "default_namespace")]
+    pub namespace: String,
     pub id: String,
     pub severity: String,
     pub message: String,
@@ -591,6 +617,7 @@ impl StoreEvent {
     pub fn info(message: impl Into<String>, object_id: Option<String>) -> Self {
         Self {
             schema_version: current_schema_version(),
+            namespace: default_namespace(),
             id: format!("evt_{}", Uuid::new_v4()),
             severity: "info".to_string(),
             message: message.into(),
@@ -602,6 +629,7 @@ impl StoreEvent {
     pub fn warning(message: impl Into<String>, object_id: Option<String>) -> Self {
         Self {
             schema_version: current_schema_version(),
+            namespace: default_namespace(),
             id: format!("evt_{}", Uuid::new_v4()),
             severity: "warning".to_string(),
             message: message.into(),

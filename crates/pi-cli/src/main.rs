@@ -13,12 +13,15 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "0.7.0",
+    version = "0.8.0",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
     #[arg(long, global = true, default_value = ".pi")]
     store: PathBuf,
+
+    #[arg(long, global = true, default_value = "default")]
+    namespace: String,
 
     #[command(subcommand)]
     command: Commands,
@@ -252,11 +255,21 @@ enum Commands {
     },
 
 
+    /// Namespace inspection commands.
+    Namespace {
+        #[command(subcommand)]
+        command: NamespaceCommands,
+    },
+
     /// Export the PI store as a portable JSON bundle.
     Export {
         /// Optional output path. If omitted, the export bundle is printed to stdout.
         #[arg(long)]
         output: Option<PathBuf>,
+
+        /// Export all namespaces.
+        #[arg(long = "all-namespaces")]
+        all_namespaces: bool,
 
         /// Optional project filter. Global records are included with matching project records.
         #[arg(long)]
@@ -274,6 +287,10 @@ enum Commands {
         /// Report planned import changes without rewriting files.
         #[arg(long)]
         dry_run: bool,
+
+        /// Preserve namespaces stored in the bundle.
+        #[arg(long = "preserve-namespaces")]
+        preserve_namespaces: bool,
 
         /// Create a timestamped backup under the store before rewriting.
         #[arg(long)]
@@ -313,9 +330,18 @@ enum Commands {
     McpStdio,
 }
 
+#[derive(Debug, Subcommand)]
+enum NamespaceCommands {
+    /// List namespace summaries.
+    List,
+    /// Inspect namespace health.
+    Doctor,
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    let namespace = cli.namespace;
     let store = JsonlStore::new(cli.store);
     let engine = GovernanceEngine::new(store);
 
@@ -349,6 +375,7 @@ fn main() -> Result<()> {
 
             let result = engine.propose_record(
                 ProposalInput {
+                    namespace: namespace.clone(),
                     class,
                     claim,
                     confidence,
@@ -382,6 +409,7 @@ fn main() -> Result<()> {
             };
             let bundle = engine.retrieve_context_with_options(RetrievalOptions {
                 query,
+                namespace: namespace.clone(),
                 project,
                 budget,
                 format: retrieval_format.clone(),
@@ -487,6 +515,7 @@ fn main() -> Result<()> {
 
             let result = engine.supersede_record(
                 SupersedeInput {
+                    namespace: namespace.clone(),
                     target_id,
                     class,
                     claim,
@@ -518,6 +547,7 @@ fn main() -> Result<()> {
 
             let result = engine.tombstone_record(
                 TombstoneInput {
+                    namespace: namespace.clone(),
                     target_id,
                     evidence_refs,
                     reason,
@@ -539,6 +569,7 @@ fn main() -> Result<()> {
         } => {
             let result = engine.reinforce_record(
                 ReinforceInput {
+                    namespace: namespace.clone(),
                     target_id,
                     evidence_refs: vec![EvidenceRef::new(evidence_kind, evidence_uri)],
                     reason,
@@ -560,6 +591,7 @@ fn main() -> Result<()> {
         } => {
             let result = engine.contest_record(
                 ContestInput {
+                    namespace: namespace.clone(),
                     target_id,
                     evidence_refs: vec![EvidenceRef::new(evidence_kind, evidence_uri)],
                     reason,
@@ -597,6 +629,7 @@ fn main() -> Result<()> {
 
             let result = engine.resolve_contest(
                 ResolveContestInput {
+                    namespace: namespace.clone(),
                     target_id,
                     resolution,
                     class,
@@ -615,12 +648,32 @@ fn main() -> Result<()> {
         }
 
 
+        Commands::Namespace { command } => match command {
+            NamespaceCommands::List => {
+                for summary in engine.namespace_summaries()? {
+                    println!(
+                        "- {} records={} active={} contested={} superseded={} tombstoned={}",
+                        summary.namespace, summary.records, summary.active, summary.contested, summary.superseded, summary.tombstoned
+                    );
+                }
+            }
+            NamespaceCommands::Doctor => {
+                let report = engine.namespace_doctor()?;
+                println!("PI Namespace Doctor");
+                println!("Namespaces: {}", report.namespaces);
+                println!("Default namespace: {}", report.default_namespace);
+                println!("Records without explicit namespace: {}", report.records_without_explicit_namespace);
+                println!("Cross-namespace duplicate IDs: {}", report.cross_namespace_duplicate_ids);
+            }
+        },
+
         Commands::Export {
             output,
+            all_namespaces,
             project,
             redacted,
         } => {
-            let input = ExportInput { project, redacted };
+            let input = ExportInput { namespace: Some(namespace.clone()), all_namespaces, project, redacted };
 
             match output {
                 Some(path) => {
@@ -628,6 +681,7 @@ fn main() -> Result<()> {
                     println!("PI export written: {}", path.display());
                     println!("Schema version: {}", bundle.schema_version);
                     println!("Redacted: {}", bundle.redacted);
+                    println!("Namespace: {}", bundle.namespace.as_deref().unwrap_or(if bundle.all_namespaces { "<all>" } else { "<none>" }));
                     println!("Project: {}", bundle.project.as_deref().unwrap_or("<all>"));
                     println!("Records: {}", bundle.records.len());
                     println!("Patches: {}", bundle.patches.len());
@@ -643,10 +697,11 @@ fn main() -> Result<()> {
         Commands::Import {
             path,
             dry_run,
+            preserve_namespaces,
             backup,
             json,
         } => {
-            let report = engine.import_store_from_path(&path, ImportInput { dry_run, backup })?;
+            let report = engine.import_store_from_path(&path, ImportInput { namespace: namespace.clone(), preserve_namespaces, dry_run, backup })?;
 
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
@@ -729,7 +784,7 @@ fn main() -> Result<()> {
         }
 
         Commands::Doctor { json } => {
-            let report = engine.doctor()?;
+            let report = engine.doctor_in_namespace(&namespace)?;
 
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
@@ -739,6 +794,13 @@ fn main() -> Result<()> {
                 println!("Lock: {}", report.lock_path);
                 println!("Schema version: {}", report.schema_version);
                 println!("Migration needed: {}", report.migration_needed);
+                println!("Namespaces: {}", report.namespaces);
+                println!("Current namespace: {}", report.current_namespace);
+                println!("Records in current namespace: {}", report.records_in_current_namespace);
+                println!("Active in current namespace: {}", report.active_in_current_namespace);
+                println!("Contested in current namespace: {}", report.contested_in_current_namespace);
+                println!("Superseded in current namespace: {}", report.superseded_in_current_namespace);
+                println!("Tombstoned in current namespace: {}", report.tombstoned_in_current_namespace);
                 println!("Records: {}", report.total_records);
                 println!("Active: {}", report.active_records);
                 println!("Superseded: {}", report.superseded_records);
@@ -781,7 +843,7 @@ fn main() -> Result<()> {
         }
 
         Commands::List { limit } => {
-            let records = engine.list_records(limit)?;
+            let records = engine.list_records_in_namespace(&namespace, limit)?;
 
             for record in records {
                 println!(

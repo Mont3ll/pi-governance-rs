@@ -90,6 +90,8 @@ fn exports_and_imports_portable_bundle_without_overwriting_duplicates() -> anyho
     source.append_record(&record)?;
 
     let bundle = source.export_bundle(StoreExportOptions {
+        namespace: Some("default".to_string()),
+        all_namespaces: false,
         project: Some("pi-governance-rs".to_string()),
         redacted: false,
     })?;
@@ -103,6 +105,8 @@ fn exports_and_imports_portable_bundle_without_overwriting_duplicates() -> anyho
     let dry_run = target.import_bundle(
         bundle.clone(),
         StoreImportOptions {
+            namespace: "default".to_string(),
+            preserve_namespaces: false,
             dry_run: true,
             backup: true,
         },
@@ -115,6 +119,8 @@ fn exports_and_imports_portable_bundle_without_overwriting_duplicates() -> anyho
     let imported = target.import_bundle(
         bundle.clone(),
         StoreImportOptions {
+            namespace: "default".to_string(),
+            preserve_namespaces: false,
             dry_run: false,
             backup: true,
         },
@@ -127,6 +133,8 @@ fn exports_and_imports_portable_bundle_without_overwriting_duplicates() -> anyho
     let duplicate = target.import_bundle(
         bundle,
         StoreImportOptions {
+            namespace: "default".to_string(),
+            preserve_namespaces: false,
             dry_run: false,
             backup: true,
         },
