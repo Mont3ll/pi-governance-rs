@@ -3,9 +3,9 @@ use chrono::{DateTime, Utc};
 use pi_core::{
     validate_patch, validate_record, ContestResolution, ContextBundle, DecisionStatus, EvidenceRef,
     GovernanceDecision, Patch, PatchOperation, PatchStatus, Record, RecordClass, RecordStatus,
-    RetrievalBudget, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
+    RetrievalBudget, RetrievalOptions, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
 };
-use pi_retrieval::retrieve;
+use pi_retrieval::{retrieve, retrieve_with_options};
 use pi_store::{
     JsonlStore, SchemaMigrationOptions, SchemaMigrationReport, StoreExportBundle,
     StoreExportOptions, StoreImportOptions, StoreImportReport,
@@ -752,6 +752,12 @@ impl GovernanceEngine {
             project,
             RetrievalBudget { max_tokens },
         ))
+    }
+
+    pub fn retrieve_context_with_options(&self, options: RetrievalOptions) -> Result<ContextBundle> {
+        self.store.init()?;
+        let records = self.store.load_records()?;
+        Ok(retrieve_with_options(&records, options))
     }
 
     pub fn list_records(&self, limit: usize) -> Result<Vec<Record>> {

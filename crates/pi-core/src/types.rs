@@ -513,6 +513,48 @@ pub struct RetrievalBudget {
     pub max_tokens: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RetrievalFormat {
+    Markdown,
+    Json,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetrievalOptions {
+    pub query: String,
+    pub project: Option<String>,
+    pub budget: usize,
+    pub format: RetrievalFormat,
+    pub explain: bool,
+    pub classes: Vec<RecordClass>,
+    pub include_global: bool,
+    pub include_contested: bool,
+    pub min_confidence: Option<f32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScoreBreakdown {
+    pub query_match: f32,
+    pub project_scope: f32,
+    pub class_priority: f32,
+    pub tag_match: f32,
+    pub confidence: f32,
+    pub evidence: f32,
+    pub recency: f32,
+    pub status_penalty: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RankedRecord {
+    pub record: Record,
+    pub score: f32,
+    #[serde(rename = "score_breakdown")]
+    pub breakdown: ScoreBreakdown,
+    pub matched_terms: Vec<String>,
+    pub explanation: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextBlock {
     pub record_id: String,
@@ -528,7 +570,9 @@ pub struct ContextBundle {
     pub project: Option<String>,
     pub budget: RetrievalBudget,
     pub used_estimated_tokens: usize,
+    pub explain: bool,
     pub blocks: Vec<ContextBlock>,
+    pub records: Vec<RankedRecord>,
     pub warnings: Vec<String>,
 }
 

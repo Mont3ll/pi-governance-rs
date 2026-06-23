@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, Scope};
+use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
 use pi_governance::{
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput,
@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "0.6.0";
+const SERVER_VERSION: &str = "0.7.0";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -139,7 +139,7 @@ impl McpStdioServer {
         })
     }
 
-    fn tool_definitions(&self) -> Value {
+    pub fn tool_definitions(&self) -> Value {
         json!([
             {
                 "name": "pi.retrieve_context",
@@ -166,6 +166,28 @@ impl McpStdioServer {
                             "type": "string",
                             "enum": ["json", "markdown"],
                             "default": "markdown"
+                        },
+                        "explain": {
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "classes": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "default": []
+                        },
+                        "include_global": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "include_contested": {
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "min_confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
                         }
                     },
                     "required": ["query"]
@@ -610,16 +632,39 @@ impl McpStdioServer {
         let project = optional_string(&args, "project");
         let budget = optional_usize(&args, "budget").unwrap_or(1200);
         let format = optional_string(&args, "format").unwrap_or_else(|| "markdown".to_string());
+        let explain = optional_bool(&args, "explain").unwrap_or(false);
+        let include_global = optional_bool(&args, "include_global").unwrap_or(true);
+        let include_contested = optional_bool(&args, "include_contested").unwrap_or(false);
+        let min_confidence = optional_f32(&args, "min_confidence");
+        let classes = optional_string_array(&args, "classes")?
+            .unwrap_or_default()
+            .into_iter()
+            .map(|raw| RecordClass::from_str(&raw).map_err(anyhow::Error::msg))
+            .collect::<Result<Vec<_>>>()?;
+        let retrieval_format = match format.as_str() {
+            "json" => RetrievalFormat::Json,
+            "markdown" | "md" => RetrievalFormat::Markdown,
+            other => bail!("unsupported retrieve format: {other}"),
+        };
 
         let bundle = self
             .engine
-            .retrieve_context(query, project, budget)
+            .retrieve_context_with_options(RetrievalOptions {
+                query,
+                project,
+                budget,
+                format: retrieval_format.clone(),
+                explain,
+                classes,
+                include_global,
+                include_contested,
+                min_confidence,
+            })
             .context("failed to retrieve PI context")?;
 
-        let text = match format.as_str() {
-            "json" => serde_json::to_string_pretty(&bundle)?,
-            "markdown" | "md" => render_markdown(&bundle),
-            other => bail!("unsupported retrieve format: {other}"),
+        let text = match retrieval_format {
+            RetrievalFormat::Json => serde_json::to_string_pretty(&bundle)?,
+            RetrievalFormat::Markdown => render_markdown(&bundle),
         };
 
         Ok(tool_result(text, serde_json::to_value(bundle)?))

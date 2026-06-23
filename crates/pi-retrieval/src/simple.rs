@@ -1,27 +1,10 @@
 use pi_core::{
-    ContextBlock, ContextBundle, Record, RecordClass, RecordStatus, RetrievalBudget,
+    ContextBlock, ContextBundle, RankedRecord, Record, RecordClass, RetrievalBudget,
+    RetrievalFormat, RetrievalOptions,
 };
-use std::cmp::Ordering;
-use std::collections::HashSet;
 
-fn tokenize(input: &str) -> HashSet<String> {
-    input
-        .split(|c: char| !c.is_alphanumeric())
-        .filter_map(|term| {
-            let term = term.trim().to_lowercase();
-            if term.len() >= 3 {
-                Some(term)
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-fn estimate_tokens(input: &str) -> usize {
-    let word_count = input.split_whitespace().count();
-    ((word_count as f32) * 1.35).ceil() as usize + 24
-}
+use crate::packing::pack_ranked;
+use crate::scoring::{eligible, rank_record, sort_ranked, tokenize};
 
 fn block_type_for(class: &RecordClass) -> &'static str {
     match class {
@@ -36,91 +19,60 @@ fn block_type_for(class: &RecordClass) -> &'static str {
     }
 }
 
-fn score_record(record: &Record, query_terms: &HashSet<String>) -> f32 {
-    let haystack = format!(
-        "{} {} {} {:?}",
-        record.claim,
-        record.tags.join(" "),
-        record.class,
-        record.scope.key.clone().unwrap_or_default()
-    )
-    .to_lowercase();
-
-    let mut score = 0.0;
-
-    for term in query_terms {
-        if haystack.contains(term) {
-            score += 1.0;
-        }
-
-        if record.tags.iter().any(|tag| tag.to_lowercase() == *term) {
-            score += 1.5;
-        }
-    }
-
-    score += record.confidence * 0.25;
-
-    match record.class {
-        RecordClass::IdentityRule => score += 0.3,
-        RecordClass::Requirement => score += 0.2,
-        RecordClass::Correction => score += 0.2,
-        _ => {}
-    }
-
-    score
-}
-
 pub fn retrieve(
     records: &[Record],
     query: impl Into<String>,
     project: Option<String>,
     budget: RetrievalBudget,
 ) -> ContextBundle {
-    let query = query.into();
-    let query_terms = tokenize(&query);
+    retrieve_with_options(records, RetrievalOptions {
+        query: query.into(),
+        project,
+        budget: budget.max_tokens,
+        format: RetrievalFormat::Markdown,
+        explain: false,
+        classes: Vec::new(),
+        include_global: true,
+        include_contested: false,
+        min_confidence: None,
+    })
+}
 
-    let mut scored: Vec<(f32, &Record)> = records
+pub fn retrieve_with_options(records: &[Record], options: RetrievalOptions) -> ContextBundle {
+    let query_terms = tokenize(&options.query);
+    let mut ranked: Vec<RankedRecord> = records
         .iter()
-        .filter(|record| record.status == RecordStatus::Active)
-        .filter(|record| record.scope.matches_project_filter(project.as_deref()))
-        .map(|record| (score_record(record, &query_terms), record))
-        .filter(|(score, _)| *score > 0.15)
+        .filter(|record| eligible(
+            record,
+            options.project.as_deref(),
+            &options.classes,
+            options.include_global,
+            options.include_contested,
+            options.min_confidence,
+        ))
+        .map(|record| rank_record(record, &query_terms, options.project.as_deref()))
+        .filter(|ranked| query_terms.is_empty() || !ranked.matched_terms.is_empty() || ranked.score > 0.30)
         .collect();
 
-    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
+    sort_ranked(&mut ranked);
+    let (packed, used_estimated_tokens, warnings) = pack_ranked(ranked, options.budget);
 
-    let mut blocks = Vec::new();
-    let mut used_estimated_tokens = 0usize;
-    let mut warnings = Vec::new();
-
-    for (_, record) in scored {
-        let token_estimate = estimate_tokens(&record.claim);
-
-        if used_estimated_tokens + token_estimate > budget.max_tokens {
-            warnings.push(format!(
-                "budget reached; skipped record {} and remaining matches",
-                record.id
-            ));
-            break;
-        }
-
-        used_estimated_tokens += token_estimate;
-
-        blocks.push(ContextBlock {
-            record_id: record.id.clone(),
-            block_type: block_type_for(&record.class).to_string(),
-            content: record.claim.clone(),
-            confidence: record.confidence,
-            source_count: record.evidence.len(),
-        });
-    }
+    let blocks = packed.iter().map(|ranked| ContextBlock {
+        record_id: ranked.record.id.clone(),
+        block_type: block_type_for(&ranked.record.class).to_string(),
+        content: ranked.record.claim.clone(),
+        confidence: ranked.record.confidence,
+        source_count: ranked.record.evidence.len(),
+    }).collect();
 
     ContextBundle {
-        query,
-        project,
-        budget,
+        query: options.query,
+        project: options.project,
+        budget: RetrievalBudget { max_tokens: options.budget },
         used_estimated_tokens,
+        explain: options.explain,
         blocks,
+        records: packed,
         warnings,
     }
 }
@@ -140,13 +92,28 @@ pub fn render_markdown(bundle: &ContextBundle) -> String {
         bundle.budget.max_tokens, bundle.used_estimated_tokens
     ));
 
-    for block in &bundle.blocks {
+    for (idx, block) in bundle.blocks.iter().enumerate() {
         output.push_str(&format!("## {} — {}\n\n", block.block_type, block.record_id));
         output.push_str(&format!("{}\n\n", block.content));
         output.push_str(&format!(
-            "- confidence: {:.2}\n- sources: {}\n\n",
+            "- confidence: {:.2}\n- sources: {}\n",
             block.confidence, block.source_count
         ));
+        if bundle.explain {
+            if let Some(ranked) = bundle.records.get(idx) {
+                output.push_str(&format!("- score: {:.3}\n", ranked.score));
+                if !ranked.matched_terms.is_empty() {
+                    output.push_str(&format!("- matched terms: {}\n", ranked.matched_terms.join(", ")));
+                }
+                if !ranked.explanation.is_empty() {
+                    output.push_str("- explanation:\n");
+                    for item in &ranked.explanation {
+                        output.push_str(&format!("  - {item}\n"));
+                    }
+                }
+            }
+        }
+        output.push('\n');
     }
 
     if !bundle.warnings.is_empty() {

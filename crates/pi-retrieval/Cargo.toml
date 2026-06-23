@@ -6,3 +6,6 @@ license.workspace = true
 
 [dependencies]
 pi-core.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

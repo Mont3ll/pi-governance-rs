@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, Scope};
+use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
 use pi_governance::{
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput,
@@ -13,7 +13,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "0.6.0",
+    version = "0.7.0",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -76,6 +76,21 @@ enum Commands {
 
         #[arg(long, default_value = "markdown")]
         format: String,
+
+        #[arg(long)]
+        explain: bool,
+
+        #[arg(long = "include-global", default_value_t = true)]
+        include_global: bool,
+
+        #[arg(long = "include-contested")]
+        include_contested: bool,
+
+        #[arg(long = "min-confidence")]
+        min_confidence: Option<f32>,
+
+        #[arg(long = "class")]
+        classes: Vec<RecordClass>,
     },
 
     /// Apply a previously proposed patch.
@@ -354,15 +369,32 @@ fn main() -> Result<()> {
             project,
             budget,
             format,
+            explain,
+            include_global,
+            include_contested,
+            min_confidence,
+            classes,
         } => {
-            let bundle = engine.retrieve_context(query, project, budget)?;
+            let retrieval_format = match format.as_str() {
+                "json" => RetrievalFormat::Json,
+                "markdown" | "md" => RetrievalFormat::Markdown,
+                other => anyhow::bail!("unsupported format: {other}. Use `markdown` or `json`."),
+            };
+            let bundle = engine.retrieve_context_with_options(RetrievalOptions {
+                query,
+                project,
+                budget,
+                format: retrieval_format.clone(),
+                explain,
+                classes,
+                include_global,
+                include_contested,
+                min_confidence,
+            })?;
 
-            match format.as_str() {
-                "json" => println!("{}", serde_json::to_string_pretty(&bundle)?),
-                "markdown" | "md" => println!("{}", render_markdown(&bundle)),
-                other => {
-                    anyhow::bail!("unsupported format: {other}. Use `markdown` or `json`.");
-                }
+            match retrieval_format {
+                RetrievalFormat::Json => println!("{}", serde_json::to_string_pretty(&bundle)?),
+                RetrievalFormat::Markdown => println!("{}", render_markdown(&bundle)),
             }
         }
 

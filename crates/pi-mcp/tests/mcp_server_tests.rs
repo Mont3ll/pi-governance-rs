@@ -22,3 +22,20 @@ fn stdio_server_can_be_constructed() {
     let engine = GovernanceEngine::new(JsonlStore::new(root));
     let _server = McpStdioServer::new(engine);
 }
+
+#[test]
+fn retrieve_context_schema_includes_deterministic_retrieval_fields() {
+    let root = temp_store_dir("schema");
+    let engine = GovernanceEngine::new(JsonlStore::new(root));
+    let server = McpStdioServer::new(engine);
+    let tools = server.tool_definitions();
+    let retrieve = tools.as_array().unwrap().iter()
+        .find(|tool| tool["name"] == "pi.retrieve_context")
+        .expect("retrieve tool exists");
+    let props = &retrieve["inputSchema"]["properties"];
+    assert!(props["explain"].is_object());
+    assert!(props["classes"].is_object());
+    assert!(props["include_global"].is_object());
+    assert!(props["include_contested"].is_object());
+    assert!(props["min_confidence"].is_object());
+}
