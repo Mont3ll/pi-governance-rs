@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use pi_core::{default_namespace, ContestResolution, EvidenceKind, EvidenceRef, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
+use pi_core::{default_namespace, ContestResolution, EvidenceKind, EvidenceRef, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
 use pi_governance::{
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput,
@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "0.8.0";
+const SERVER_VERSION: &str = "0.9.0";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -562,6 +562,37 @@ impl McpStdioServer {
                 }
             },
             {
+                "name": "pi.config_show",
+                "description": "Show PI JSON config.",
+                "inputSchema": { "type": "object", "additionalProperties": false, "properties": {} }
+            },
+            {
+                "name": "pi.config_set_policy",
+                "description": "Set namespace policy profile.",
+                "inputSchema": {
+                    "type": "object", "additionalProperties": false,
+                    "properties": {
+                        "namespace": { "type": "string" },
+                        "policy": { "type": "string", "enum": ["permissive", "standard", "strict"] }
+                    },
+                    "required": ["namespace", "policy"]
+                }
+            },
+            {
+                "name": "pi.policy_doctor",
+                "description": "Inspect PI policy config.",
+                "inputSchema": { "type": "object", "additionalProperties": false, "properties": {} }
+            },
+            {
+                "name": "pi.policy_explain",
+                "description": "Explain policy treatment for an operation.",
+                "inputSchema": {
+                    "type": "object", "additionalProperties": false,
+                    "properties": { "operation": { "type": "string", "enum": ["propose", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "import"] } },
+                    "required": ["operation"]
+                }
+            },
+            {
                 "name": "pi.migrate_schema",
                 "description": "Migrate legacy JSONL entries to the current PI schema version. Defaults to dry-run for safety.",
                 "inputSchema": {
@@ -644,11 +675,38 @@ impl McpStdioServer {
             "pi.import_store" => self.tool_import_store(arguments),
             "pi.migrate_schema" => self.tool_migrate_schema(arguments),
             "pi.doctor" => self.tool_doctor(),
+            "pi.config_show" => self.tool_config_show(),
+            "pi.config_set_policy" => self.tool_config_set_policy(arguments),
+            "pi.policy_doctor" => self.tool_policy_doctor(),
+            "pi.policy_explain" => self.tool_policy_explain(arguments),
             "pi.list_namespaces" => self.tool_list_namespaces(),
             "pi.namespace_doctor" => self.tool_namespace_doctor(),
             "pi.list_records" => self.tool_list_records(arguments),
             other => bail!("unknown PI MCP tool: {other}"),
         }
+    }
+
+    fn tool_config_show(&self) -> Result<Value> {
+        let config = self.engine.config()?;
+        let text = serde_json::to_string_pretty(&config)?;
+        Ok(tool_result(text, serde_json::to_value(config)?))
+    }
+
+    fn tool_config_set_policy(&self, args: Value) -> Result<Value> {
+        let namespace = required_string(&args, "namespace")?;
+        let policy_raw = required_string(&args, "policy")?;
+        let policy = PolicyProfile::from_str(&policy_raw).map_err(anyhow::Error::msg)?;
+        let config = self.engine.set_policy(&namespace, policy)?;
+        let text = serde_json::to_string_pretty(&config)?;
+        Ok(tool_result(text, serde_json::to_value(config)?))
+    }
+
+    fn tool_policy_doctor(&self) -> Result<Value> { self.tool_config_show() }
+
+    fn tool_policy_explain(&self, args: Value) -> Result<Value> {
+        let operation = required_string(&args, "operation")?;
+        let text = GovernanceEngine::policy_explain(&operation);
+        Ok(tool_result(text.clone(), json!({"operation": operation, "explanation": text})))
     }
 
     fn tool_list_namespaces(&self) -> Result<Value> {

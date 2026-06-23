@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
+use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
 use pi_governance::{
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput,
@@ -13,7 +13,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "0.8.0",
+    version = "0.9.0",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -255,6 +255,18 @@ enum Commands {
     },
 
 
+    /// Configuration commands.
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
+    },
+
+    /// Policy inspection commands.
+    Policy {
+        #[command(subcommand)]
+        command: PolicyCommands,
+    },
+
     /// Namespace inspection commands.
     Namespace {
         #[command(subcommand)]
@@ -328,6 +340,22 @@ enum Commands {
 
     /// Run PI as an MCP server over stdio.
     McpStdio,
+}
+
+#[derive(Debug, Subcommand)]
+enum ConfigCommands {
+    /// Show effective JSON config.
+    Show,
+    /// Set a namespace policy profile.
+    SetPolicy { namespace: String, profile: PolicyProfile },
+}
+
+#[derive(Debug, Subcommand)]
+enum PolicyCommands {
+    /// Show policy config health.
+    Doctor,
+    /// Explain operation behavior across profiles.
+    Explain { operation: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -647,6 +675,31 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
 
+
+        Commands::Config { command } => match command {
+            ConfigCommands::Show => {
+                println!("{}", serde_json::to_string_pretty(&engine.config()?)?);
+            }
+            ConfigCommands::SetPolicy { namespace, profile } => {
+                let config = engine.set_policy(&namespace, profile)?;
+                println!("{}", serde_json::to_string_pretty(&config)?);
+            }
+        },
+
+        Commands::Policy { command } => match command {
+            PolicyCommands::Doctor => {
+                let config = engine.policy_doctor()?;
+                println!("PI Policy Doctor");
+                println!("Default policy: {}", config.default_policy);
+                println!("Namespaces:");
+                for (namespace, cfg) in config.namespaces {
+                    println!("- {}: {}", namespace, cfg.policy);
+                }
+            }
+            PolicyCommands::Explain { operation } => {
+                println!("{}", GovernanceEngine::policy_explain(&operation));
+            }
+        },
 
         Commands::Namespace { command } => match command {
             NamespaceCommands::List => {

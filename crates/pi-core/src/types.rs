@@ -14,6 +14,40 @@ pub fn default_namespace() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct NamespaceId(pub String);
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PolicyProfile {
+    Permissive,
+    Standard,
+    Strict,
+}
+
+impl Default for PolicyProfile {
+    fn default() -> Self { Self::Standard }
+}
+
+impl PolicyProfile {
+    pub fn as_str(&self) -> &'static str {
+        match self { Self::Permissive => "permissive", Self::Standard => "standard", Self::Strict => "strict" }
+    }
+}
+
+impl fmt::Display for PolicyProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.as_str()) }
+}
+
+impl FromStr for PolicyProfile {
+    type Err = String;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input.trim().to_lowercase().replace('_', "-").as_str() {
+            "permissive" => Ok(Self::Permissive),
+            "standard" => Ok(Self::Standard),
+            "strict" => Ok(Self::Strict),
+            _ => Err(format!("unknown policy profile: {input}")),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordClass {

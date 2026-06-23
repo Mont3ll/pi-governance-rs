@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use pi_core::{
     validate_patch, validate_record, ContestResolution, ContextBundle, DecisionStatus, EvidenceRef,
     GovernanceDecision, Patch, PatchOperation, PatchStatus, Record, RecordClass, RecordStatus,
-    default_namespace, RetrievalBudget, RetrievalOptions, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
+    default_namespace, PiConfig, PolicyProfile, RetrievalBudget, RetrievalOptions, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
 };
 use pi_retrieval::{retrieve, retrieve_with_options};
 use pi_store::{
@@ -100,6 +100,7 @@ pub struct ResolveContestInput {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ProposalResult {
+    pub policy_profile: PolicyProfile,
     pub patch_id: String,
     pub record_id: Option<String>,
     pub decision: GovernanceDecision,
@@ -201,6 +202,59 @@ impl GovernanceEngine {
         self.store.init()
     }
 
+    pub fn config(&self) -> Result<PiConfig> { self.store.load_config() }
+
+    pub fn set_policy(&self, namespace: &str, policy: PolicyProfile) -> Result<PiConfig> {
+        let mut config = self.store.load_config()?;
+        config.set_policy(namespace, policy);
+        self.store.save_config(&config)?;
+        Ok(config)
+    }
+
+    pub fn effective_policy(&self, namespace: &str) -> Result<PolicyProfile> {
+        Ok(self.store.load_config()?.effective_policy(namespace))
+    }
+
+    pub fn policy_doctor(&self) -> Result<PiConfig> { self.store.load_config() }
+
+    pub fn policy_explain(operation: &str) -> String {
+        let op = operation;
+        match op {
+            "propose" => "propose: permissive=allow, standard=allow, strict=manual_review".to_string(),
+            "reinforce" => "reinforce: permissive=allow, standard=allow, strict=manual_review".to_string(),
+            "supersede" => "supersede: permissive=allow with warning, standard=manual_review, strict=manual_review".to_string(),
+            "tombstone" => "tombstone: permissive=manual_review, standard=manual_review, strict=manual_review".to_string(),
+            "contest" => "contest: permissive=manual_review, standard=manual_review, strict=manual_review".to_string(),
+            "resolve-contest" => "resolve-contest: uphold permissive=allow; otherwise manual_review".to_string(),
+            "import" => "import: all profiles allow; duplicate and schema safety checks still apply".to_string(),
+            _ => format!("unknown operation: {op}"),
+        }
+    }
+
+    fn apply_policy_profile(mut decision: GovernanceDecision, patch: &Patch, profile: PolicyProfile) -> GovernanceDecision {
+        if decision.status == DecisionStatus::Reject { return decision; }
+        match profile {
+            PolicyProfile::Standard => decision,
+            PolicyProfile::Strict => {
+                decision.escalate_to_manual(format!("policy profile '{}' required manual review", profile));
+                decision
+            }
+            PolicyProfile::Permissive => {
+                match patch.operation {
+                    PatchOperation::SupersedeRecord => {
+                        if decision.status == DecisionStatus::ManualReview { decision.status = DecisionStatus::Allow; }
+                        decision.add_warning("policy profile 'permissive' allowed supersede with warning");
+                    }
+                    PatchOperation::ResolveContest if patch.contest_resolution == Some(ContestResolution::Uphold) => {
+                        if decision.status == DecisionStatus::ManualReview { decision.status = DecisionStatus::Allow; }
+                    }
+                    _ => {}
+                }
+                decision
+            }
+        }
+    }
+
     pub fn propose_record(
         &self,
         input: ProposalInput,
@@ -228,7 +282,8 @@ impl GovernanceEngine {
         );
 
         let existing = session.load_records()?;
-        let decision = validate_patch(&patch, &existing);
+        let policy_profile = self.effective_policy(&patch.namespace)?;
+        let decision = Self::apply_policy_profile(validate_patch(&patch, &existing), &patch, policy_profile);
 
         if decision.status == DecisionStatus::Reject {
             session.append_patch(&patch.rejected_copy())?;
@@ -238,6 +293,7 @@ impl GovernanceEngine {
             ))?;
 
             return Ok(ProposalResult {
+                policy_profile,
                 patch_id: patch.id,
                 record_id: Some(record.id),
                 decision,
@@ -250,12 +306,13 @@ impl GovernanceEngine {
 
         let mut applied = false;
 
-        if apply_now {
+        if apply_now && decision.can_apply(force) {
             Self::apply_patch_object_locked(&session, &patch, force)?;
             applied = true;
         }
 
         Ok(ProposalResult {
+            policy_profile,
             patch_id: patch.id,
             record_id: Some(record.id),
             decision,
@@ -287,7 +344,8 @@ impl GovernanceEngine {
 
         let patch = Patch::supersede_record(input.target_id, replacement.clone(), input.reason);
         let existing = session.load_records()?;
-        let decision = validate_patch(&patch, &existing);
+        let policy_profile = self.effective_policy(&patch.namespace)?;
+        let decision = Self::apply_policy_profile(validate_patch(&patch, &existing), &patch, policy_profile);
 
         if decision.status == DecisionStatus::Reject {
             session.append_patch(&patch.rejected_copy())?;
@@ -297,6 +355,7 @@ impl GovernanceEngine {
             ))?;
 
             return Ok(ProposalResult {
+                policy_profile,
                 patch_id: patch.id,
                 record_id: Some(replacement.id),
                 decision,
@@ -309,12 +368,13 @@ impl GovernanceEngine {
 
         let mut applied = false;
 
-        if apply_now {
+        if apply_now && decision.can_apply(force) {
             Self::apply_patch_object_locked(&session, &patch, force)?;
             applied = true;
         }
 
         Ok(ProposalResult {
+            policy_profile,
             patch_id: patch.id,
             record_id: Some(replacement.id),
             decision,
@@ -338,7 +398,8 @@ impl GovernanceEngine {
         let mut patch = Patch::tombstone_record(input.target_id, input.evidence_refs, input.reason);
         patch.namespace = namespace;
         let existing = session.load_records()?;
-        let decision = validate_patch(&patch, &existing);
+        let policy_profile = self.effective_policy(&patch.namespace)?;
+        let decision = Self::apply_policy_profile(validate_patch(&patch, &existing), &patch, policy_profile);
 
         if decision.status == DecisionStatus::Reject {
             session.append_patch(&patch.rejected_copy())?;
@@ -348,6 +409,7 @@ impl GovernanceEngine {
             ))?;
 
             return Ok(ProposalResult {
+                policy_profile,
                 patch_id: patch.id,
                 record_id: Some(target_id),
                 decision,
@@ -360,12 +422,13 @@ impl GovernanceEngine {
 
         let mut applied = false;
 
-        if apply_now {
+        if apply_now && decision.can_apply(force) {
             Self::apply_patch_object_locked(&session, &patch, force)?;
             applied = true;
         }
 
         Ok(ProposalResult {
+            policy_profile,
             patch_id: patch.id,
             record_id: Some(target_id),
             decision,
@@ -389,7 +452,8 @@ impl GovernanceEngine {
         let mut patch = Patch::reinforce_record(input.target_id, input.evidence_refs, input.reason);
         patch.namespace = namespace;
         let existing = session.load_records()?;
-        let decision = validate_patch(&patch, &existing);
+        let policy_profile = self.effective_policy(&patch.namespace)?;
+        let decision = Self::apply_policy_profile(validate_patch(&patch, &existing), &patch, policy_profile);
 
         if decision.status == DecisionStatus::Reject {
             session.append_patch(&patch.rejected_copy())?;
@@ -399,6 +463,7 @@ impl GovernanceEngine {
             ))?;
 
             return Ok(ProposalResult {
+                policy_profile,
                 patch_id: patch.id,
                 record_id: Some(target_id),
                 decision,
@@ -411,12 +476,13 @@ impl GovernanceEngine {
 
         let mut applied = false;
 
-        if apply_now {
+        if apply_now && decision.can_apply(force) {
             Self::apply_patch_object_locked(&session, &patch, force)?;
             applied = true;
         }
 
         Ok(ProposalResult {
+            policy_profile,
             patch_id: patch.id,
             record_id: Some(target_id),
             decision,
@@ -440,7 +506,8 @@ impl GovernanceEngine {
         let mut patch = Patch::contest_record(input.target_id, input.evidence_refs, input.reason);
         patch.namespace = namespace;
         let existing = session.load_records()?;
-        let decision = validate_patch(&patch, &existing);
+        let policy_profile = self.effective_policy(&patch.namespace)?;
+        let decision = Self::apply_policy_profile(validate_patch(&patch, &existing), &patch, policy_profile);
 
         if decision.status == DecisionStatus::Reject {
             session.append_patch(&patch.rejected_copy())?;
@@ -450,6 +517,7 @@ impl GovernanceEngine {
             ))?;
 
             return Ok(ProposalResult {
+                policy_profile,
                 patch_id: patch.id,
                 record_id: Some(target_id),
                 decision,
@@ -462,12 +530,13 @@ impl GovernanceEngine {
 
         let mut applied = false;
 
-        if apply_now {
+        if apply_now && decision.can_apply(force) {
             Self::apply_patch_object_locked(&session, &patch, force)?;
             applied = true;
         }
 
         Ok(ProposalResult {
+            policy_profile,
             patch_id: patch.id,
             record_id: Some(target_id),
             decision,
@@ -519,7 +588,8 @@ impl GovernanceEngine {
             input.reason,
         );
         let existing = session.load_records()?;
-        let decision = validate_patch(&patch, &existing);
+        let policy_profile = self.effective_policy(&patch.namespace)?;
+        let decision = Self::apply_policy_profile(validate_patch(&patch, &existing), &patch, policy_profile);
 
         if decision.status == DecisionStatus::Reject {
             session.append_patch(&patch.rejected_copy())?;
@@ -529,6 +599,7 @@ impl GovernanceEngine {
             ))?;
 
             return Ok(ProposalResult {
+                policy_profile,
                 patch_id: patch.id,
                 record_id: replacement_id.or(Some(target_id)),
                 decision,
@@ -541,12 +612,13 @@ impl GovernanceEngine {
 
         let mut applied = false;
 
-        if apply_now {
+        if apply_now && decision.can_apply(force) {
             Self::apply_patch_object_locked(&session, &patch, force)?;
             applied = true;
         }
 
         Ok(ProposalResult {
+            policy_profile,
             patch_id: patch.id,
             record_id: replacement_id.or(Some(target_id)),
             decision,

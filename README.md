@@ -267,3 +267,34 @@ Export/import behavior:
 - `pi export --all-namespaces` exports all namespaces.
 - `pi import bundle.json` imports records into the current namespace, rewriting bundle record namespaces.
 - `pi import bundle.json --preserve-namespaces` keeps namespaces from the bundle.
+
+## v0.9.0 policy profiles and operating modes
+
+PI stores policy configuration at `.pi/config.json`. If the file is absent, PI uses an in-memory default config with `default_policy: standard` and no namespace overrides. Policies are resolved by namespace override, then default policy, then `standard`.
+
+Profiles:
+
+- `permissive`: ordinary proposals and reinforcement are allowed; supersede is allowed with a warning; identity rules, tombstones, contests, and destructive contest resolutions still require manual review.
+- `standard`: preserves the existing governance behavior.
+- `strict`: all mutation operations require manual review unless explicitly applied with `--force`; hard validation failures remain rejects.
+
+Manual-review decisions can still be applied with `--force`. Rejects remain rejects in every profile.
+
+CLI examples:
+
+```bash
+pi config show
+pi config set-policy default strict
+pi config set-policy sandbox permissive
+
+pi --namespace sandbox propose \
+  --class requirement \
+  --claim "Sandbox can use permissive policy for local experimentation." \
+  --evidence-uri smoke:v0.9.0 \
+  --apply
+
+pi policy doctor
+pi policy explain supersede
+```
+
+MCP tools include `pi.config_show`, `pi.config_set_policy`, `pi.policy_doctor`, and `pi.policy_explain`. Mutation responses include the effective `policy_profile` where practical.

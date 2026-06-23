@@ -1,4 +1,5 @@
 pub mod backup;
+pub mod config;
 pub mod jsonl;
 pub mod lock;
 pub mod migrations;
