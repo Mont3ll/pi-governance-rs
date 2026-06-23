@@ -1,6 +1,6 @@
 # pi-governance-rs
 
-Current milestone: `0.6.0`.
+Current milestone: `1.0.0-rc.1`.
 
 A Rust port of the PI governance layer for coding agents. The runtime exposes governed memory operations through a CLI and an MCP stdio server while keeping mutations patch-governed, inspectable, and auditable.
 
@@ -15,6 +15,20 @@ crates/
   pi-mcp/          MCP stdio adapter
   pi-cli/          command-line binary
 ```
+
+
+## Fresh-user install flow
+
+```bash
+git clone <repo-url>
+cd pi-governance-rs
+cargo build -p pi-cli
+./target/debug/pi init
+./target/debug/pi smoke-test
+./target/debug/pi mcp-config claude
+```
+
+Use generic local paths such as `/path/to/pi` and `/path/to/.pi` when configuring MCP clients.
 
 ## Core commands
 
@@ -234,7 +248,7 @@ cargo build -p pi-cli
 Expected:
 
 ```text
-pi 0.6.0
+pi 1.0.0-rc.1
 ```
 
 ## v0.8.0 namespace isolation
@@ -348,3 +362,18 @@ Version history is maintained in `CHANGELOG.md`.
 ## v0.10.1 audit and release-candidate cleanup
 
 Run `pi release-audit` or `pi release-audit --json` before release-candidate tagging. The audit covers JSON diagnostics, smoke tests, changelog coverage, README command matrix coverage, and MCP adapter config generation. Hidden Unicode and secret/path scans should be run with the documented grep commands in the release checklist and should avoid `.pi`, `target`, and generated exports.
+
+## v1.0.0-rc.1 first release candidate
+
+This release candidate freezes the public CLI command-name surface and MCP tool names documented in `RELEASE.md`. Output details may still receive compatibility fixes before stable `v1.0.0`; no new governance semantics are added in this release-candidate packaging sprint.
+
+Run the release checklist before tagging:
+
+```bash
+cargo check --workspace
+cargo test --workspace
+cargo build -p pi-cli
+./target/debug/pi --version
+./target/debug/pi smoke-test
+./target/debug/pi release-audit
+```
