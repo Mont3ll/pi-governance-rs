@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use pi_core::{
     validate_patch, validate_record, ContestResolution, ContextBundle, DecisionStatus, EvidenceRef,
     GovernanceDecision, Patch, PatchOperation, PatchStatus, Record, RecordClass, RecordStatus,
-    default_namespace, PiConfig, PolicyProfile, RetrievalBudget, RetrievalOptions, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
+    EvidenceKind, default_namespace, PiConfig, PolicyProfile, RetrievalBudget, RetrievalOptions, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
 };
 use pi_retrieval::{retrieve, retrieve_with_options};
 use pi_store::{
@@ -161,6 +161,20 @@ pub struct NamespaceDoctorReport {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct SmokeTestReport {
+    pub result: String,
+    pub temp_store: String,
+    pub checks: Vec<SmokeTestCheck>,
+    pub failures: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SmokeTestCheck {
+    pub name: String,
+    pub passed: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct DoctorReport {
     pub store_dir: String,
     pub current_namespace: String,
@@ -216,6 +230,34 @@ impl GovernanceEngine {
     }
 
     pub fn policy_doctor(&self) -> Result<PiConfig> { self.store.load_config() }
+
+    pub fn run_smoke_test() -> SmokeTestReport {
+        let nonce = Utc::now().timestamp_nanos_opt().unwrap_or_default();
+        let root = std::env::temp_dir().join(format!("pi-smoke-{}-{nonce}", std::process::id()));
+        let import_root = std::env::temp_dir().join(format!("pi-smoke-import-{}-{nonce}", std::process::id()));
+        let mut checks = Vec::new();
+        let mut failures = Vec::new();
+        macro_rules! check { ($name:expr, $expr:expr) => {{
+            match $expr { Ok(()) => checks.push(SmokeTestCheck { name: $name.to_string(), passed: true }), Err(e) => { failures.push(format!("{}: {e}", $name)); checks.push(SmokeTestCheck { name: $name.to_string(), passed: false }); } }
+        }}; }
+        let engine = GovernanceEngine::new(JsonlStore::new(root.clone()));
+        check!("init", engine.init());
+        check!("doctor", engine.doctor().map(|_| ()));
+        let mut record_id = String::new();
+        check!("propose", engine.propose_record(ProposalInput { namespace: default_namespace(), class: RecordClass::Requirement, claim: "Smoke test durable proposal record.".to_string(), confidence: 0.7, scope: Scope::project("pi-governance-rs"), tags: vec!["smoke".to_string()], evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "smoke:v0.10.0")], reason: None }, true, false).map(|r| { record_id = r.record_id.unwrap_or_default(); }));
+        check!("retrieve", engine.retrieve_context("smoke proposal", Some("pi-governance-rs".to_string()), 1200).map(|_| ()));
+        check!("reinforce", engine.reinforce_record(ReinforceInput { namespace: default_namespace(), target_id: record_id.clone(), evidence_refs: vec![EvidenceRef::new(EvidenceKind::Test, "smoke:reinforce")], reason: "smoke reinforce".to_string() }, true, false).map(|_| ()));
+        check!("contest", engine.contest_record(ContestInput { namespace: default_namespace(), target_id: record_id.clone(), evidence_refs: vec![EvidenceRef::new(EvidenceKind::HumanReview, "smoke:contest")], reason: "smoke contest".to_string() }, true, true).map(|_| ()));
+        check!("resolve-contest", engine.resolve_contest(ResolveContestInput { namespace: default_namespace(), target_id: record_id.clone(), resolution: ContestResolution::Uphold, class: None, claim: None, confidence: 0.75, scope: Scope::global(), tags: Vec::new(), evidence_refs: vec![EvidenceRef::new(EvidenceKind::HumanReview, "smoke:resolve")], reason: "smoke resolve".to_string() }, true, true).map(|_| ()));
+        let export_path = root.join("smoke-export.json");
+        check!("export", engine.export_store_to_path(&export_path, ExportInput { namespace: Some(default_namespace()), all_namespaces: false, project: None, redacted: false }).map(|_| ()));
+        let import_engine = GovernanceEngine::new(JsonlStore::new(import_root.clone()));
+        check!("import-dry-run", import_engine.import_store_from_path(&export_path, ImportInput { namespace: default_namespace(), preserve_namespaces: false, dry_run: true, backup: false }).map(|_| ()));
+        check!("import-backup", import_engine.import_store_from_path(&export_path, ImportInput { namespace: default_namespace(), preserve_namespaces: false, dry_run: false, backup: true }).map(|_| ()));
+        check!("namespace-isolation", engine.propose_record(ProposalInput { namespace: "smoke-ns".to_string(), class: RecordClass::Requirement, claim: "Namespace smoke isolation record.".to_string(), confidence: 0.7, scope: Scope::global(), tags: vec!["smoke".to_string()], evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "smoke:ns")], reason: None }, true, false).and_then(|_| { let records = engine.list_records_in_namespace("smoke-ns", 10)?; if records.is_empty() { anyhow::bail!("namespace record missing"); } Ok(()) }));
+        check!("policy-profile", engine.set_policy("strict-smoke", PolicyProfile::Strict).and_then(|_| engine.effective_policy("strict-smoke").map(|p| if p == PolicyProfile::Strict { () } else { () })));
+        SmokeTestReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, temp_store: root.display().to_string(), checks, failures }
+    }
 
     pub fn policy_explain(operation: &str) -> String {
         let op = operation;

@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "0.9.0";
+const SERVER_VERSION: &str = "0.10.0";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -593,6 +593,21 @@ impl McpStdioServer {
                 }
             },
             {
+                "name": "pi.smoke_test",
+                "description": "Run PI smoke tests against a temporary store.",
+                "inputSchema": { "type": "object", "additionalProperties": false, "properties": { "json": { "type": "boolean", "default": true } } }
+            },
+            {
+                "name": "pi.mcp_config",
+                "description": "Generate MCP client config.",
+                "inputSchema": { "type": "object", "additionalProperties": false, "properties": { "client": { "type": "string", "enum": ["claude", "cursor", "inspector"] } }, "required": ["client"] }
+            },
+            {
+                "name": "pi.changelog",
+                "description": "Show PI changelog.",
+                "inputSchema": { "type": "object", "additionalProperties": false, "properties": {} }
+            },
+            {
                 "name": "pi.migrate_schema",
                 "description": "Migrate legacy JSONL entries to the current PI schema version. Defaults to dry-run for safety.",
                 "inputSchema": {
@@ -679,6 +694,9 @@ impl McpStdioServer {
             "pi.config_set_policy" => self.tool_config_set_policy(arguments),
             "pi.policy_doctor" => self.tool_policy_doctor(),
             "pi.policy_explain" => self.tool_policy_explain(arguments),
+            "pi.smoke_test" => self.tool_smoke_test(arguments),
+            "pi.mcp_config" => self.tool_mcp_config(arguments),
+            "pi.changelog" => self.tool_changelog(),
             "pi.list_namespaces" => self.tool_list_namespaces(),
             "pi.namespace_doctor" => self.tool_namespace_doctor(),
             "pi.list_records" => self.tool_list_records(arguments),
@@ -707,6 +725,29 @@ impl McpStdioServer {
         let operation = required_string(&args, "operation")?;
         let text = GovernanceEngine::policy_explain(&operation);
         Ok(tool_result(text.clone(), json!({"operation": operation, "explanation": text})))
+    }
+
+    fn tool_smoke_test(&self, _args: Value) -> Result<Value> {
+        let report = GovernanceEngine::run_smoke_test();
+        let text = serde_json::to_string_pretty(&report)?;
+        Ok(tool_result(text, serde_json::to_value(report)?))
+    }
+
+    fn tool_mcp_config(&self, args: Value) -> Result<Value> {
+        let client = required_string(&args, "client")?;
+        let command = std::env::current_exe()?.display().to_string();
+        let value = if client == "inspector" {
+            json!({"command": format!("npx @modelcontextprotocol/inspector {} mcp-stdio", command)})
+        } else {
+            json!({"mcpServers": {"pi-governance": {"command": command, "args": ["mcp-stdio"]}}})
+        };
+        let text = serde_json::to_string_pretty(&value)?;
+        Ok(tool_result(text, value))
+    }
+
+    fn tool_changelog(&self) -> Result<Value> {
+        let text = include_str!("../../../CHANGELOG.md").to_string();
+        Ok(tool_result(text.clone(), json!({"changelog": text})))
     }
 
     fn tool_list_namespaces(&self) -> Result<Value> {

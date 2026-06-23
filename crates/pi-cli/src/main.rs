@@ -13,7 +13,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "0.9.0",
+    version = "0.10.0",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -338,6 +338,24 @@ enum Commands {
         limit: usize,
     },
 
+    /// Generate MCP client configuration.
+    McpConfig {
+        client: String,
+        #[arg(long)]
+        command: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Run built-in smoke tests against a temporary store.
+    SmokeTest {
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Print version history.
+    Changelog,
+
     /// Run PI as an MCP server over stdio.
     McpStdio,
 }
@@ -353,7 +371,7 @@ enum ConfigCommands {
 #[derive(Debug, Subcommand)]
 enum PolicyCommands {
     /// Show policy config health.
-    Doctor,
+    Doctor { #[arg(long)] json: bool },
     /// Explain operation behavior across profiles.
     Explain { operation: String },
 }
@@ -363,15 +381,16 @@ enum NamespaceCommands {
     /// List namespace summaries.
     List,
     /// Inspect namespace health.
-    Doctor,
+    Doctor { #[arg(long)] json: bool },
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let namespace = cli.namespace;
-    let store = JsonlStore::new(cli.store);
-    let engine = GovernanceEngine::new(store);
+    let store_path = cli.store;
+    let store = JsonlStore::new(store_path.clone());
+    let engine = GovernanceEngine::new(store.clone());
 
     match cli.command {
         Commands::Init => {
@@ -687,13 +706,26 @@ fn main() -> Result<()> {
         },
 
         Commands::Policy { command } => match command {
-            PolicyCommands::Doctor => {
+            PolicyCommands::Doctor { json } => {
                 let config = engine.policy_doctor()?;
-                println!("PI Policy Doctor");
-                println!("Default policy: {}", config.default_policy);
-                println!("Namespaces:");
-                for (namespace, cfg) in config.namespaces {
-                    println!("- {}: {}", namespace, cfg.policy);
+                let effective_policy = config.effective_policy(&namespace);
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+                        "default_policy": config.default_policy,
+                        "namespaces": config.namespaces,
+                        "current_namespace": namespace,
+                        "effective_policy": effective_policy,
+                        "config_path": store.config_path(),
+                        "config_exists": store.config_path().exists(),
+                        "warnings": Vec::<String>::new(),
+                    }))?);
+                } else {
+                    println!("PI Policy Doctor");
+                    println!("Default policy: {}", config.default_policy);
+                    println!("Namespaces:");
+                    for (namespace, cfg) in config.namespaces {
+                        println!("- {}: {}", namespace, cfg.policy);
+                    }
                 }
             }
             PolicyCommands::Explain { operation } => {
@@ -710,13 +742,24 @@ fn main() -> Result<()> {
                     );
                 }
             }
-            NamespaceCommands::Doctor => {
+            NamespaceCommands::Doctor { json } => {
                 let report = engine.namespace_doctor()?;
-                println!("PI Namespace Doctor");
-                println!("Namespaces: {}", report.namespaces);
-                println!("Default namespace: {}", report.default_namespace);
-                println!("Records without explicit namespace: {}", report.records_without_explicit_namespace);
-                println!("Cross-namespace duplicate IDs: {}", report.cross_namespace_duplicate_ids);
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+                        "default_namespace": report.default_namespace,
+                        "current_namespace": namespace,
+                        "namespace_count": report.namespaces,
+                        "namespaces": report.summaries,
+                        "cross_namespace_duplicate_ids": report.cross_namespace_duplicate_ids,
+                        "warnings": Vec::<String>::new(),
+                    }))?);
+                } else {
+                    println!("PI Namespace Doctor");
+                    println!("Namespaces: {}", report.namespaces);
+                    println!("Default namespace: {}", report.default_namespace);
+                    println!("Records without explicit namespace: {}", report.records_without_explicit_namespace);
+                    println!("Cross-namespace duplicate IDs: {}", report.cross_namespace_duplicate_ids);
+                }
             }
         },
 
@@ -840,7 +883,25 @@ fn main() -> Result<()> {
             let report = engine.doctor_in_namespace(&namespace)?;
 
             if json {
-                println!("{}", serde_json::to_string_pretty(&report)?);
+                let policy_profile = engine.effective_policy(&namespace)?;
+                println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+                    "schema_version": report.schema_version,
+                    "migration_needed": report.migration_needed,
+                    "store_path": report.store_dir,
+                    "lock_path": report.lock_path,
+                    "records": report.total_records,
+                    "active": report.active_records,
+                    "contested": report.contested_records,
+                    "superseded": report.superseded_records,
+                    "tombstoned": report.tombstoned_records,
+                    "patches": report.total_patches,
+                    "events": report.total_events,
+                    "namespaces": report.namespaces,
+                    "current_namespace": report.current_namespace,
+                    "policy_profile": policy_profile,
+                    "warnings": report.warnings,
+                    "schema_audit": report.schema_audits,
+                }))?);
             } else {
                 println!("PI Doctor Report");
                 println!("Store: {}", report.store_dir);
@@ -904,6 +965,40 @@ fn main() -> Result<()> {
                     record.id, record.claim, record.class, record.confidence, record.status
                 );
             }
+        }
+
+        Commands::McpConfig { client, command, json: _ } => {
+            let command_path = command.unwrap_or(std::env::current_exe()?).display().to_string();
+            let store_arg = store_path.display().to_string();
+            match client.as_str() {
+                "claude" | "cursor" => {
+                    let value = serde_json::json!({
+                        "mcpServers": { "pi-governance": { "command": command_path, "args": ["--store", store_arg, "--namespace", namespace, "mcp-stdio"] } }
+                    });
+                    println!("{}", serde_json::to_string_pretty(&value)?);
+                }
+                "inspector" => {
+                    println!("npx @modelcontextprotocol/inspector {} --store {} --namespace {} mcp-stdio", command_path, store_arg, namespace);
+                }
+                other => anyhow::bail!("unsupported mcp client: {other}. Use claude, cursor, or inspector."),
+            }
+        }
+
+        Commands::SmokeTest { json } => {
+            let report = GovernanceEngine::run_smoke_test();
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!("PI Smoke Test");
+                println!("Store: {}", report.temp_store);
+                for check in &report.checks { println!("{}: {}", check.name, if check.passed { "pass" } else { "fail" }); }
+                println!("Result: {}", report.result);
+            }
+            if report.result != "pass" { std::process::exit(1); }
+        }
+
+        Commands::Changelog => {
+            println!("{}", include_str!("../../../CHANGELOG.md"));
         }
 
         Commands::McpStdio => {

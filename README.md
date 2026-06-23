@@ -298,3 +298,46 @@ pi policy explain supersede
 ```
 
 MCP tools include `pi.config_show`, `pi.config_set_policy`, `pi.policy_doctor`, and `pi.policy_explain`. Mutation responses include the effective `policy_profile` where practical.
+
+## v0.10.0 release hardening and adapter polish
+
+Build locally with `cargo build -p pi-cli`, then run `./target/debug/pi --version`.
+Quickstart: `pi init`, `pi propose --class requirement --claim "..." --evidence-uri conversation:... --apply`, then `pi retrieve "..."`.
+
+### MCP setup
+
+Generate adapter snippets with:
+
+```bash
+pi mcp-config claude
+pi mcp-config cursor
+pi mcp-config inspector --command /absolute/path/to/pi --store /absolute/path/to/.pi
+```
+
+### Command matrix
+
+`init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `smoke-test`, `changelog`.
+
+### JSON diagnostics and smoke tests
+
+```bash
+pi doctor --json
+pi namespace doctor --json
+pi policy doctor --json
+pi smoke-test
+pi smoke-test --json
+```
+
+### Release checklist
+
+```bash
+cargo check --workspace
+cargo test --workspace
+cargo build -p pi-cli
+./target/debug/pi --version
+./target/debug/pi smoke-test
+./target/debug/pi doctor --json
+git status
+```
+
+Version history is maintained in `CHANGELOG.md`.
