@@ -1,5 +1,13 @@
 # Changelog
 
+- v1.0.0-rc.6 — MCP client onboarding and troubleshooting
+  - Adds `pi mcp-config opencode`, `pi mcp-config codex`, and `pi mcp-config pi-agent`.
+  - Adds `pi mcp-install opencode`, `pi mcp-install codex`, and `pi mcp-install pi-agent`.
+  - Adds `pi mcp-doctor opencode`, `pi mcp-doctor codex`, and `pi mcp-doctor pi-agent`.
+  - Adds MCP troubleshooting docs.
+  - Updates public testing docs.
+  - Updates README and product guide.
+  - Adds no governance semantic changes.
 - v1.0.0-rc.5 — public-testing readiness and record inspection
   - Adds `pi inspect-record`.
   - Adds `pi inspect-record --json`.

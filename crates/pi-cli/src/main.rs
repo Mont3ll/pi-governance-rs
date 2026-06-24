@@ -9,12 +9,17 @@ use pi_mcp::McpStdioServer;
 use pi_retrieval::render_markdown;
 use pi_store::JsonlStore;
 use serde::Serialize;
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+use std::fs;
+use std::io::{self, Write};
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "1.0.0-rc.5",
+    version = "1.0.0-rc.6",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -380,6 +385,32 @@ enum Commands {
         json: bool,
     },
 
+    /// Safely install or merge MCP client configuration.
+    McpInstall {
+        client: String,
+        #[arg(long)]
+        command: Option<PathBuf>,
+        #[arg(long)]
+        config: Option<PathBuf>,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long)]
+        yes: bool,
+        #[arg(long)]
+        no_backup: bool,
+    },
+
+    /// Diagnose MCP client configuration and direct stdio connectivity.
+    McpDoctor {
+        client: String,
+        #[arg(long)]
+        command: Option<PathBuf>,
+        #[arg(long)]
+        config: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Run built-in smoke tests against a temporary store.
     SmokeTest {
         #[arg(long)]
@@ -591,6 +622,115 @@ enum NamespaceCommands {
     Doctor { #[arg(long)] json: bool },
 }
 
+fn mcp_args(store: &Path, namespace: &str) -> Vec<String> {
+    vec!["--store".into(), store.display().to_string(), "--namespace".into(), namespace.into(), "mcp-stdio".into()]
+}
+
+fn shared_mcp_json(command: &str, store: &Path, namespace: &str) -> serde_json::Value {
+    serde_json::json!({"mcpServers":{"pi-governance":{"command":command,"args":mcp_args(store, namespace)}}})
+}
+
+fn opencode_mcp_json(command: &str, store: &Path, namespace: &str) -> serde_json::Value {
+    let mut cmd = vec![command.to_string()];
+    cmd.extend(mcp_args(store, namespace));
+    serde_json::json!({"mcp":{"pi-governance":{"type":"local","command":cmd,"enabled":true,"timeout":10000}}})
+}
+
+fn codex_mcp_toml(command: &str, store: &Path, namespace: &str) -> String {
+    format!("[mcp_servers.pi-governance]\ncommand = {:?}\nargs = [\"--store\", {:?}, \"--namespace\", {:?}, \"mcp-stdio\"]\nenabled = true\nstartup_timeout_sec = 10\ntool_timeout_sec = 60\ndefault_tools_approval_mode = \"prompt\"\n", command, store.display().to_string(), namespace)
+}
+
+fn default_mcp_config_path(client: &str) -> Result<PathBuf> {
+    let home = std::env::var("HOME")?;
+    Ok(match client {
+        "opencode" => PathBuf::from(home).join(".config/opencode/opencode.jsonc"),
+        "codex" => PathBuf::from(home).join(".codex/config.toml"),
+        "pi-agent" => PathBuf::from(home).join(".config/mcp/mcp.json"),
+        other => anyhow::bail!("unsupported mcp client: {other}. Use opencode, codex, or pi-agent."),
+    })
+}
+
+fn has_jsonc_comments(text: &str) -> bool {
+    text.lines().any(|l| l.trim_start().starts_with("//") || l.contains("/*"))
+}
+
+fn backup_path(path: &Path) -> PathBuf {
+    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+    PathBuf::from(format!("{}.backup.{ts}", path.display()))
+}
+
+fn extract_server_names(value: &serde_json::Value, key: &str) -> Vec<String> {
+    value.get(key).and_then(|v| v.as_object()).map(|m| m.keys().cloned().collect()).unwrap_or_default()
+}
+
+fn install_json_config(path: &Path, key: &str, server: serde_json::Value, dry_run: bool, no_backup: bool) -> Result<(String, Option<PathBuf>, Vec<String>)> {
+    let existed = path.exists();
+    let mut root = if existed {
+        let text = fs::read_to_string(path)?;
+        if path.extension().and_then(|s| s.to_str()) == Some("jsonc") && has_jsonc_comments(&text) { anyhow::bail!("refusing to rewrite JSONC comments; use mcp-config output as a snippet"); }
+        serde_json::from_str::<serde_json::Value>(&text)?
+    } else { serde_json::json!({}) };
+    if !root.is_object() { anyhow::bail!("config root must be a JSON object"); }
+    let preserved = extract_server_names(&root, key).into_iter().filter(|n| n != "pi-governance").collect::<Vec<_>>();
+    let action = if root.get(key).and_then(|v| v.get("pi-governance")).is_some() { "update" } else { "add" }.to_string();
+    root.as_object_mut().unwrap().entry(key).or_insert_with(|| serde_json::json!({}));
+    root.get_mut(key).unwrap().as_object_mut().ok_or_else(|| anyhow::anyhow!("{key} must be a JSON object"))?.insert("pi-governance".into(), server);
+    if dry_run { return Ok((action, None, preserved)); }
+    if let Some(parent) = path.parent() { fs::create_dir_all(parent)?; }
+    let backup = if existed && !no_backup { let b = backup_path(path); fs::copy(path, &b)?; Some(b) } else { None };
+    fs::write(path, format!("{}\n", serde_json::to_string_pretty(&root)?))?;
+    Ok((action, backup, preserved))
+}
+
+fn install_codex_config(path: &Path, command: &str, store: &Path, namespace: &str, dry_run: bool, no_backup: bool) -> Result<(String, Option<PathBuf>, Vec<String>)> {
+    let existed = path.exists();
+    let text = if existed { fs::read_to_string(path)? } else { String::new() };
+    let preserved = text.lines().filter_map(|l| l.strip_prefix("[mcp_servers.").and_then(|r| r.strip_suffix(']'))).filter(|n| *n != "pi-governance").map(str::to_string).collect::<Vec<_>>();
+    let action = if text.contains("[mcp_servers.pi-governance]") { "update" } else { "add" }.to_string();
+    let mut out = String::new();
+    let mut skipping = false;
+    for line in text.lines() {
+        if line.trim() == "[mcp_servers.pi-governance]" { skipping = true; continue; }
+        if skipping && line.trim_start().starts_with('[') { skipping = false; }
+        if !skipping { out.push_str(line); out.push('\n'); }
+    }
+    if !out.ends_with("\n\n") { out.push('\n'); }
+    out.push_str(&codex_mcp_toml(command, store, namespace));
+    if dry_run { return Ok((action, None, preserved)); }
+    if let Some(parent) = path.parent() { fs::create_dir_all(parent)?; }
+    let backup = if existed && !no_backup { let b = backup_path(path); fs::copy(path, &b)?; Some(b) } else { None };
+    fs::write(path, out)?;
+    Ok((action, backup, preserved))
+}
+
+fn confirm_install(yes: bool, dry_run: bool) -> Result<()> {
+    if yes || dry_run { return Ok(()); }
+    print!("Proceed with MCP config install? [y/N] "); io::stdout().flush()?;
+    let mut s = String::new(); io::stdin().read_line(&mut s)?;
+    if matches!(s.trim(), "y" | "Y" | "yes" | "YES") { Ok(()) } else { anyhow::bail!("installation cancelled; rerun with --yes to confirm") }
+}
+
+fn read_server_from_config(client: &str, path: &Path) -> Result<(Option<String>, Vec<String>)> {
+    let text = fs::read_to_string(path)?;
+    match client {
+        "opencode" => { let v: serde_json::Value = serde_json::from_str(&text)?; let arr = v["mcp"]["pi-governance"]["command"].as_array().cloned(); if let Some(a)=arr { Ok((a.first().and_then(|v| v.as_str()).map(str::to_string), a.iter().skip(1).filter_map(|v| v.as_str().map(str::to_string)).collect())) } else { Ok((None, vec![])) } }
+        "pi-agent" => { let v: serde_json::Value = serde_json::from_str(&text)?; let s=&v["mcpServers"]["pi-governance"]; Ok((s["command"].as_str().map(str::to_string), s["args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default())) }
+        "codex" => { let mut in_sec=false; let mut cmd=None; let mut args=Vec::new(); for l in text.lines() { let t=l.trim(); if t=="[mcp_servers.pi-governance]" { in_sec=true; continue; } if in_sec && t.starts_with('[') { break; } if in_sec && t.starts_with("command") { cmd=t.split_once('=').map(|(_,v)| v.trim().trim_matches('"').to_string()); } if in_sec && t.starts_with("args") { args=t.split('"').skip(1).step_by(2).map(str::to_string).collect(); } } Ok((cmd,args)) }
+        _ => anyhow::bail!("unsupported mcp client: {client}"),
+    }
+}
+
+fn run_tools_list(command: &str, args: &[String]) -> Result<Vec<String>> {
+    let mut child = Command::new(command).args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).spawn()?;
+    child.stdin.as_mut().unwrap().write_all(br#"{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}
+"#)?;
+    let out = child.wait_with_output()?;
+    if !out.status.success() { anyhow::bail!("tools/list process failed"); }
+    let text = String::from_utf8_lossy(&out.stdout);
+    let v: serde_json::Value = serde_json::from_str(text.lines().last().unwrap_or(&text))?;
+    Ok(v["result"]["tools"].as_array().map(|a| a.iter().filter_map(|t| t["name"].as_str().map(str::to_string)).collect()).unwrap_or_default())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -697,7 +837,7 @@ fn main() -> Result<()> {
             let contested = demo_engine.propose_record(input(RecordClass::Observation, "Old release note says rc.1 is current, but rc.3 supersedes it.", "contest", "demo:contested"), true, false)?.record_id.unwrap();
             demo_engine.contest_record(ContestInput { namespace: "default".to_string(), target_id: contested, evidence_refs: ev("demo:contest"), reason: "demo contested record".to_string() }, true, true)?;
             let old = demo_engine.propose_record(input(RecordClass::Observation, "v1.0.0-rc.2 is current.", "supersede", "demo:old-current"), true, false)?.record_id.unwrap();
-            demo_engine.supersede_record(SupersedeInput { namespace: "default".to_string(), target_id: old, class: RecordClass::Observation, claim: "v1.0.0-rc.5 is current.".to_string(), confidence: 0.8, scope: Scope::project("pi-governance-rs"), tags: vec!["supersede".to_string()], evidence_refs: ev("demo:new-current"), reason: "demo supersession".to_string() }, true, true)?;
+            demo_engine.supersede_record(SupersedeInput { namespace: "default".to_string(), target_id: old, class: RecordClass::Observation, claim: "v1.0.0-rc.6 is current.".to_string(), confidence: 0.8, scope: Scope::project("pi-governance-rs"), tags: vec!["supersede".to_string()], evidence_refs: ev("demo:new-current"), reason: "demo supersession".to_string() }, true, true)?;
             let tomb = demo_engine.propose_record(input(RecordClass::Workflow, "Old instruction: publish immediately after tests.", "tombstone", "demo:tombstone"), true, false)?.record_id.unwrap();
             demo_engine.tombstone_record(TombstoneInput { namespace: "default".to_string(), target_id: tomb, evidence_refs: ev("demo:no-publish"), reason: "this repo does not publish during RC validation".to_string() }, true, true)?;
             demo_engine.set_policy("strict-demo", PolicyProfile::Strict)?;
@@ -1296,19 +1436,77 @@ fn main() -> Result<()> {
 
         Commands::McpConfig { client, command, json: _ } => {
             let command_path = command.unwrap_or(std::env::current_exe()?).display().to_string();
-            let store_arg = store_path.display().to_string();
             match client.as_str() {
-                "claude" | "cursor" => {
-                    let value = serde_json::json!({
-                        "mcpServers": { "pi-governance": { "command": command_path, "args": ["--store", store_arg, "--namespace", namespace, "mcp-stdio"] } }
-                    });
-                    println!("{}", serde_json::to_string_pretty(&value)?);
-                }
-                "inspector" => {
-                    println!("npx @modelcontextprotocol/inspector {} --store {} --namespace {} mcp-stdio", command_path, store_arg, namespace);
-                }
-                other => anyhow::bail!("unsupported mcp client: {other}. Use claude, cursor, or inspector."),
+                "claude" | "cursor" | "pi-agent" => println!("{}", serde_json::to_string_pretty(&shared_mcp_json(&command_path, &store_path, &namespace))?),
+                "opencode" => println!("{}", serde_json::to_string_pretty(&opencode_mcp_json(&command_path, &store_path, &namespace))?),
+                "codex" => print!("{}", codex_mcp_toml(&command_path, &store_path, &namespace)),
+                "inspector" => println!("npx @modelcontextprotocol/inspector {} --store {} --namespace {} mcp-stdio", command_path, store_path.display(), namespace),
+                other => anyhow::bail!("unsupported mcp client: {other}. Use claude, cursor, inspector, opencode, codex, or pi-agent."),
             }
+        }
+
+        Commands::McpInstall { client, command, config, dry_run, yes, no_backup } => {
+            let command_path = command.unwrap_or(std::env::current_exe()?).display().to_string();
+            let config_path = config.unwrap_or(default_mcp_config_path(&client)?);
+            confirm_install(yes, dry_run)?;
+            let (action, backup, preserved) = match client.as_str() {
+                "pi-agent" => install_json_config(&config_path, "mcpServers", shared_mcp_json(&command_path, &store_path, &namespace)["mcpServers"]["pi-governance"].clone(), dry_run, no_backup)?,
+                "opencode" => install_json_config(&config_path, "mcp", opencode_mcp_json(&command_path, &store_path, &namespace)["mcp"]["pi-governance"].clone(), dry_run, no_backup)?,
+                "codex" => install_codex_config(&config_path, &command_path, &store_path, &namespace, dry_run, no_backup)?,
+                other => anyhow::bail!("unsupported mcp client: {other}. Use opencode, codex, or pi-agent."),
+            };
+            println!("PI MCP Install{}", if dry_run { " Dry Run" } else { "" });
+            println!("\nClient: {}", client);
+            println!("Target config: {}", config_path.display());
+            if dry_run { println!("Would add or update:\n- pi-governance\n\nNo files were written."); }
+            else {
+                println!("Action: {} pi-governance", action);
+                if let Some(b) = backup { println!("Backup: {}", b.display()); }
+                if !preserved.is_empty() { println!("\nPreserved MCP servers:"); for p in preserved { println!("- {p}"); } }
+                println!("\nInstalled server:\n- pi-governance");
+                println!("\nRestart your client, then run:\n  pi mcp-doctor {} --config {}", client, config_path.display());
+            }
+        }
+
+        Commands::McpDoctor { client, command: _, config, json } => {
+            let config_path = config.unwrap_or(default_mcp_config_path(&client)?);
+            let config_exists = config_path.exists();
+            let mut checks = BTreeMap::new();
+            checks.insert("config_exists", config_exists);
+            let mut configured_command = None;
+            let mut args: Vec<String> = Vec::new();
+            let mut parse_ok = false;
+            if config_exists { match read_server_from_config(&client, &config_path) { Ok((c,a)) => { parse_ok = true; configured_command = c; args = a; }, Err(_) => parse_ok = false } }
+            let server_entry_exists = configured_command.is_some();
+            let command_exists = configured_command.as_ref().map(|c| Path::new(c).exists()).unwrap_or(false);
+            let command_executable = configured_command.as_ref().and_then(|c| fs::metadata(c).ok()).map(|m| m.permissions().mode() & 0o111 != 0).unwrap_or(false);
+            let store_exists = store_path.exists();
+            let namespace_matches = args.windows(2).any(|w| w[0] == "--namespace" && w[1] == namespace);
+            let store_matches = args.windows(2).any(|w| w[0] == "--store" && w[1] == store_path.display().to_string());
+            let ends_stdio = args.last().map(|s| s == "mcp-stdio").unwrap_or(false);
+            let mut tool_map = BTreeMap::new();
+            let expected = ["pi.retrieve_context","pi.propose_record","pi.list_patches","pi.inspect_patch","pi.doctor","pi.list_records","pi.smoke_test","pi.inspect_record"];
+            let tools = if let Some(c) = &configured_command { run_tools_list(c, &args).unwrap_or_default() } else { Vec::new() };
+            for e in expected { tool_map.insert(e, tools.iter().any(|t| t == e)); }
+            let direct_tools_list = !tools.is_empty();
+            checks.insert("config_parse", parse_ok);
+            checks.insert("server_entry_exists", server_entry_exists);
+            checks.insert("command_exists", command_exists);
+            checks.insert("command_executable", command_executable);
+            checks.insert("store_exists", store_exists);
+            checks.insert("namespace_matches", namespace_matches);
+            checks.insert("store_matches", store_matches);
+            checks.insert("args_end_mcp_stdio", ends_stdio);
+            checks.insert("direct_tools_list", direct_tools_list);
+            let pass = config_exists && parse_ok && server_entry_exists && command_exists && command_executable && store_exists && namespace_matches && store_matches && ends_stdio && direct_tools_list;
+            if json { println!("{}", serde_json::to_string_pretty(&serde_json::json!({"client":client,"config_path":config_path,"checks":checks,"tools":tool_map,"result": if pass {"pass"} else {"fail"}}))?); }
+            else {
+                println!("PI MCP Doctor\n\nClient: {}\nConfig: {}\n", client, config_path.display());
+                for (k,v) in &checks { println!("{}: {}", k.replace('_', " "), if *v { "ok" } else { "fail" }); }
+                println!("\nExpected tools:"); for (t,p) in &tool_map { println!("  {t}: {}", if *p { "ok" } else { "not available" }); }
+                println!("\nResult: {}", if pass { "pass" } else { "fail" });
+            }
+            if !pass { std::process::exit(1); }
         }
 
         Commands::SmokeTest { json } => {
@@ -1333,13 +1531,13 @@ fn main() -> Result<()> {
             audit_check(&mut checks, &mut failures, "policy-doctor-json", engine.policy_doctor().is_ok(), "policy doctor failed");
             audit_check(&mut checks, &mut failures, "smoke-test", GovernanceEngine::run_smoke_test().result == "pass", "smoke test failed");
             let changelog = include_str!("../../../CHANGELOG.md");
-            audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0-rc.5") && changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
+            audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0-rc.6") && changelog.contains("v1.0.0-rc.5") && changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
             let readme = include_str!("../../../README.md");
-            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "inspect-record", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "smoke-test", "release-audit", "changelog"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
+            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "inspect-record", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "mcp-install", "mcp-doctor", "smoke-test", "release-audit", "changelog"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
             audit_check(&mut checks, &mut failures, "mcp-tools-list", true, "MCP tools are statically registered");
             let mcp_config = serde_json::json!({"mcpServers": {"pi-governance": {"command": std::env::current_exe()?.display().to_string(), "args": ["--store", store_path.display().to_string().as_str(), "--namespace", namespace.as_str(), "mcp-stdio"]}}});
             audit_check(&mut checks, &mut failures, "mcp-config", mcp_config.to_string().contains("mcp-stdio"), "mcp config missing mcp-stdio");
-            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "1.0.0-rc.5".to_string(), checks, failures };
+            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "1.0.0-rc.6".to_string(), checks, failures };
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {

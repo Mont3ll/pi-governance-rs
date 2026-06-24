@@ -4,9 +4,9 @@
 
 
 
-## v1.0.0-rc.5 public-testing notes
+## v1.0.0-rc.6 MCP client onboarding notes
 
-`v1.0.0-rc.5` is the current public-testing readiness release candidate. It adds direct record inspection with `pi inspect-record`, public testing guidance, non-goals documentation, and GitHub issue templates. It does not add capture, semantic retrieval, graph memory, dashboards, hosted services, connectors, or stable `v1.0.0`.
+`v1.0.0-rc.6` is the current MCP client onboarding and troubleshooting release candidate. It adds `mcp-config`, `mcp-install`, and `mcp-doctor` support for OpenCode, Codex, and PI-agent shared MCP configs. It does not add capture, semantic retrieval, graph memory, dashboards, hosted services, connectors, or stable `v1.0.0`.
 
 ## v1.0.0-rc.4 documentation notes
 

@@ -50,7 +50,17 @@ Replace `<record_id>` with an ID from `pi list`.
 
 ## Coding-Agent MCP Test
 
-Generate config with `pi mcp-config claude` or `pi mcp-config cursor`, then confirm `tools/list` contains PI tools and `pi.smoke_test` returns pass.
+Run this MCP setup preflight before opening the agent client:
+
+```bash
+pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace interop-test
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace interop-test --dry-run
+pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace interop-test
+```
+
+Run `mcp-doctor` before opening the client. Restart the client after `mcp-install`. If `mcp-doctor` passes but the client has no tools, inspect the client-specific config loading rules. For Codex or shared PI-agent MCP config, substitute `codex` or `pi-agent` in the commands.
+
+Then confirm `tools/list` contains PI tools and `pi.smoke_test` returns pass.
 
 ## Memory Governance Test
 

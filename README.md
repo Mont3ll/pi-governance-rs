@@ -1,6 +1,6 @@
 # pi-governance-rs
 
-Current milestone: `1.0.0-rc.5`.
+Current milestone: `1.0.0-rc.6`.
 
 PI is a local-first governed memory runtime for coding agents. It gives agents durable project memory without silent writes: memory changes are proposed as patches, reviewed, applied under policy, and kept auditable in JSONL.
 
@@ -14,7 +14,8 @@ cargo build -p pi-cli
 ./target/debug/pi demo
 ./target/debug/pi --store /tmp/pi-governance-demo review
 ./target/debug/pi --store /tmp/pi-governance-demo retrieve "release workflow" --explain
-./target/debug/pi mcp-config claude
+./target/debug/pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
+./target/debug/pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
 ./target/debug/pi agent-instructions
 ```
 
@@ -33,10 +34,12 @@ cd pi-governance-rs
 cargo build -p pi-cli
 ./target/debug/pi init
 ./target/debug/pi smoke-test
-./target/debug/pi mcp-config claude
+./target/debug/pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
+./target/debug/pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+./target/debug/pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
 ```
 
-Use generic local paths such as `/path/to/pi` and `/path/to/.pi` when configuring MCP clients.
+Use generic local paths such as `/path/to/pi` and `/path/to/.pi` when configuring MCP clients. See [`docs/MCP_TROUBLESHOOTING.md`](docs/MCP_TROUBLESHOOTING.md) if a client shows zero PI tools.
 
 
 ## Public testing and project scope
@@ -370,17 +373,28 @@ Quickstart: `pi init`, `pi propose --class requirement --claim "..." --evidence-
 
 ### MCP setup
 
-Generate adapter snippets with:
+Generate adapter snippets and install/diagnose local client configs with:
 
 ```bash
-pi mcp-config claude
-pi mcp-config cursor
-pi mcp-config inspector --command /absolute/path/to/pi --store /absolute/path/to/.pi
+pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
+pi mcp-config codex --command /path/to/pi --store /path/to/.pi --namespace default
+pi mcp-config pi-agent --command /path/to/pi --store /path/to/.pi --namespace default
+
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --yes
+pi mcp-install codex --command /path/to/pi --store /path/to/.pi --namespace default --yes
+pi mcp-install pi-agent --command /path/to/pi --store /path/to/.pi --namespace default --yes
+
+pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
+pi mcp-doctor codex --command /path/to/pi --store /path/to/.pi --namespace default
+pi mcp-doctor pi-agent --command /path/to/pi --store /path/to/.pi --namespace default
 ```
+
+Existing `pi mcp-config claude`, `pi mcp-config cursor`, and `pi mcp-config inspector` behavior remains available.
 
 ### Command matrix
 
-`init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `review`, `demo`, `agent-instructions`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `smoke-test`, `release-audit`, `changelog`.
+`init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `review`, `demo`, `agent-instructions`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `inspect-record`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `mcp-install`, `mcp-doctor`, `smoke-test`, `release-audit`, `changelog`.
 
 ### JSON diagnostics and smoke tests
 
