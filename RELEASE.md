@@ -4,9 +4,9 @@
 
 
 
-## v1.0.0-rc.6 MCP client onboarding notes
+## v1.0.0-rc.7 MCP response compatibility notes
 
-`v1.0.0-rc.6` is the current MCP client onboarding and troubleshooting release candidate. It adds `mcp-config`, `mcp-install`, and `mcp-doctor` support for OpenCode, Codex, and PI-agent shared MCP configs. It does not add capture, semantic retrieval, graph memory, dashboards, hosted services, connectors, or stable `v1.0.0`.
+`v1.0.0-rc.7` is the current MCP response compatibility and namespace correctness release candidate. It keeps the rc.6 client setup helpers and fixes object-shaped `structuredContent` for list-style MCP tools plus server-default namespace propagation. It does not add capture, semantic retrieval, graph memory, dashboards, hosted services, connectors, or stable `v1.0.0`.
 
 ## v1.0.0-rc.4 documentation notes
 

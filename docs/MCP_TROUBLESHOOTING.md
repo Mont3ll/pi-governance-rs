@@ -1,6 +1,6 @@
 # MCP Troubleshooting
 
-PI MCP stdio can work while an agent client still shows zero PI tools if the active client config does not contain a `pi-governance` server entry. rc.6 adds setup helpers for that exact failure mode.
+PI MCP stdio can work while an agent client still shows zero PI tools if the active client config does not contain a `pi-governance` server entry. rc.6 added setup helpers for that exact failure mode; rc.7 additionally fixes MCP list response compatibility and server-default namespace propagation.
 
 ## Quick Diagnosis
 
@@ -101,7 +101,16 @@ The namespace in the client config must match the namespace used during testing,
 
 Run the direct smoke test. If it fails, fix the binary, store, namespace, or permissions. If it passes, check client logs and config reload behavior.
 
-## Expected rc.6 Tool List
+## Client-Prefixed Tool Names
+
+Some MCP clients expose PI tools with client/server-prefixed names, such as:
+
+- `pi-governance_pi_retrieve_context`
+- `pi_governance_pi.retrieve_context`
+
+These are equivalent to `pi.retrieve_context`. The prefix is a client display or routing convention, not a different PI tool.
+
+## Expected rc.7 Tool List
 
 Expected MCP tools include:
 

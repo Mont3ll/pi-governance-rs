@@ -1008,6 +1008,14 @@ impl GovernanceEngine {
     }
 
     pub fn list_patches(&self, limit: usize) -> Result<Vec<PatchSummary>> {
+        self.list_patches_filtered(None, limit)
+    }
+
+    pub fn list_patches_in_namespace(&self, namespace: &str, limit: usize) -> Result<Vec<PatchSummary>> {
+        self.list_patches_filtered(Some(namespace), limit)
+    }
+
+    fn list_patches_filtered(&self, namespace: Option<&str>, limit: usize) -> Result<Vec<PatchSummary>> {
         self.store.init()?;
 
         let patches = self.store.load_patches()?;
@@ -1015,6 +1023,9 @@ impl GovernanceEngine {
         let mut summaries = Vec::new();
 
         for latest in patches.iter().rev() {
+            if namespace.is_some_and(|expected| latest.namespace != expected) {
+                continue;
+            }
             if !seen.insert(latest.id.clone()) {
                 continue;
             }

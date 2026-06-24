@@ -1,6 +1,6 @@
 # pi-governance-rs
 
-Current milestone: `1.0.0-rc.6`.
+Current milestone: `1.0.0-rc.7`.
 
 PI is a local-first governed memory runtime for coding agents. It gives agents durable project memory without silent writes: memory changes are proposed as patches, reviewed, applied under policy, and kept auditable in JSONL.
 
@@ -391,6 +391,8 @@ pi mcp-doctor pi-agent --command /path/to/pi --store /path/to/.pi --namespace de
 ```
 
 Existing `pi mcp-config claude`, `pi mcp-config cursor`, and `pi mcp-config inspector` behavior remains available.
+
+Some clients display or route PI tools with client/server-prefixed names, such as `pi-governance_pi_retrieve_context` or `pi_governance_pi.retrieve_context`. These are equivalent to `pi.retrieve_context`. The `pi.inspect_record` MCP tool remains deferred unless implemented separately; use the CLI `pi inspect-record` for record inspection.
 
 ### Command matrix
 

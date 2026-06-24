@@ -1,5 +1,11 @@
 # Changelog
 
+- v1.0.0-rc.7 — MCP response compatibility and namespace correctness
+  - Fixes object-shaped `structuredContent` for list-style MCP tools.
+  - Fixes/defaults MCP namespace propagation from `pi --namespace ... mcp-stdio`.
+  - Documents client-prefixed MCP tool names used by some clients.
+  - Adds regression coverage.
+  - Adds no governance semantic changes.
 - v1.0.0-rc.6 — MCP client onboarding and troubleshooting
   - Adds `pi mcp-config opencode`, `pi mcp-config codex`, and `pi mcp-config pi-agent`.
   - Adds `pi mcp-install opencode`, `pi mcp-install codex`, and `pi mcp-install pi-agent`.

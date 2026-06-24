@@ -60,7 +60,7 @@ pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace in
 
 Run `mcp-doctor` before opening the client. Restart the client after `mcp-install`. If `mcp-doctor` passes but the client has no tools, inspect the client-specific config loading rules. For Codex or shared PI-agent MCP config, substitute `codex` or `pi-agent` in the commands.
 
-Then confirm `tools/list` contains PI tools and `pi.smoke_test` returns pass.
+Then confirm `tools/list` contains PI tools and `pi.smoke_test` returns pass. Some clients display PI tools with client/server-prefixed names such as `pi-governance_pi_retrieve_context` or `pi_governance_pi.retrieve_context`; these are equivalent to `pi.retrieve_context`. `pi.inspect_record` remains deferred through MCP unless implemented separately.
 
 ## Memory Governance Test
 

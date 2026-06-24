@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PI Governance v1.0.0-rc.6 Product Guide</title>
+  <title>PI Governance v1.0.0-rc.7 Product Guide</title>
   <style>
     :root { color-scheme: light dark; --accent:#5b6ee1; --muted:#667085; --card:#f6f7fb; }
     body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; line-height: 1.55; max-width: 1040px; margin: 0 auto; padding: 32px; }
@@ -20,7 +20,7 @@
   <header>
     <p class="muted">PI Governance Rust Port</p>
     <h1>Local-first governed memory for coding agents</h1>
-    <p>Current release candidate: <strong>v1.0.0-rc.6</strong>. Stable v1.0.0 has not shipped yet.</p>
+    <p>Current release candidate: <strong>v1.0.0-rc.7</strong>. Stable v1.0.0 has not shipped yet.</p>
   </header>
 
   <section>
@@ -61,7 +61,7 @@
       <li><strong>Belief revision:</strong> contest, supersede, tombstone, reinforce, and resolve contested records.</li>
       <li><strong>Import/export:</strong> portable JSON bundles with dry-run and backup options.</li>
       <li><strong>MCP stdio integration:</strong> coding agents can retrieve governed memory and propose changes.</li>
-      <li><strong>MCP setup helpers:</strong> <code>pi mcp-config opencode/codex/pi-agent</code>, <code>pi mcp-install</code>, and <code>pi mcp-doctor</code> streamline client registration.</li>
+      <li><strong>MCP setup helpers:</strong> <code>pi mcp-config opencode/codex/pi-agent</code>, <code>pi mcp-install</code>, and <code>pi mcp-doctor</code> streamline client registration. Some clients display prefixed tool names such as <code>pi-governance_pi_retrieve_context</code> or <code>pi_governance_pi.retrieve_context</code>; these are equivalent to <code>pi.retrieve_context</code>. The <code>pi.inspect_record</code> MCP tool remains deferred unless implemented separately.</li>
     </ul>
   </section>
 
@@ -78,7 +78,7 @@
 
   <section>
     <h2>Path to stable v1.0.0</h2>
-    <p>The release-candidate line freezes public CLI command names and MCP tool names while allowing documentation and output-level compatibility fixes before stable v1.0.0. This guide reflects v1.0.0-rc.6 and does not claim the stable release has shipped.</p>
+    <p>The release-candidate line freezes public CLI command names and MCP tool names while allowing documentation and output-level compatibility fixes before stable v1.0.0. This guide reflects v1.0.0-rc.7 and does not claim the stable release has shipped.</p>
   </section>
 </body>
 </html>
