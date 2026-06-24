@@ -1,5 +1,14 @@
 # Changelog
 
+- v1.0.0-rc.5 — public-testing readiness and record inspection
+  - Adds `pi inspect-record`.
+  - Adds `pi inspect-record --json`.
+  - Adds public testing guide.
+  - Adds non-goals documentation.
+  - Adds GitHub issue templates.
+  - Updates README for public testing.
+  - Updates product guide for rc.5.
+  - Adds no governance semantic changes.
 - v1.0.0-rc.4 — final docs consistency pass
   - Cleans up duplicated README sections.
   - Cleans up stale release-candidate version references.

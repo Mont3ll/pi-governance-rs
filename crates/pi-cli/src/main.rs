@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, PatchStatus, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
 use pi_governance::{
-    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection, PatchSummary, ProposalInput, ReinforceInput, ResolveContestInput,
+    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection, PatchSummary, ProposalInput, RecordInspection, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput,
 };
 use pi_mcp::McpStdioServer;
@@ -14,7 +14,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "1.0.0-rc.4",
+    version = "1.0.0-rc.5",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -364,6 +364,13 @@ enum Commands {
         limit: usize,
     },
 
+    /// Inspect a governed memory record by id.
+    InspectRecord {
+        record_id: String,
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Generate MCP client configuration.
     McpConfig {
         client: String,
@@ -474,6 +481,47 @@ struct DemoReport {
 #[derive(Debug, Serialize)]
 struct AgentInstructionsReport {
     instructions: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct InspectRecordError {
+    error: String,
+    record_id: String,
+}
+
+fn record_project(inspection: &RecordInspection) -> Option<String> {
+    inspection.record.scope.key.clone()
+}
+
+fn print_record_inspection(inspection: &RecordInspection) {
+    let record = &inspection.record;
+    println!("Record {}\n", record.id);
+    println!("Status: {:?}", record.status);
+    println!("Class: {:?}", record.class);
+    println!("Namespace: {}", record.namespace);
+    if let Some(project) = record_project(inspection) { println!("Project: {}", project); }
+    println!("Confidence: {:.2}", record.confidence);
+    println!("\nClaim:\n  {}", record.claim);
+    if !record.tags.is_empty() { println!("\nTags:\n  {}", record.tags.join(", ")); }
+    if !record.evidence.is_empty() {
+        println!("\nEvidence:");
+        for evidence in &record.evidence { println!("  - {} ({:?})", evidence.uri, evidence.kind); }
+    }
+    println!("\nCreated:\n  {}", record.created_at);
+    println!("Updated:\n  {}", record.updated_at);
+    println!("\nRevision:");
+    println!("  Supersedes: {}", if inspection.revision.supersedes.is_empty() { "none".to_string() } else { inspection.revision.supersedes.join(", ") });
+    println!("  Superseded by: {}", if inspection.revision.superseded_by.is_empty() { "none".to_string() } else { inspection.revision.superseded_by.join(", ") });
+    println!("  Contested: {}", inspection.revision.contested);
+    println!("  Tombstoned: {}", inspection.revision.tombstoned);
+    if !inspection.related_patches.is_empty() {
+        println!("\nRelated patches:");
+        for patch in &inspection.related_patches { println!("  - {}", patch); }
+    }
+    println!("\nNext:");
+    println!("  pi retrieve \"{}\" --explain", record.claim.split_whitespace().take(4).collect::<Vec<_>>().join(" "));
+    println!("  pi contest {} --reason \"...\" --evidence-uri review:...", record.id);
+    println!("  pi supersede {} --class {:?} --claim \"...\" --reason \"...\" --evidence-uri review:...", record.id, record.class);
 }
 
 fn patch_project(summary: &PatchSummary) -> Option<String> {
@@ -649,7 +697,7 @@ fn main() -> Result<()> {
             let contested = demo_engine.propose_record(input(RecordClass::Observation, "Old release note says rc.1 is current, but rc.3 supersedes it.", "contest", "demo:contested"), true, false)?.record_id.unwrap();
             demo_engine.contest_record(ContestInput { namespace: "default".to_string(), target_id: contested, evidence_refs: ev("demo:contest"), reason: "demo contested record".to_string() }, true, true)?;
             let old = demo_engine.propose_record(input(RecordClass::Observation, "v1.0.0-rc.2 is current.", "supersede", "demo:old-current"), true, false)?.record_id.unwrap();
-            demo_engine.supersede_record(SupersedeInput { namespace: "default".to_string(), target_id: old, class: RecordClass::Observation, claim: "v1.0.0-rc.4 is current.".to_string(), confidence: 0.8, scope: Scope::project("pi-governance-rs"), tags: vec!["supersede".to_string()], evidence_refs: ev("demo:new-current"), reason: "demo supersession".to_string() }, true, true)?;
+            demo_engine.supersede_record(SupersedeInput { namespace: "default".to_string(), target_id: old, class: RecordClass::Observation, claim: "v1.0.0-rc.5 is current.".to_string(), confidence: 0.8, scope: Scope::project("pi-governance-rs"), tags: vec!["supersede".to_string()], evidence_refs: ev("demo:new-current"), reason: "demo supersession".to_string() }, true, true)?;
             let tomb = demo_engine.propose_record(input(RecordClass::Workflow, "Old instruction: publish immediately after tests.", "tombstone", "demo:tombstone"), true, false)?.record_id.unwrap();
             demo_engine.tombstone_record(TombstoneInput { namespace: "default".to_string(), target_id: tomb, evidence_refs: ev("demo:no-publish"), reason: "this repo does not publish during RC validation".to_string() }, true, true)?;
             demo_engine.set_policy("strict-demo", PolicyProfile::Strict)?;
@@ -1229,6 +1277,23 @@ fn main() -> Result<()> {
             }
         }
 
+        Commands::InspectRecord { record_id, json } => {
+            match engine.inspect_record_in_namespace(&namespace, &record_id)? {
+                Some(inspection) => {
+                    if json { println!("{}", serde_json::to_string_pretty(&inspection)?); }
+                    else { print_record_inspection(&inspection); }
+                }
+                None => {
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&InspectRecordError { error: "record_not_found".to_string(), record_id: record_id.clone() })?);
+                    } else {
+                        eprintln!("Record not found: {}", record_id);
+                    }
+                    std::process::exit(1);
+                }
+            }
+        }
+
         Commands::McpConfig { client, command, json: _ } => {
             let command_path = command.unwrap_or(std::env::current_exe()?).display().to_string();
             let store_arg = store_path.display().to_string();
@@ -1268,13 +1333,13 @@ fn main() -> Result<()> {
             audit_check(&mut checks, &mut failures, "policy-doctor-json", engine.policy_doctor().is_ok(), "policy doctor failed");
             audit_check(&mut checks, &mut failures, "smoke-test", GovernanceEngine::run_smoke_test().result == "pass", "smoke test failed");
             let changelog = include_str!("../../../CHANGELOG.md");
-            audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0-rc.4") && changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
+            audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0-rc.5") && changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
             let readme = include_str!("../../../README.md");
-            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "smoke-test", "release-audit", "changelog"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
+            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "inspect-record", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "smoke-test", "release-audit", "changelog"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
             audit_check(&mut checks, &mut failures, "mcp-tools-list", true, "MCP tools are statically registered");
             let mcp_config = serde_json::json!({"mcpServers": {"pi-governance": {"command": std::env::current_exe()?.display().to_string(), "args": ["--store", store_path.display().to_string().as_str(), "--namespace", namespace.as_str(), "mcp-stdio"]}}});
             audit_check(&mut checks, &mut failures, "mcp-config", mcp_config.to_string().contains("mcp-stdio"), "mcp config missing mcp-stdio");
-            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "1.0.0-rc.4".to_string(), checks, failures };
+            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "1.0.0-rc.5".to_string(), checks, failures };
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {

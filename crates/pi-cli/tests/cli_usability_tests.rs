@@ -74,3 +74,43 @@ fn agent_instructions_json_is_valid() {
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert!(json["instructions"].as_array().unwrap().len() >= 4);
 }
+
+#[test]
+fn inspect_record_finds_json_and_filters_namespace() {
+    let store = tmp_store("inspect-record");
+    assert!(Command::new(bin()).args(["--store", &store, "init"]).status().unwrap().success());
+    let out = Command::new(bin()).args([
+        "--store", &store, "propose", "--class", "requirement", "--claim", "Inspect record test memory.",
+        "--project", "pi-governance-rs", "--tag", "inspect", "--evidence-uri", "test:inspect", "--apply",
+    ]).output().unwrap();
+    assert!(out.status.success());
+    let proposed: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let record_id = proposed["record_id"].as_str().unwrap();
+
+    let out = Command::new(bin()).args(["--store", &store, "inspect-record", record_id]).output().unwrap();
+    assert!(out.status.success());
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("Status:"));
+    assert!(text.contains("Class:"));
+    assert!(text.contains("Inspect record test memory."));
+    assert!(text.contains("test:inspect"));
+
+    let out = Command::new(bin()).args(["--store", &store, "inspect-record", record_id, "--json"]).output().unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["record"]["id"], record_id);
+    assert_eq!(json["record"]["namespace"], "default");
+
+    let out = Command::new(bin()).args(["--store", &store, "--namespace", "other", "inspect-record", record_id]).output().unwrap();
+    assert!(!out.status.success());
+}
+
+#[test]
+fn inspect_record_missing_json_is_error() {
+    let store = tmp_store("inspect-missing");
+    assert!(Command::new(bin()).args(["--store", &store, "init"]).status().unwrap().success());
+    let out = Command::new(bin()).args(["--store", &store, "inspect-record", "rec_missing", "--json"]).output().unwrap();
+    assert!(!out.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["error"], "record_not_found");
+}

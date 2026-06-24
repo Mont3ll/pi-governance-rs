@@ -3,6 +3,11 @@
 
 
 
+
+## v1.0.0-rc.5 public-testing notes
+
+`v1.0.0-rc.5` is the current public-testing readiness release candidate. It adds direct record inspection with `pi inspect-record`, public testing guidance, non-goals documentation, and GitHub issue templates. It does not add capture, semantic retrieval, graph memory, dashboards, hosted services, connectors, or stable `v1.0.0`.
+
 ## v1.0.0-rc.4 documentation notes
 
 `v1.0.0-rc.4` is the current release-candidate documentation consistency pass. It cleans README duplication, stale version references, command examples, MCP documentation, security and memory-poisoning wording, and adds `docs/product-guide.html`. It does not claim stable `v1.0.0` has shipped and does not change governance semantics.

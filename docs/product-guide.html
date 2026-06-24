@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PI Governance v1.0.0-rc.4 Product Guide</title>
+  <title>PI Governance v1.0.0-rc.5 Product Guide</title>
   <style>
     :root { color-scheme: light dark; --accent:#5b6ee1; --muted:#667085; --card:#f6f7fb; }
     body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; line-height: 1.55; max-width: 1040px; margin: 0 auto; padding: 32px; }
@@ -20,7 +20,7 @@
   <header>
     <p class="muted">PI Governance Rust Port</p>
     <h1>Local-first governed memory for coding agents</h1>
-    <p>Current release candidate: <strong>v1.0.0-rc.4</strong>. Stable v1.0.0 has not shipped yet.</p>
+    <p>Current release candidate: <strong>v1.0.0-rc.5</strong>. Stable v1.0.0 has not shipped yet.</p>
   </header>
 
   <section>
@@ -34,6 +34,8 @@
 ./target/debug/pi demo
 ./target/debug/pi --store /tmp/pi-governance-demo review
 ./target/debug/pi --store /tmp/pi-governance-demo retrieve "release workflow" --explain
+./target/debug/pi --store /tmp/pi-governance-demo list
+./target/debug/pi --store /tmp/pi-governance-demo inspect-record &lt;record_id&gt;
 ./target/debug/pi mcp-config claude
 ./target/debug/pi agent-instructions</code></pre>
   </section>
@@ -51,7 +53,7 @@
   <section>
     <h2>Core capabilities</h2>
     <ul>
-      <li><strong>Review/demo/agent-instructions:</strong> quick onboarding for new users and coding agents.</li>
+      <li><strong>Review/demo/inspect-record/agent-instructions:</strong> quick onboarding, auditability, and coding-agent guidance.</li>
       <li><strong>Policy profiles:</strong> permissive, standard, and strict operation modes.</li>
       <li><strong>Namespace isolation:</strong> logical separation for projects or agents while keeping JSONL storage.</li>
       <li><strong>Belief revision:</strong> contest, supersede, tombstone, reinforce, and resolve contested records.</li>
@@ -67,13 +69,13 @@
 
   <section>
     <h2>Ecosystem fit</h2>
-    <p>PI complements codebase intelligence MCP servers and skill libraries. Codebase-memory tools answer structural questions about code. Skill libraries package reusable workflows. PI stores governed decisions, corrections, workflows, and revisions across sessions.</p>
+    <p>For public testing, start with docs/PUBLIC_TESTING.md and docs/NON_GOALS.md. PI complements codebase intelligence MCP servers and skill libraries. Codebase-memory tools answer structural questions about code. Skill libraries package reusable workflows. PI stores governed decisions, corrections, workflows, and revisions across sessions.</p>
     <p>The recommended split with <code>pi-persistent-intelligence</code> is: Rust PI as the canonical governance engine and source-of-truth runtime; TS PI as SDK, adapters, dashboard, web/product layer, and integration tooling.</p>
   </section>
 
   <section>
     <h2>Path to stable v1.0.0</h2>
-    <p>The release-candidate line freezes public CLI command names and MCP tool names while allowing documentation and output-level compatibility fixes before stable v1.0.0. This guide reflects v1.0.0-rc.4 and does not claim the stable release has shipped.</p>
+    <p>The release-candidate line freezes public CLI command names and MCP tool names while allowing documentation and output-level compatibility fixes before stable v1.0.0. This guide reflects v1.0.0-rc.5 and does not claim the stable release has shipped.</p>
   </section>
 </body>
 </html>

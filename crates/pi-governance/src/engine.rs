@@ -142,6 +142,21 @@ pub struct PatchInspection {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct RecordRevisionInfo {
+    pub supersedes: Vec<String>,
+    pub superseded_by: Vec<String>,
+    pub contested: bool,
+    pub tombstoned: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RecordInspection {
+    pub record: Record,
+    pub revision: RecordRevisionInfo,
+    pub related_patches: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct NamespaceSummary {
     pub namespace: String,
     pub records: usize,
@@ -958,6 +973,38 @@ impl GovernanceEngine {
         records.truncate(limit);
 
         Ok(records)
+    }
+
+    pub fn inspect_record_in_namespace(&self, namespace: &str, record_id: &str) -> Result<Option<RecordInspection>> {
+        self.store.init()?;
+        let records = self.store.load_records()?;
+        let Some(record) = records.iter().find(|record| record.id == record_id && record.namespace == namespace).cloned() else {
+            return Ok(None);
+        };
+        let superseded_by: Vec<String> = records
+            .iter()
+            .filter(|candidate| candidate.namespace == namespace && candidate.supersedes.iter().any(|id| id == record_id))
+            .map(|candidate| candidate.id.clone())
+            .collect();
+        let patches = self.store.load_patches()?;
+        let mut related_patches: Vec<String> = patches
+            .iter()
+            .filter(|patch| {
+                patch.namespace == namespace
+                    && (patch.target_id.as_deref() == Some(record_id)
+                        || patch.proposed_record.as_ref().map(|proposed| proposed.id.as_str()) == Some(record_id))
+            })
+            .map(|patch| patch.id.clone())
+            .collect();
+        related_patches.sort();
+        related_patches.dedup();
+        let revision = RecordRevisionInfo {
+            supersedes: record.supersedes.clone(),
+            superseded_by,
+            contested: record.status == RecordStatus::Contested,
+            tombstoned: record.status == RecordStatus::Tombstoned,
+        };
+        Ok(Some(RecordInspection { record, revision, related_patches }))
     }
 
     pub fn list_patches(&self, limit: usize) -> Result<Vec<PatchSummary>> {
