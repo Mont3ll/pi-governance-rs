@@ -1,5 +1,15 @@
 # Changelog
 
+- v1.0.0-rc.3 — OSS usability, governed skills, and coding-agent integration
+  - Adds `pi review` for pending governed memory patches.
+  - Adds `pi demo` for a safe local demo store.
+  - Adds governed skill/workflow examples.
+  - Adds agent instruction guidance.
+  - Adds memory-poisoning documentation and security documentation.
+  - Adds codebase-memory-mcp complement documentation.
+  - Adds pi-persistent-intelligence compatibility notes.
+  - Rewrites the README quickstart for first-10-minutes adoption.
+  - Adds no governance semantic changes.
 - v1.0.0-rc.2 — release-candidate soak and compatibility pass
   - Verifies fresh-user clean clone installation.
   - Verifies README and release documentation examples.

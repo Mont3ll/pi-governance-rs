@@ -1,8 +1,42 @@
 # pi-governance-rs
 
-Current milestone: `1.0.0-rc.2`.
+Current milestone: `1.0.0-rc.3`.
 
-A Rust port of the PI governance layer for coding agents. The runtime exposes governed memory operations through a CLI and an MCP stdio server while keeping mutations patch-governed, inspectable, and auditable.
+PI is a local-first governed memory runtime for coding agents. It gives agents durable project memory without silent writes: memory changes are proposed as patches, reviewed, applied under policy, and kept auditable in JSONL.
+
+PI complements codebase intelligence MCP servers and skill libraries. It does not replace them. Use codebase tools to understand source structure; use PI to remember governed decisions, corrections, workflows, and stale-memory revisions.
+
+## First 10 minutes
+
+```bash
+cargo build -p pi-cli
+
+./target/debug/pi demo
+./target/debug/pi --store /tmp/pi-governance-demo review
+./target/debug/pi --store /tmp/pi-governance-demo retrieve "release workflow" --explain
+./target/debug/pi mcp-config claude
+./target/debug/pi agent-instructions
+```
+
+What to try next:
+
+- `pi review` to inspect pending memory proposals.
+- `pi retrieve "release workflow" --project pi-governance-rs --explain` to see governed context.
+- `pi propose --class workflow ...` to queue durable project knowledge.
+- `pi contest`, `pi supersede`, and `pi tombstone` to revise stale memory without deleting audit history.
+
+## Fresh-user install flow
+
+```bash
+git clone <repo-url>
+cd pi-governance-rs
+cargo build -p pi-cli
+./target/debug/pi init
+./target/debug/pi smoke-test
+./target/debug/pi mcp-config claude
+```
+
+Use generic local paths such as `/path/to/pi` and `/path/to/.pi` when configuring MCP clients.
 
 ## Workspace layout
 
@@ -330,7 +364,7 @@ pi mcp-config inspector --command /absolute/path/to/pi --store /absolute/path/to
 
 ### Command matrix
 
-`init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `smoke-test`, `release-audit`, `changelog`.
+`init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `review`, `demo`, `agent-instructions`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `smoke-test`, `release-audit`, `changelog`.
 
 ### JSON diagnostics and smoke tests
 
@@ -381,3 +415,7 @@ cargo build -p pi-cli
 ## v1.0.0-rc.2 release-candidate soak and compatibility pass
 
 This release candidate verifies fresh-user install, README examples, MCP client config, MCP smoke flows, clean-store import/export portability, namespace and policy behavior after fresh init, JSON diagnostics, and release-audit output. It adds no new governance semantics and preserves the frozen CLI command names and MCP tool names from `v1.0.0-rc.1`.
+
+## v1.0.0-rc.3 OSS usability, governed skills, and coding-agent integration
+
+Adds `pi review`, `pi demo`, `pi agent-instructions`, governed skill examples, security documentation, memory-poisoning guidance, codebase-memory-mcp complement documentation, pi-persistent-intelligence compatibility notes, and a first-10-minutes quickstart. No governance semantics are changed.

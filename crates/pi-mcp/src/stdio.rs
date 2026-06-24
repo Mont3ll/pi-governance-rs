@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "1.0.0-rc.2";
+const SERVER_VERSION: &str = "1.0.0-rc.3";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {

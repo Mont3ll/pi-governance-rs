@@ -1,6 +1,11 @@
 # Release candidate notes
 
 
+
+## v1.0.0-rc.3 usability notes
+
+`v1.0.0-rc.3` focuses on open-source usability. It adds a review inbox (`pi review`), a safe demo store (`pi demo`), agent instruction output, governed skill examples, security documentation, memory-poisoning guidance, codebase-memory-mcp complement documentation, and pi-persistent-intelligence compatibility notes. It does not change existing governance semantics or remove/rename CLI commands or MCP tools.
+
 ## v1.0.0-rc.2 compatibility notes
 
 `v1.0.0-rc.2` is a release-candidate soak and compatibility pass. It verifies fresh-user clean clone installation, README examples, MCP client configuration, MCP smoke flows, clean-store import/export portability, namespace and policy behavior after fresh init, JSON diagnostics, and release-audit output. It adds no new governance semantics and does not remove or rename any CLI commands or MCP tools.

@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
+use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, PatchStatus, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
 use pi_governance::{
-    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
+    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection, PatchSummary, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput,
 };
 use pi_mcp::McpStdioServer;
@@ -14,7 +14,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "1.0.0-rc.2",
+    version = "1.0.0-rc.3",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -95,6 +95,31 @@ enum Commands {
 
         #[arg(long = "class")]
         classes: Vec<RecordClass>,
+    },
+
+    /// Review pending memory patches.
+    Review {
+        patch_id: Option<String>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        apply: bool,
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Create a safe demo store with governed memory examples.
+    Demo {
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        reset: bool,
+    },
+
+    /// Print coding-agent instructions for PI usage.
+    AgentInstructions {
+        #[arg(long)]
+        json: bool,
     },
 
     /// Apply a previously proposed patch.
@@ -402,6 +427,114 @@ fn audit_check(checks: &mut Vec<ReleaseAuditCheck>, failures: &mut Vec<String>, 
     if !passed { failures.push(format!("{name}: {detail}")); }
 }
 
+#[derive(Debug, Serialize)]
+struct ReviewInbox {
+    pending_count: usize,
+    patches: Vec<ReviewPatch>,
+}
+
+#[derive(Debug, Serialize)]
+struct ReviewPatch {
+    id: String,
+    status: String,
+    operation: String,
+    decision: Option<String>,
+    namespace: String,
+    project: Option<String>,
+    summary: String,
+    evidence: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ReviewDetail {
+    id: String,
+    status: String,
+    operation: String,
+    decision: Option<String>,
+    namespace: String,
+    project: Option<String>,
+    claim: Option<String>,
+    evidence: Vec<String>,
+    warnings: Vec<String>,
+    reason: String,
+    target_id: Option<String>,
+    next_actions: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct DemoReport {
+    store: String,
+    records: usize,
+    pending_patches: usize,
+    namespaces: Vec<String>,
+    #[serde(rename = "try")]
+    try_commands: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct AgentInstructionsReport {
+    instructions: Vec<String>,
+}
+
+fn patch_project(summary: &PatchSummary) -> Option<String> {
+    summary.proposed_record_claim.as_ref()?;
+    None
+}
+
+fn summarize_claim(claim: &Option<String>, reason: &str) -> String {
+    claim.clone().unwrap_or_else(|| reason.to_string()).chars().take(96).collect()
+}
+
+fn review_patch_from_summary(summary: &PatchSummary) -> ReviewPatch {
+    ReviewPatch {
+        id: summary.patch_id.clone(),
+        status: format!("{:?}", summary.latest_status),
+        operation: format!("{:?}", summary.operation),
+        decision: None,
+        namespace: "unknown".to_string(),
+        project: patch_project(summary),
+        summary: summarize_claim(&summary.proposed_record_claim, &summary.reason),
+        evidence: vec![format!("{} evidence ref(s)", summary.evidence_count)],
+    }
+}
+
+fn review_detail_from_inspection(inspection: &PatchInspection) -> ReviewDetail {
+    let latest = inspection.history.last();
+    let evidence = latest.map(|p| p.evidence.iter().map(|e| e.uri.clone()).collect()).unwrap_or_default();
+    let namespace = latest.map(|p| p.namespace.clone()).unwrap_or_else(|| "unknown".to_string());
+    let project = latest.and_then(|p| p.proposed_record.as_ref()).and_then(|r| r.scope.key.clone());
+    let warnings = inspection.current_decision.as_ref().map(|d| d.warnings.clone()).unwrap_or_default();
+    let decision = inspection.current_decision.as_ref().map(|d| format!("{:?}", d.status));
+    let mut next_actions = Vec::new();
+    if inspection.can_apply_without_force { next_actions.push(format!("pi review {} --apply", inspection.summary.patch_id)); }
+    if inspection.can_apply_with_force { next_actions.push(format!("pi review {} --apply --force", inspection.summary.patch_id)); }
+    ReviewDetail {
+        id: inspection.summary.patch_id.clone(),
+        status: format!("{:?}", inspection.summary.latest_status),
+        operation: format!("{:?}", inspection.summary.operation),
+        decision,
+        namespace,
+        project,
+        claim: inspection.summary.proposed_record_claim.clone(),
+        evidence,
+        warnings,
+        reason: inspection.summary.reason.clone(),
+        target_id: inspection.summary.target_id.clone(),
+        next_actions,
+    }
+}
+
+fn agent_instructions() -> Vec<String> {
+    vec![
+        "Before starting a non-trivial coding task, retrieve PI context for the project.".to_string(),
+        "Prefer active records; treat contested records as unsafe unless explicitly included.".to_string(),
+        "When the user corrects you, propose a correction memory.".to_string(),
+        "When a memory appears stale, contest or supersede it.".to_string(),
+        "Respect PI policy profile decisions and do not silently store high-impact memories under strict policy.".to_string(),
+        "Review pending patches before release work.".to_string(),
+    ]
+}
+
 #[derive(Debug, Subcommand)]
 enum NamespaceCommands {
     /// List namespace summaries.
@@ -422,6 +555,109 @@ fn main() -> Result<()> {
         Commands::Init => {
             engine.init()?;
             println!("PI store initialized.");
+        }
+
+        Commands::AgentInstructions { json } => {
+            let instructions = agent_instructions();
+            if json {
+                println!("{}", serde_json::to_string_pretty(&AgentInstructionsReport { instructions })?);
+            } else {
+                println!("PI Agent Instructions\n");
+                for (idx, instruction) in instructions.iter().enumerate() {
+                    println!("{}. {}", idx + 1, instruction);
+                }
+            }
+        }
+
+        Commands::Review { patch_id, json, apply, force } => {
+            if let Some(patch_id) = patch_id {
+                if apply {
+                    let result = engine.apply_patch_by_id(&patch_id, force)?;
+                    if json { println!("{}", serde_json::to_string_pretty(&result)?); }
+                    else { println!("Patch {}", result.patch_id); println!("Applied: {}", result.applied); println!("{}", result.message); }
+                } else {
+                    let inspection = engine.inspect_patch(&patch_id)?;
+                    let detail = review_detail_from_inspection(&inspection);
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&detail)?);
+                    } else {
+                        println!("Patch {}\n", detail.id);
+                        println!("Status: {}", detail.status);
+                        println!("Operation: {}", detail.operation);
+                        println!("Decision: {}", detail.decision.clone().unwrap_or_else(|| "n/a".to_string()));
+                        println!("Namespace: {}", detail.namespace);
+                        if let Some(project) = &detail.project { println!("Project: {}", project); }
+                        if let Some(target) = &detail.target_id { println!("Target: {}", target); }
+                        if let Some(claim) = &detail.claim { println!("\nClaim:\n  {}", claim); }
+                        if !detail.evidence.is_empty() { println!("\nEvidence:"); for e in &detail.evidence { println!("  {}", e); } }
+                        if !detail.warnings.is_empty() { println!("\nWarnings:"); for w in &detail.warnings { println!("  {}", w); } }
+                        if !detail.reason.is_empty() { println!("\nReason:\n  {}", detail.reason); }
+                        if !detail.next_actions.is_empty() { println!("\nNext:"); for action in &detail.next_actions { println!("  {}", action); } }
+                    }
+                }
+            } else {
+                let patches: Vec<ReviewPatch> = engine.list_patches(200)?.into_iter().filter(|p| p.latest_status == PatchStatus::Proposed).map(|p| {
+                    let mut review = review_patch_from_summary(&p);
+                    if let Ok(detail) = engine.inspect_patch(&p.patch_id).map(|inspection| review_detail_from_inspection(&inspection)) {
+                        review.namespace = detail.namespace;
+                        review.project = detail.project;
+                        review.decision = detail.decision;
+                        review.evidence = detail.evidence;
+                    }
+                    review
+                }).collect();
+                let inbox = ReviewInbox { pending_count: patches.len(), patches };
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&inbox)?);
+                } else {
+                    println!("PI Review Inbox\n");
+                    println!("Pending patches: {}\n", inbox.pending_count);
+                    if inbox.pending_count == 0 {
+                        println!("No pending memory changes.");
+                        println!("Try:\n  pi demo --store /tmp/pi-demo\n  pi --store /tmp/pi-demo review");
+                    } else {
+                        for (idx, patch) in inbox.patches.iter().enumerate() {
+                            println!("{}. {}", idx + 1, patch.id);
+                            println!("   operation: {}", patch.operation);
+                            println!("   status: {}", patch.status);
+                            println!("   namespace: {}", patch.namespace);
+                            println!("   summary: {}", patch.summary);
+                            println!("   evidence: {}", patch.evidence.join(", "));
+                            println!("   next: pi review {}\n", patch.id);
+                        }
+                    }
+                }
+            }
+        }
+
+        Commands::Demo { json, reset } => {
+            let demo_path = if store_path == PathBuf::from(".pi") { PathBuf::from("/tmp/pi-governance-demo") } else { store_path.clone() };
+            if demo_path == PathBuf::from(".pi") || demo_path.ends_with("target") { anyhow::bail!("refusing to use protected demo path"); }
+            if demo_path.exists() {
+                let non_empty = std::fs::read_dir(&demo_path)?.next().is_some();
+                if non_empty && !reset { anyhow::bail!("demo store exists and is non-empty; pass --reset to replace it"); }
+                if reset { std::fs::remove_dir_all(&demo_path)?; }
+            }
+            let demo_store = JsonlStore::new(demo_path.clone());
+            let demo_engine = GovernanceEngine::new(demo_store);
+            demo_engine.init()?;
+            let ev = |uri: &str| vec![EvidenceRef { schema_version: pi_core::current_schema_version(), kind: EvidenceKind::Conversation, uri: uri.to_string(), note: None }];
+            let input = |class, claim: &str, tag: &str, uri: &str| ProposalInput { namespace: "default".to_string(), class, claim: claim.to_string(), confidence: 0.75, scope: Scope::project("pi-governance-rs"), tags: vec![tag.to_string()], evidence_refs: ev(uri), reason: Some("demo memory".to_string()) };
+            demo_engine.propose_record(input(RecordClass::Preference, "Use cargo test --workspace before tagging Rust release candidates.", "release", "demo:preference"), true, false)?;
+            demo_engine.propose_record(input(RecordClass::Correction, "If MCP smoke tests fail, inspect tools/list before tools/call.", "mcp", "demo:correction"), true, false)?;
+            demo_engine.propose_record(input(RecordClass::Workflow, "Release validation requires cargo check, cargo test, smoke-test, release-audit, and changelog verification.", "workflow", "demo:workflow"), true, false)?;
+            let contested = demo_engine.propose_record(input(RecordClass::Observation, "Old release note says rc.1 is current, but rc.3 supersedes it.", "contest", "demo:contested"), true, false)?.record_id.unwrap();
+            demo_engine.contest_record(ContestInput { namespace: "default".to_string(), target_id: contested, evidence_refs: ev("demo:contest"), reason: "demo contested record".to_string() }, true, true)?;
+            let old = demo_engine.propose_record(input(RecordClass::Observation, "v1.0.0-rc.2 is current.", "supersede", "demo:old-current"), true, false)?.record_id.unwrap();
+            demo_engine.supersede_record(SupersedeInput { namespace: "default".to_string(), target_id: old, class: RecordClass::Observation, claim: "v1.0.0-rc.3 is current.".to_string(), confidence: 0.8, scope: Scope::project("pi-governance-rs"), tags: vec!["supersede".to_string()], evidence_refs: ev("demo:new-current"), reason: "demo supersession".to_string() }, true, true)?;
+            let tomb = demo_engine.propose_record(input(RecordClass::Workflow, "Old instruction: publish immediately after tests.", "tombstone", "demo:tombstone"), true, false)?.record_id.unwrap();
+            demo_engine.tombstone_record(TombstoneInput { namespace: "default".to_string(), target_id: tomb, evidence_refs: ev("demo:no-publish"), reason: "this repo does not publish during RC validation".to_string() }, true, true)?;
+            demo_engine.set_policy("strict-demo", PolicyProfile::Strict)?;
+            demo_engine.set_policy("permissive-demo", PolicyProfile::Permissive)?;
+            demo_engine.propose_record(ProposalInput { namespace: "default".to_string(), class: RecordClass::Workflow, claim: "Review pending patches before release.".to_string(), confidence: 0.75, scope: Scope::project("pi-governance-rs"), tags: vec!["review".to_string()], evidence_refs: ev("demo:pending-review"), reason: Some("demo pending patch".to_string()) }, false, false)?;
+            let report = DemoReport { store: demo_path.display().to_string(), records: demo_engine.list_records(200)?.len(), pending_patches: demo_engine.list_patches(200)?.iter().filter(|p| p.latest_status == PatchStatus::Proposed).count(), namespaces: vec!["default".to_string(), "strict-demo".to_string(), "permissive-demo".to_string()], try_commands: vec![format!("pi --store {} review", demo_path.display()), format!("pi --store {} retrieve \"release workflow\" --explain", demo_path.display())] };
+            if json { println!("{}", serde_json::to_string_pretty(&report)?); }
+            else { println!("PI Demo Store Created\n"); println!("Store: {}", report.store); println!("Records: {}", report.records); println!("Pending patches: {}", report.pending_patches); println!("Namespaces: {}", report.namespaces.join(", ")); println!("\nTry:"); for cmd in &report.try_commands { println!("  {}", cmd); } println!("  pi --store {} doctor", report.store); println!("  pi --store {} namespace doctor", report.store); println!("  pi --store {} policy doctor", report.store); }
         }
 
         Commands::Propose {
@@ -1032,13 +1268,13 @@ fn main() -> Result<()> {
             audit_check(&mut checks, &mut failures, "policy-doctor-json", engine.policy_doctor().is_ok(), "policy doctor failed");
             audit_check(&mut checks, &mut failures, "smoke-test", GovernanceEngine::run_smoke_test().result == "pass", "smoke test failed");
             let changelog = include_str!("../../../CHANGELOG.md");
-            audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
+            audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0-rc.3") && changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
             let readme = include_str!("../../../README.md");
-            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "smoke-test", "release-audit", "changelog"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
+            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "smoke-test", "release-audit", "changelog"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
             audit_check(&mut checks, &mut failures, "mcp-tools-list", true, "MCP tools are statically registered");
             let mcp_config = serde_json::json!({"mcpServers": {"pi-governance": {"command": std::env::current_exe()?.display().to_string(), "args": ["--store", store_path.display().to_string().as_str(), "--namespace", namespace.as_str(), "mcp-stdio"]}}});
             audit_check(&mut checks, &mut failures, "mcp-config", mcp_config.to_string().contains("mcp-stdio"), "mcp config missing mcp-stdio");
-            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "1.0.0-rc.2".to_string(), checks, failures };
+            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "1.0.0-rc.3".to_string(), checks, failures };
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
