@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Security fixes are considered for the current release-candidate line and the latest tagged release.
+Security fixes are considered for the current release-candidate line (`v1.0.0-rc.4` as of this document) and the latest tagged release.
 
 ## Reporting Vulnerabilities
 

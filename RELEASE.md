@@ -2,6 +2,11 @@
 
 
 
+
+## v1.0.0-rc.4 documentation notes
+
+`v1.0.0-rc.4` is the current release-candidate documentation consistency pass. It cleans README duplication, stale version references, command examples, MCP documentation, security and memory-poisoning wording, and adds `docs/product-guide.html`. It does not claim stable `v1.0.0` has shipped and does not change governance semantics.
+
 ## v1.0.0-rc.3 usability notes
 
 `v1.0.0-rc.3` focuses on open-source usability. It adds a review inbox (`pi review`), a safe demo store (`pi demo`), agent instruction output, governed skill examples, security documentation, memory-poisoning guidance, codebase-memory-mcp complement documentation, and pi-persistent-intelligence compatibility notes. It does not change existing governance semantics or remove/rename CLI commands or MCP tools.
@@ -16,7 +21,7 @@ This sprint is a release-candidate packaging sprint only. It adds no new governa
 
 ## Public CLI surface freeze
 
-The following command names are considered part of the release-candidate public surface for `v1.0.0-rc.1`:
+The following command names are considered part of the release-candidate public surface for the current release-candidate line (introduced in `v1.0.0-rc.1`):
 
 ```text
 init
@@ -45,11 +50,11 @@ release-audit
 changelog
 ```
 
-Command names are frozen for `v1.0.0-rc.1`. Output details may still receive compatibility fixes before stable `v1.0.0`.
+Command names are frozen for the release-candidate line. Output details may still receive compatibility fixes before stable `v1.0.0`.
 
 ## MCP schema freeze
 
-MCP tool names are frozen for `v1.0.0-rc.1`. The governed memory tool surface includes:
+MCP tool names are frozen for the release-candidate line. The governed memory tool surface includes:
 
 ```text
 pi.retrieve_context
@@ -107,7 +112,7 @@ Verify the release candidate in a temporary local clone:
 ```bash
 git clone <repo-url> pi-governance-rs-rc1-clone
 cd pi-governance-rs-rc1-clone
-git checkout v1.0.0-rc.1
+git checkout v1.0.0-rc.4
 cargo check --workspace
 cargo test --workspace
 cargo build -p pi-cli
@@ -119,7 +124,7 @@ cargo build -p pi-cli
 Expected version output:
 
 ```text
-pi 1.0.0-rc.1
+pi 1.0.0-rc.4
 ```
 
 ## Archive content verification

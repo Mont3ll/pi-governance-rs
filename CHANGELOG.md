@@ -1,5 +1,13 @@
 # Changelog
 
+- v1.0.0-rc.4 — final docs consistency pass
+  - Cleans up duplicated README sections.
+  - Cleans up stale release-candidate version references.
+  - Verifies first-10-minutes commands and command matrix documentation.
+  - Verifies MCP documentation against available tools.
+  - Adds standalone product guide HTML under docs/.
+  - Verifies release-audit and smoke-test output.
+  - Adds no governance semantic changes.
 - v1.0.0-rc.3 — OSS usability, governed skills, and coding-agent integration
   - Adds `pi review` for pending governed memory patches.
   - Adds `pi demo` for a safe local demo store.

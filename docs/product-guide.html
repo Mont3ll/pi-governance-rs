@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PI Governance v1.0.0-rc.4 Product Guide</title>
+  <style>
+    :root { color-scheme: light dark; --accent:#5b6ee1; --muted:#667085; --card:#f6f7fb; }
+    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; line-height: 1.55; max-width: 1040px; margin: 0 auto; padding: 32px; }
+    header { border-bottom: 3px solid var(--accent); margin-bottom: 28px; }
+    h1, h2 { line-height: 1.2; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    pre { padding: 16px; overflow-x: auto; background: var(--card); border-radius: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card { background: var(--card); border-radius: 14px; padding: 16px; }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="muted">PI Governance Rust Port</p>
+    <h1>Local-first governed memory for coding agents</h1>
+    <p>Current release candidate: <strong>v1.0.0-rc.4</strong>. Stable v1.0.0 has not shipped yet.</p>
+  </header>
+
+  <section>
+    <h2>What PI is</h2>
+    <p>PI Governance is a local-first runtime that gives coding agents durable memory without silent writes. Memory changes are proposed as patches, reviewed, applied under policy, and kept auditable in a JSONL source-of-truth store.</p>
+  </section>
+
+  <section>
+    <h2>First 10 minutes</h2>
+    <pre><code>cargo build -p pi-cli
+./target/debug/pi demo
+./target/debug/pi --store /tmp/pi-governance-demo review
+./target/debug/pi --store /tmp/pi-governance-demo retrieve "release workflow" --explain
+./target/debug/pi mcp-config claude
+./target/debug/pi agent-instructions</code></pre>
+  </section>
+
+  <section>
+    <h2>Governance lifecycle</h2>
+    <div class="grid">
+      <div class="card"><h3>Patch before mutation</h3><p>Durable records enter the store through proposed patches, not silent background writes.</p></div>
+      <div class="card"><h3>Review</h3><p><code>pi review</code> lists and inspects pending patches before they are applied.</p></div>
+      <div class="card"><h3>Policy</h3><p>Profiles can allow, warn, or require manual review while preserving existing governance semantics.</p></div>
+      <div class="card"><h3>Audit</h3><p>Applied, contested, superseded, and tombstoned records preserve history instead of erasing context.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Core capabilities</h2>
+    <ul>
+      <li><strong>Review/demo/agent-instructions:</strong> quick onboarding for new users and coding agents.</li>
+      <li><strong>Policy profiles:</strong> permissive, standard, and strict operation modes.</li>
+      <li><strong>Namespace isolation:</strong> logical separation for projects or agents while keeping JSONL storage.</li>
+      <li><strong>Belief revision:</strong> contest, supersede, tombstone, reinforce, and resolve contested records.</li>
+      <li><strong>Import/export:</strong> portable JSON bundles with dry-run and backup options.</li>
+      <li><strong>MCP stdio integration:</strong> coding agents can retrieve governed memory and propose changes.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Security and memory-poisoning limits</h2>
+    <p>PI reduces memory-poisoning risk by making durable memory writes explicit, inspectable, policy-controlled, revisable, and auditable. It does not prove that accepted memories are true, prevent every prompt injection, encrypt local JSONL files by default, or sandbox arbitrary tools.</p>
+  </section>
+
+  <section>
+    <h2>Ecosystem fit</h2>
+    <p>PI complements codebase intelligence MCP servers and skill libraries. Codebase-memory tools answer structural questions about code. Skill libraries package reusable workflows. PI stores governed decisions, corrections, workflows, and revisions across sessions.</p>
+    <p>The recommended split with <code>pi-persistent-intelligence</code> is: Rust PI as the canonical governance engine and source-of-truth runtime; TS PI as SDK, adapters, dashboard, web/product layer, and integration tooling.</p>
+  </section>
+
+  <section>
+    <h2>Path to stable v1.0.0</h2>
+    <p>The release-candidate line freezes public CLI command names and MCP tool names while allowing documentation and output-level compatibility fixes before stable v1.0.0. This guide reflects v1.0.0-rc.4 and does not claim the stable release has shipped.</p>
+  </section>
+</body>
+</html>

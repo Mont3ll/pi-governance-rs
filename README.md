@@ -1,6 +1,6 @@
 # pi-governance-rs
 
-Current milestone: `1.0.0-rc.3`.
+Current milestone: `1.0.0-rc.4`.
 
 PI is a local-first governed memory runtime for coding agents. It gives agents durable project memory without silent writes: memory changes are proposed as patches, reviewed, applied under policy, and kept auditable in JSONL.
 
@@ -50,20 +50,6 @@ crates/
   pi-cli/          command-line binary
 ```
 
-
-## Fresh-user install flow
-
-```bash
-git clone <repo-url>
-cd pi-governance-rs
-cargo build -p pi-cli
-./target/debug/pi init
-./target/debug/pi smoke-test
-./target/debug/pi mcp-config claude
-```
-
-Use generic local paths such as `/path/to/pi` and `/path/to/.pi` when configuring MCP clients.
-
 ## Core commands
 
 ```bash
@@ -98,6 +84,19 @@ Retrieve context:
   --project pi-governance-rs \
   --budget 900
 ```
+
+
+## Review, demo, and agent instructions
+
+```bash
+./target/debug/pi demo
+./target/debug/pi --store /tmp/pi-governance-demo review
+./target/debug/pi --store /tmp/pi-governance-demo review --json
+./target/debug/pi --store /tmp/pi-governance-demo retrieve "release workflow" --explain
+./target/debug/pi agent-instructions
+```
+
+`pi demo` creates a safe temporary demo store by default. `pi review` shows pending governed memory patches. `pi agent-instructions` prints guidance for coding agents that use PI.
 
 ## Patch visibility
 
@@ -282,7 +281,7 @@ cargo build -p pi-cli
 Expected:
 
 ```text
-pi 1.0.0-rc.1
+pi 1.0.0-rc.4
 ```
 
 ## v0.8.0 namespace isolation
