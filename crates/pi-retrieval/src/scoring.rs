@@ -101,8 +101,54 @@ pub fn rank_record(record: &Record, query_terms: &[String], project: Option<&str
         format!("recency={:.3}", breakdown.recency),
     ];
     if status_penalty > 0.0 { explanation.push(format!("status_penalty={:.3}", status_penalty)); }
-    RankedRecord { record: record.clone(), score, breakdown, matched_terms, explanation }
+    let mut matched_fields = Vec::new();
+    if matched_terms.iter().any(|term| claim.contains(term)) { matched_fields.push("claim".to_string()); }
+    if tag_hits > 0 { matched_fields.push("tags".to_string()); }
+    if matched_terms.iter().any(|term| scope_key.contains(term)) { matched_fields.push("project".to_string()); }
+    if matched_terms.iter().any(|term| class_text.contains(term)) { matched_fields.push("class".to_string()); }
+    RankedRecord { record: record.clone(), score, deterministic_score: score, lexical_score: score, hybrid_score: score, matched_fields, breakdown, matched_terms, explanation }
 }
+
+pub fn rank_record_with_mode(record: &Record, query: &str, query_terms: &[String], project: Option<&str>, mode: &str) -> RankedRecord {
+    let mut ranked = rank_record(record, query_terms, project);
+    let claim = record.claim.to_lowercase();
+    let tags = record.tags.iter().map(|t| t.to_lowercase()).collect::<Vec<_>>();
+    let project_text = record.scope.key.clone().unwrap_or_default().to_lowercase();
+    let class_text = record.class.as_str().to_lowercase();
+    let evidence_text = record.evidence.iter().map(|e| e.uri.to_lowercase()).collect::<Vec<_>>().join(" ");
+    let query_l = query.to_lowercase();
+    let mut raw = 0.0f32;
+    let mut matched_fields = ranked.matched_fields.clone();
+    let mut matched_terms = ranked.matched_terms.clone();
+    for term in query_terms {
+        if claim.contains(term) { raw += 4.0; matched_fields.push("claim".to_string()); matched_terms.push(term.clone()); }
+        if tags.iter().any(|t| t.contains(term)) { raw += 3.0; matched_fields.push("tags".to_string()); matched_terms.push(term.clone()); }
+        if project_text.contains(term) { raw += 2.0; matched_fields.push("project".to_string()); matched_terms.push(term.clone()); }
+        if class_text.contains(term) { raw += 1.5; matched_fields.push("class".to_string()); matched_terms.push(term.clone()); }
+        if evidence_text.contains(term) { raw += 1.0; matched_fields.push("evidence".to_string()); matched_terms.push(term.clone()); }
+    }
+    if !query_l.is_empty() && claim.contains(&query_l) { raw += 4.0; matched_fields.push("claim".to_string()); }
+    raw *= record.confidence.clamp(0.1, 1.0);
+    raw += (record.evidence.len() as f32 * 0.05).min(0.2);
+    let max_raw = (query_terms.len().max(1) as f32) * 11.5 + 4.2;
+    let lexical = (raw / max_raw).clamp(0.0, 1.0);
+    let deterministic = ranked.score.clamp(0.0, 1.0);
+    let hybrid = (deterministic * 0.55 + lexical * 0.45).clamp(0.0, 1.0);
+    matched_fields.sort(); matched_fields.dedup();
+    matched_terms.sort(); matched_terms.dedup();
+    ranked.deterministic_score = deterministic;
+    ranked.lexical_score = lexical;
+    ranked.hybrid_score = hybrid;
+    ranked.matched_fields = matched_fields;
+    ranked.matched_terms = matched_terms;
+    ranked.score = match mode { "lexical" => lexical, "hybrid" => hybrid, _ => deterministic };
+    ranked.explanation.push(format!("retriever={mode}"));
+    ranked.explanation.push(format!("deterministic_score={deterministic:.3}"));
+    ranked.explanation.push(format!("lexical_score={lexical:.3}"));
+    ranked.explanation.push(format!("hybrid_score={hybrid:.3}"));
+    ranked
+}
+
 
 pub fn sort_ranked(records: &mut [RankedRecord]) {
     records.sort_by(|a, b| {

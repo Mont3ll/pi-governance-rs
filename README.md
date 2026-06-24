@@ -1,6 +1,6 @@
 # pi-governance-rs
 
-Current milestone: `1.0.0-rc.7`.
+Current milestone: `1.0.0-rc.8`.
 
 PI is a local-first governed memory runtime for coding agents. It gives agents durable project memory without silent writes: memory changes are proposed as patches, reviewed, applied under policy, and kept auditable in JSONL.
 
@@ -451,3 +451,12 @@ This release candidate verifies fresh-user install, README examples, MCP client 
 ## v1.0.0-rc.3 OSS usability, governed skills, and coding-agent integration
 
 Adds `pi review`, `pi demo`, `pi agent-instructions`, governed skill examples, security documentation, memory-poisoning guidance, codebase-memory-mcp complement documentation, pi-persistent-intelligence compatibility notes, and a first-10-minutes quickstart. No governance semantics are changed.
+
+## v1.0.0-rc.8 release-quality additions
+
+- MCP `pi.inspect_record` parity for CLI `inspect-record`.
+- Review actions: `pi review --apply <patch-id>`, `pi review --reject <patch-id> --reason "..."`, and `pi review --defer <patch-id> --reason "..."`.
+- Read-only maintenance scan: `pi maintenance scan` and `pi maintenance scan --json`.
+- Retrieval modes: `pi retrieve "query" --retriever deterministic|lexical|hybrid --explain`.
+- Redacted exports include redaction metadata. Redaction is best-effort; review before sharing.
+- Schema docs: `docs/schema/`.

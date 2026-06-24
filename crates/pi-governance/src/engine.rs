@@ -117,6 +117,14 @@ pub struct ApplyPatchResult {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ReviewActionResult {
+    pub patch_id: String,
+    pub status: String,
+    pub reason: String,
+    pub namespace: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct PatchSummary {
     pub patch_id: String,
     pub operation: PatchOperation,
@@ -173,6 +181,30 @@ pub struct NamespaceDoctorReport {
     pub records_without_explicit_namespace: usize,
     pub cross_namespace_duplicate_ids: usize,
     pub summaries: Vec<NamespaceSummary>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MaintenanceSummary {
+    pub namespace: String,
+    pub records_checked: usize,
+    pub patches_checked: usize,
+    pub finding_count: usize,
+    pub severity: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MaintenanceFinding {
+    pub kind: String,
+    pub severity: String,
+    pub record_id: Option<String>,
+    pub patch_id: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MaintenanceScanReport {
+    pub summary: MaintenanceSummary,
+    pub findings: Vec<MaintenanceFinding>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -684,6 +716,34 @@ impl GovernanceEngine {
         })
     }
 
+    pub fn reject_patch_by_id(&self, patch_id: &str, namespace: &str, reason: &str) -> Result<ReviewActionResult> {
+        self.store.init()?;
+        let session = self.store.write_session()?;
+        let patches = session.load_patches()?;
+        let latest = patches.iter().filter(|patch| patch.id == patch_id).last().ok_or_else(|| anyhow::anyhow!("patch_not_found: no patch history found for id {patch_id}"))?;
+        if latest.namespace != namespace { bail!("patch_not_found_in_namespace: patch {patch_id} is not in namespace {namespace}"); }
+        if latest.status != PatchStatus::Proposed && latest.status != PatchStatus::Deferred { bail!("patch_not_pending: patch {patch_id} cannot be rejected because latest status is {:?}", latest.status); }
+        let mut rejected = latest.rejected_copy();
+        rejected.reason = reason.to_string();
+        session.append_patch(&rejected)?;
+        session.append_event(&StoreEvent::info(format!("patch rejected: {reason}"), Some(patch_id.to_string())))?;
+        Ok(ReviewActionResult { patch_id: patch_id.to_string(), status: "rejected".to_string(), reason: reason.to_string(), namespace: namespace.to_string() })
+    }
+
+    pub fn defer_patch_by_id(&self, patch_id: &str, namespace: &str, reason: &str) -> Result<ReviewActionResult> {
+        self.store.init()?;
+        let session = self.store.write_session()?;
+        let patches = session.load_patches()?;
+        let latest = patches.iter().filter(|patch| patch.id == patch_id).last().ok_or_else(|| anyhow::anyhow!("patch_not_found: no patch history found for id {patch_id}"))?;
+        if latest.namespace != namespace { bail!("patch_not_found_in_namespace: patch {patch_id} is not in namespace {namespace}"); }
+        if latest.status != PatchStatus::Proposed { bail!("patch_not_pending: patch {patch_id} cannot be deferred because latest status is {:?}", latest.status); }
+        let mut deferred = latest.deferred_copy();
+        deferred.reason = reason.to_string();
+        session.append_patch(&deferred)?;
+        session.append_event(&StoreEvent::info(format!("patch deferred: {reason}"), Some(patch_id.to_string())))?;
+        Ok(ReviewActionResult { patch_id: patch_id.to_string(), status: "deferred".to_string(), reason: reason.to_string(), namespace: namespace.to_string() })
+    }
+
     pub fn apply_patch_by_id(&self, patch_id: &str, force: bool) -> Result<ApplyPatchResult> {
         self.store.init()?;
         let session = self.store.write_session()?;
@@ -1105,6 +1165,39 @@ impl GovernanceEngine {
                 tombstoned: in_ns.iter().filter(|record| record.status == RecordStatus::Tombstoned).count(),
             }
         }).collect())
+    }
+
+    pub fn maintenance_scan(&self, namespace: &str) -> Result<MaintenanceScanReport> {
+        self.store.init()?;
+        let records: Vec<_> = self.store.load_records()?.into_iter().filter(|r| r.namespace == namespace).collect();
+        let patches: Vec<_> = self.store.load_patches()?.into_iter().filter(|p| p.namespace == namespace).collect();
+        let mut findings = Vec::new();
+        let mut latest = std::collections::HashMap::new();
+        for patch in &patches { latest.insert(patch.id.clone(), patch); }
+        for patch in latest.values() {
+            match patch.status {
+                PatchStatus::Proposed => findings.push(MaintenanceFinding { kind: "pending_patches".into(), severity: "info".into(), record_id: None, patch_id: Some(patch.id.clone()), message: "Patch is pending review.".into() }),
+                PatchStatus::Deferred => findings.push(MaintenanceFinding { kind: "deferred_patches".into(), severity: "info".into(), record_id: None, patch_id: Some(patch.id.clone()), message: "Patch has been deferred.".into() }),
+                PatchStatus::Rejected => findings.push(MaintenanceFinding { kind: "rejected_patches".into(), severity: "info".into(), record_id: None, patch_id: Some(patch.id.clone()), message: "Patch was rejected.".into() }),
+                PatchStatus::Applied => {}
+            }
+        }
+        let mut claims = std::collections::HashMap::<String, String>::new();
+        for record in &records {
+            if record.evidence.is_empty() { findings.push(MaintenanceFinding { kind: "records_without_evidence".into(), severity: "warn".into(), record_id: Some(record.id.clone()), patch_id: None, message: "Record has no evidence references.".into() }); }
+            if record.confidence < 0.5 { findings.push(MaintenanceFinding { kind: "low_confidence_records".into(), severity: "info".into(), record_id: Some(record.id.clone()), patch_id: None, message: "Record confidence is below 0.50.".into() }); }
+            if record.claim.trim().is_empty() { findings.push(MaintenanceFinding { kind: "records_with_empty_claims".into(), severity: "error".into(), record_id: Some(record.id.clone()), patch_id: None, message: "Record claim is empty.".into() }); }
+            match record.status {
+                RecordStatus::Contested => findings.push(MaintenanceFinding { kind: "contested_records".into(), severity: "warn".into(), record_id: Some(record.id.clone()), patch_id: None, message: "Record is contested.".into() }),
+                RecordStatus::Superseded => findings.push(MaintenanceFinding { kind: "superseded_records".into(), severity: "info".into(), record_id: Some(record.id.clone()), patch_id: None, message: "Record is superseded.".into() }),
+                RecordStatus::Tombstoned => findings.push(MaintenanceFinding { kind: "tombstoned_records".into(), severity: "info".into(), record_id: Some(record.id.clone()), patch_id: None, message: "Record is tombstoned.".into() }),
+                RecordStatus::Active => {}
+            }
+            let norm = record.claim.to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ");
+            if let Some(first) = claims.insert(norm, record.id.clone()) { findings.push(MaintenanceFinding { kind: "possible_duplicate_claims".into(), severity: "info".into(), record_id: Some(record.id.clone()), patch_id: None, message: format!("Record has same normalized claim as {first}.") }); }
+        }
+        let severity = if findings.iter().any(|f| f.severity == "error") { "error" } else if findings.iter().any(|f| f.severity == "warn") { "warn" } else if findings.is_empty() { "ok" } else { "info" }.to_string();
+        Ok(MaintenanceScanReport { summary: MaintenanceSummary { namespace: namespace.to_string(), records_checked: records.len(), patches_checked: latest.len(), finding_count: findings.len(), severity }, findings })
     }
 
     pub fn namespace_doctor(&self) -> Result<NamespaceDoctorReport> {

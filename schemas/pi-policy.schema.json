@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"PI Policy","type":"object","properties":{"default_policy":{"type":"string","enum":["permissive","standard","strict"]},"namespaces":{"type":"object"}}}

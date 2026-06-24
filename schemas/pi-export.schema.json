@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"PI Export Bundle","type":"object","required":["schema_version","records","patches","events"],"properties":{"schema_version":{"type":"integer"},"redacted":{"type":"boolean"},"redaction":{"type":"object"},"records":{"type":"array"},"patches":{"type":"array"},"events":{"type":"array"}}}

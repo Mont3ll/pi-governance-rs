@@ -330,6 +330,7 @@ pub enum PatchStatus {
     Proposed,
     Applied,
     Rejected,
+    Deferred,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -500,6 +501,13 @@ impl Patch {
         patch.updated_at = Utc::now();
         patch
     }
+
+    pub fn deferred_copy(&self) -> Self {
+        let mut patch = self.clone();
+        patch.status = PatchStatus::Deferred;
+        patch.updated_at = Utc::now();
+        patch
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -574,9 +582,13 @@ pub enum RetrievalFormat {
     Json,
 }
 
+pub fn default_retriever() -> String { "deterministic".to_string() }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrievalOptions {
     pub query: String,
+    #[serde(default = "default_retriever")]
+    pub retriever: String,
     #[serde(default = "default_namespace")]
     pub namespace: String,
     pub project: Option<String>,
@@ -605,6 +617,14 @@ pub struct ScoreBreakdown {
 pub struct RankedRecord {
     pub record: Record,
     pub score: f32,
+    #[serde(default)]
+    pub deterministic_score: f32,
+    #[serde(default)]
+    pub lexical_score: f32,
+    #[serde(default)]
+    pub hybrid_score: f32,
+    #[serde(default)]
+    pub matched_fields: Vec<String>,
     #[serde(rename = "score_breakdown")]
     pub breakdown: ScoreBreakdown,
     pub matched_terms: Vec<String>,
@@ -623,6 +643,8 @@ pub struct ContextBlock {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextBundle {
     pub query: String,
+    #[serde(default = "default_retriever")]
+    pub retriever: String,
     #[serde(default = "default_namespace")]
     pub namespace: String,
     pub project: Option<String>,
@@ -632,6 +654,10 @@ pub struct ContextBundle {
     pub blocks: Vec<ContextBlock>,
     pub records: Vec<RankedRecord>,
     pub warnings: Vec<String>,
+    #[serde(default)]
+    pub empty_reason: Option<String>,
+    #[serde(default)]
+    pub suggestions: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

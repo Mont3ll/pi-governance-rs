@@ -26,10 +26,19 @@ pub struct StoreImportOptions {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedactionMetadata {
+    pub enabled: bool,
+    pub fields_checked: Vec<String>,
+    pub fields_redacted: Vec<String>,
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreExportBundle {
     pub schema_version: u32,
     pub exported_at: DateTime<Utc>,
     pub redacted: bool,
+    pub redaction: RedactionMetadata,
     pub namespace: Option<String>,
     pub all_namespaces: bool,
     pub project: Option<String>,
@@ -129,6 +138,12 @@ impl JsonlStore {
             schema_version: CURRENT_SCHEMA_VERSION,
             exported_at: Utc::now(),
             redacted: options.redacted,
+            redaction: RedactionMetadata {
+                enabled: options.redacted,
+                fields_checked: vec!["records.evidence.uri".to_string(), "patches.evidence.uri".to_string(), "events.message".to_string()],
+                fields_redacted: if options.redacted { vec!["records.evidence.uri".to_string(), "patches.evidence.uri".to_string(), "events.message".to_string()] } else { Vec::new() },
+                notes: vec!["Redaction is best-effort and does not replace user review.".to_string()],
+            },
             namespace: options.namespace,
             all_namespaces: options.all_namespaces,
             project: options.project,

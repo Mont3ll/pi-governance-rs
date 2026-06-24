@@ -138,3 +138,7 @@ Expected MCP tools include:
 ## Known Limitation: pi.inspect_record MCP Tool Deferred
 
 `pi inspect-record` exists as a CLI command in rc.5+, but the `pi.inspect_record` MCP tool remains deferred unless added separately in a future release candidate. `mcp-doctor` reports whether it is present or unavailable.
+
+## rc.8 MCP Notes
+
+rc.8 adds `pi.inspect_record` and `pi.maintenance_scan`. `pi.retrieve_context` accepts `retriever` values `deterministic`, `lexical`, and `hybrid`. Some clients still show prefixed tool names; these are equivalent to the canonical `pi.*` names.

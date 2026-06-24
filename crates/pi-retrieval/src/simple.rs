@@ -4,7 +4,7 @@ use pi_core::{
 };
 
 use crate::packing::pack_ranked;
-use crate::scoring::{eligible, rank_record, sort_ranked, tokenize};
+use crate::scoring::{eligible, rank_record_with_mode, sort_ranked, tokenize};
 
 fn block_type_for(class: &RecordClass) -> &'static str {
     match class {
@@ -27,6 +27,7 @@ pub fn retrieve(
 ) -> ContextBundle {
     retrieve_with_options(records, RetrievalOptions {
         query: query.into(),
+        retriever: "deterministic".to_string(),
         namespace: pi_core::default_namespace(),
         project,
         budget: budget.max_tokens,
@@ -52,12 +53,20 @@ pub fn retrieve_with_options(records: &[Record], options: RetrievalOptions) -> C
             options.include_contested,
             options.min_confidence,
         ))
-        .map(|record| rank_record(record, &query_terms, options.project.as_deref()))
+        .map(|record| rank_record_with_mode(record, &options.query, &query_terms, options.project.as_deref(), &options.retriever))
         .filter(|ranked| query_terms.is_empty() || !ranked.matched_terms.is_empty() || ranked.score > 0.30)
         .collect();
 
     sort_ranked(&mut ranked);
-    let (packed, used_estimated_tokens, warnings) = pack_ranked(ranked, options.budget);
+    let mut warnings = Vec::new();
+    let empty_reason = if ranked.is_empty() {
+        let namespace_count = records.iter().filter(|record| record.namespace == options.namespace).count();
+        if namespace_count == 0 { Some("no active records matched query in namespace; records may exist only in other namespaces".to_string()) }
+        else { Some("no active records matched query after project/status/confidence filters".to_string()) }
+    } else { None };
+    let suggestions = if empty_reason.is_some() { vec!["try include-global".to_string(), "try include-contested".to_string(), "try lower min-confidence".to_string()] } else { Vec::new() };
+    let (packed, used_estimated_tokens, pack_warnings) = pack_ranked(ranked, options.budget);
+    warnings.extend(pack_warnings);
 
     let blocks = packed.iter().map(|ranked| ContextBlock {
         record_id: ranked.record.id.clone(),
@@ -69,6 +78,7 @@ pub fn retrieve_with_options(records: &[Record], options: RetrievalOptions) -> C
 
     ContextBundle {
         query: options.query,
+        retriever: options.retriever,
         namespace: options.namespace,
         project: options.project,
         budget: RetrievalBudget { max_tokens: options.budget },
@@ -77,6 +87,8 @@ pub fn retrieve_with_options(records: &[Record], options: RetrievalOptions) -> C
         blocks,
         records: packed,
         warnings,
+        empty_reason,
+        suggestions,
     }
 }
 
@@ -87,6 +99,7 @@ pub fn render_markdown(bundle: &ContextBundle) -> String {
     output.push_str(&format!("Query: `{}`\n\n", bundle.query));
 
     output.push_str(&format!("Namespace: `{}`\n\n", bundle.namespace));
+    output.push_str(&format!("Retriever: `{}`\n\n", bundle.retriever));
 
     if let Some(project) = &bundle.project {
         output.push_str(&format!("Project: `{project}`\n\n"));
@@ -107,8 +120,14 @@ pub fn render_markdown(bundle: &ContextBundle) -> String {
         if bundle.explain {
             if let Some(ranked) = bundle.records.get(idx) {
                 output.push_str(&format!("- score: {:.3}\n", ranked.score));
+                output.push_str(&format!("- deterministic score: {:.3}\n", ranked.deterministic_score));
+                output.push_str(&format!("- lexical score: {:.3}\n", ranked.lexical_score));
+                output.push_str(&format!("- hybrid score: {:.3}\n", ranked.hybrid_score));
                 if !ranked.matched_terms.is_empty() {
                     output.push_str(&format!("- matched terms: {}\n", ranked.matched_terms.join(", ")));
+                }
+                if !ranked.matched_fields.is_empty() {
+                    output.push_str(&format!("- matched fields: {}\n", ranked.matched_fields.join(", ")));
                 }
                 if !ranked.explanation.is_empty() {
                     output.push_str("- explanation:\n");
@@ -117,6 +136,17 @@ pub fn render_markdown(bundle: &ContextBundle) -> String {
                     }
                 }
             }
+        }
+        output.push('\n');
+    }
+
+    if bundle.blocks.is_empty() {
+        if let Some(reason) = &bundle.empty_reason {
+            output.push_str(&format!("## Empty result\n\n- empty reason: {reason}\n"));
+        }
+        if !bundle.suggestions.is_empty() {
+            output.push_str("- suggestions:\n");
+            for suggestion in &bundle.suggestions { output.push_str(&format!("  - {suggestion}\n")); }
         }
         output.push('\n');
     }

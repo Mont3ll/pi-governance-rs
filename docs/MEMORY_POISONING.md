@@ -31,3 +31,7 @@ Use strict policy for identity rules, release workflows, security guidance, and 
 ## Agent Instruction Risks
 
 Agent instructions should say when to retrieve PI memory, how to treat contested records, and when to propose corrections. They should not tell agents to blindly apply every memory or to store secrets.
+
+## rc.8 Maintenance and Redaction Notes
+
+`pi maintenance scan` is read-only and does not create suggestions or mutate memory. Redacted export is best-effort and does not replace user review. PI is not a secret scanner or DLP system; do not store secrets in PI.

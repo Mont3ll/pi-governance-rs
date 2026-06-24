@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"PI Patch","type":"object","required":["id","namespace","operation","status"],"properties":{"id":{"type":"string"},"namespace":{"type":"string"},"operation":{"type":"string"},"status":{"type":"string"}}}

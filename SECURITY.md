@@ -34,3 +34,7 @@ PI assumes the local user controls the machine and can inspect the store. It hel
 - MCP clients can display or forward retrieved memory according to their own behavior.
 - Manual review reduces risk but cannot guarantee correctness.
 - PI does not prevent all prompt injection or memory poisoning.
+
+## rc.8 Redacted Export Warning
+
+Redacted export metadata reports fields checked and redacted, but redaction is best-effort. Users must review exports before sharing. PI is not a secret scanner, DLP system, or encrypted secret store.

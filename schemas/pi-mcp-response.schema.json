@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"PI MCP Tool Response","type":"object","required":["content","structuredContent","isError"],"properties":{"content":{"type":"array"},"structuredContent":{"type":"object"},"isError":{"type":"boolean"}}}

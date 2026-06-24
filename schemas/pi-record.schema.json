@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"PI Record","type":"object","required":["id","namespace","class","claim","status"],"properties":{"id":{"type":"string"},"namespace":{"type":"string"},"class":{"type":"string"},"claim":{"type":"string"},"status":{"type":"string"}}}

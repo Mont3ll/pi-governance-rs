@@ -1,5 +1,13 @@
 # Changelog
 
+- v1.0.0-rc.8 — release-quality governance, review ergonomics, and retrieval hardening
+  - Adds MCP `pi.inspect_record` parity.
+  - Adds review queue actions: `review --apply`, `review --reject`, and `review --defer`.
+  - Adds read-only `maintenance scan` and MCP `pi.maintenance_scan`.
+  - Adds local deterministic lexical/hybrid retrieval modes without embeddings or external indexes.
+  - Adds redacted export metadata.
+  - Adds schema documentation.
+  - Adds no governance semantic changes.
 - v1.0.0-rc.7 — MCP response compatibility and namespace correctness
   - Fixes object-shaped `structuredContent` for list-style MCP tools.
   - Fixes/defaults MCP namespace propagation from `pi --namespace ... mcp-stdio`.

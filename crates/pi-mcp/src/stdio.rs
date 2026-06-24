@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "1.0.0-rc.7";
+const SERVER_VERSION: &str = "1.0.0-rc.8";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -179,6 +179,11 @@ impl McpStdioServer {
                             "type": "string",
                             "enum": ["json", "markdown"],
                             "default": "markdown"
+                        },
+                        "retriever": {
+                            "type": "string",
+                            "enum": ["deterministic", "lexical", "hybrid"],
+                            "default": "deterministic"
                         },
                         "explain": {
                             "type": "boolean",
@@ -662,6 +667,31 @@ impl McpStdioServer {
                 }
             },
             {
+                "name": "pi.inspect_record",
+                "description": "Inspect a governed memory record by id.",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": { "record_id": { "type": "string" }, "namespace": { "type": "string" } },
+                    "required": ["record_id"]
+                }
+            },
+            {
+                "name": "pi.maintenance_scan",
+                "description": "Run a read-only governance maintenance scan.",
+                "inputSchema": { "type": "object", "additionalProperties": false, "properties": { "namespace": { "type": "string" } } }
+            },
+            {
+                "name": "pi.reject_patch",
+                "description": "Reject a proposed or deferred patch without mutating records.",
+                "inputSchema": { "type": "object", "additionalProperties": false, "properties": { "patch_id": { "type": "string" }, "reason": { "type": "string" }, "namespace": { "type": "string" } }, "required": ["patch_id", "reason"] }
+            },
+            {
+                "name": "pi.defer_patch",
+                "description": "Defer a proposed patch without mutating records.",
+                "inputSchema": { "type": "object", "additionalProperties": false, "properties": { "patch_id": { "type": "string" }, "reason": { "type": "string" }, "namespace": { "type": "string" } }, "required": ["patch_id", "reason"] }
+            },
+            {
                 "name": "pi.list_records",
                 "description": "List recent PI records for inspection.",
                 "inputSchema": {
@@ -693,6 +723,8 @@ impl McpStdioServer {
             "pi.contest_record" => self.tool_contest_record(arguments),
             "pi.resolve_contest" => self.tool_resolve_contest(arguments),
             "pi.apply_patch" => self.tool_apply_patch(arguments),
+            "pi.reject_patch" => self.tool_reject_patch(arguments),
+            "pi.defer_patch" => self.tool_defer_patch(arguments),
             "pi.list_patches" => self.tool_list_patches(arguments),
             "pi.inspect_patch" => self.tool_inspect_patch(arguments),
             "pi.export_store" => self.tool_export_store(arguments),
@@ -708,6 +740,8 @@ impl McpStdioServer {
             "pi.changelog" => self.tool_changelog(),
             "pi.list_namespaces" => self.tool_list_namespaces(),
             "pi.namespace_doctor" => self.tool_namespace_doctor(),
+            "pi.inspect_record" => self.tool_inspect_record(arguments),
+            "pi.maintenance_scan" => self.tool_maintenance_scan(arguments),
             "pi.list_records" => self.tool_list_records(arguments),
             other => bail!("unknown PI MCP tool: {other}"),
         }
@@ -778,6 +812,7 @@ impl McpStdioServer {
         let project = optional_string(&args, "project");
         let budget = optional_usize(&args, "budget").unwrap_or(1200);
         let format = optional_string(&args, "format").unwrap_or_else(|| "markdown".to_string());
+        let retriever = optional_string(&args, "retriever").unwrap_or_else(|| "deterministic".to_string());
         let explain = optional_bool(&args, "explain").unwrap_or(false);
         let include_global = optional_bool(&args, "include_global").unwrap_or(true);
         let include_contested = optional_bool(&args, "include_contested").unwrap_or(false);
@@ -797,6 +832,7 @@ impl McpStdioServer {
             .engine
             .retrieve_context_with_options(RetrievalOptions {
                 query,
+                retriever: retriever.clone(),
                 namespace,
                 project,
                 budget,
@@ -1104,6 +1140,26 @@ impl McpStdioServer {
         }
     }
 
+    fn tool_reject_patch(&self, args: Value) -> Result<Value> {
+        let patch_id = required_string(&args, "patch_id")?;
+        let reason = required_string(&args, "reason")?;
+        let namespace = self.namespace_arg(&args);
+        match self.engine.reject_patch_by_id(&patch_id, &namespace, &reason) {
+            Ok(result) => Ok(tool_result(serde_json::to_string_pretty(&result)?, serde_json::to_value(result)?)),
+            Err(error) => Ok(tool_error(error.to_string(), json!({"code":"reject_patch_failed","patch_id":patch_id}))),
+        }
+    }
+
+    fn tool_defer_patch(&self, args: Value) -> Result<Value> {
+        let patch_id = required_string(&args, "patch_id")?;
+        let reason = required_string(&args, "reason")?;
+        let namespace = self.namespace_arg(&args);
+        match self.engine.defer_patch_by_id(&patch_id, &namespace, &reason) {
+            Ok(result) => Ok(tool_result(serde_json::to_string_pretty(&result)?, serde_json::to_value(result)?)),
+            Err(error) => Ok(tool_error(error.to_string(), json!({"code":"defer_patch_failed","patch_id":patch_id}))),
+        }
+    }
+
     fn tool_apply_patch(&self, args: Value) -> Result<Value> {
         let patch_id = required_string(&args, "patch_id")?;
         let force = optional_bool(&args, "force").unwrap_or(false);
@@ -1205,6 +1261,30 @@ impl McpStdioServer {
         let text = serde_json::to_string_pretty(&report)?;
 
         Ok(tool_result(text, serde_json::to_value(report)?))
+    }
+
+    fn tool_inspect_record(&self, args: Value) -> Result<Value> {
+        let record_id = required_string(&args, "record_id")?;
+        let namespace = self.namespace_arg(&args);
+        match self.engine.inspect_record_in_namespace(&namespace, &record_id)? {
+            Some(inspection) => {
+                let record = inspection.record;
+                let value = json!({
+                    "record": record,
+                    "evidence": record.evidence,
+                    "related_patches": inspection.related_patches,
+                    "audit": { "supersedes": inspection.revision.supersedes, "superseded_by": inspection.revision.superseded_by, "contested": inspection.revision.contested, "tombstoned": inspection.revision.tombstoned }
+                });
+                Ok(tool_result(serde_json::to_string_pretty(&value)?, value))
+            }
+            None => Ok(tool_error(format!("record not found in namespace {namespace}: {record_id}"), json!({"code":"record_not_found","record_id":record_id,"namespace":namespace}))),
+        }
+    }
+
+    fn tool_maintenance_scan(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let report = self.engine.maintenance_scan(&namespace)?;
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
     }
 
     fn tool_doctor(&self) -> Result<Value> {
