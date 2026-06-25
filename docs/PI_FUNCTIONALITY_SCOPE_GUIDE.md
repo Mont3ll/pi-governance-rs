@@ -30,3 +30,12 @@ Current release candidate: v1.0.0-rc.8. Stable v1.0.0 has not shipped yet.
 - Team RBAC / SSO
 - Central audit logs
 - Cloud sync
+
+## Release Documentation Links
+
+- [Wiki index](docs/WIKI_INDEX.md)
+- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
+- [Release strategy](docs/RELEASE_STRATEGY.md)
+- [Stable v1 gate](docs/STABLE_V1_GATE.md)
+- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
+- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)

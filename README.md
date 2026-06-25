@@ -1,462 +1,188 @@
-# pi-governance-rs
+# PI Governance
 
-Current milestone: `1.0.0-rc.8`.
+Local-first governed memory for AI agents.
 
-PI is a local-first governed memory runtime for coding agents. It gives agents durable project memory without silent writes: memory changes are proposed as patches, reviewed, applied under policy, and kept auditable in JSONL.
+- **Current:** `v1.0.0-rc.8`
+- **Status:** stable-release candidate
+- **Runtime:** Rust CLI + MCP stdio server
+- **Store:** local JSONL source of truth
 
-PI complements codebase intelligence MCP servers and skill libraries. It does not replace them. Use codebase tools to understand source structure; use PI to remember governed decisions, corrections, workflows, and stale-memory revisions.
+## Why PI Exists
 
-## First 10 minutes
+Agents should not silently rewrite what they believe. Durable memory changes should be proposed, reviewed, audited, revised, contested, and reversible. PI Governance gives local AI-agent memory a governance layer: every durable belief starts as a patch, carries evidence, and can be inspected before it changes the source of truth.
+
+## What PI Is
+
+PI is a local-first governed memory runtime for coding agents and MCP clients. It provides:
+
+- patch-before-mutation memory updates
+- evidence references for claims
+- namespace isolation for projects, clients, or workflows
+- policy profiles for stricter or more permissive review
+- MCP integration over stdio
+- audit, smoke-test, maintenance, schema, and release tooling
+- local deterministic, lexical, and hybrid retrieval over the JSONL store
+
+## What PI Is Not
+
+PI is not a:
+
+- vector database
+- GraphRAG engine
+- codebase indexer
+- agent framework
+- hosted memory service
+- secret vault
+- DLP system
+- dashboard product
+
+## Current Release Candidate
+
+`v1.0.0-rc.8` is the current stable-release candidate. It includes validated support for:
+
+- MCP `inspect_record`
+- `review --apply`, `review --reject`, and `review --defer`
+- `maintenance scan`
+- deterministic, lexical, and hybrid retrieval
+- redacted export metadata
+- schema documentation and JSON schemas
+- OpenCode, Codex CLI, and PI agent interoperability
+- MCP `list_patches` / `list_records` structured content compatibility
+- MCP namespace propagation
+
+Stable `v1.0.0` has not shipped yet.
+
+## Quick Start
 
 ```bash
-cargo build -p pi-cli
-
-./target/debug/pi demo
-./target/debug/pi --store /tmp/pi-governance-demo review
-./target/debug/pi --store /tmp/pi-governance-demo retrieve "release workflow" --explain
-./target/debug/pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
-./target/debug/pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
-./target/debug/pi agent-instructions
-```
-
-What to try next:
-
-- `pi review` to inspect pending memory proposals.
-- `pi retrieve "release workflow" --project pi-governance-rs --explain` to see governed context.
-- `pi propose --class workflow ...` to queue durable project knowledge.
-- `pi contest`, `pi supersede`, and `pi tombstone` to revise stale memory without deleting audit history.
-
-## Fresh-user install flow
-
-```bash
-git clone <repo-url>
+git clone <repository-url> pi-governance-rs
 cd pi-governance-rs
 cargo build -p pi-cli
-./target/debug/pi init
-./target/debug/pi smoke-test
-./target/debug/pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
-./target/debug/pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
-./target/debug/pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
-```
-
-Use generic local paths such as `/path/to/pi` and `/path/to/.pi` when configuring MCP clients. See [`docs/MCP_TROUBLESHOOTING.md`](docs/MCP_TROUBLESHOOTING.md) if a client shows zero PI tools.
-
-
-## Public testing and project scope
-
-- Public testing guide: [`docs/PUBLIC_TESTING.md`](docs/PUBLIC_TESTING.md)
-- Non-goals: [`docs/NON_GOALS.md`](docs/NON_GOALS.md)
-- Product guide: [`docs/product-guide.html`](docs/product-guide.html)
-
-PI is still in the release-candidate line. Stable `v1.0.0` has not shipped yet.
-
-## Workspace layout
-
-```text
-crates/
-  pi-core/         core schemas, policy rules, record/patch types
-  pi-store/        JSONL store, locking, migrations, import/export
-  pi-retrieval/    deterministic retrieval and context rendering
-  pi-governance/   runtime engine over store/policy/retrieval
-  pi-mcp/          MCP stdio adapter
-  pi-cli/          command-line binary
-```
-
-## Core commands
-
-```bash
-cargo build -p pi-cli
 ./target/debug/pi --version
-./target/debug/pi --store .pi doctor
+./target/debug/pi demo --store /tmp/pi-demo-store --reset
+./target/debug/pi --store /tmp/pi-demo-store review
+./target/debug/pi --store /tmp/pi-demo-store retrieve "release workflow" --retriever hybrid --explain
+./target/debug/pi --store /tmp/pi-demo-store doctor
 ```
 
-Initialize a store:
-
-```bash
-./target/debug/pi --store .pi init
-```
-
-Propose and apply a governed record:
-
-```bash
-./target/debug/pi --store .pi propose \
-  --class requirement \
-  --claim "Governed memory updates must go through patches." \
-  --project pi-governance-rs \
-  --tag governance \
-  --evidence-uri conversation:example \
-  --apply
-```
-
-Retrieve context:
-
-```bash
-./target/debug/pi --store .pi retrieve \
-  "governed memory update requirements" \
-  --project pi-governance-rs \
-  --budget 900
-```
-
-
-## Review, demo, and agent instructions
-
-```bash
-./target/debug/pi demo
-./target/debug/pi --store /tmp/pi-governance-demo review
-./target/debug/pi --store /tmp/pi-governance-demo review --json
-./target/debug/pi --store /tmp/pi-governance-demo retrieve "release workflow" --explain
-./target/debug/pi agent-instructions
-```
-
-`pi demo` creates a safe temporary demo store by default. `pi review` shows pending governed memory patches. `pi agent-instructions` prints guidance for coding agents that use PI.
-
-Inspect a governed record:
-
-```bash
-./target/debug/pi --store /tmp/pi-governance-demo list
-./target/debug/pi --store /tmp/pi-governance-demo inspect-record <record_id>
-./target/debug/pi --store /tmp/pi-governance-demo inspect-record <record_id> --json
-```
-
-## Patch visibility
-
-```bash
-./target/debug/pi --store .pi list-patches
-./target/debug/pi --store .pi inspect-patch <patch_id>
-./target/debug/pi --store .pi apply <patch_id>
-```
-
-## Schema migrations
-
-Dry run:
-
-```bash
-./target/debug/pi --store .pi migrate --dry-run
-```
-
-Rewrite with backup:
-
-```bash
-./target/debug/pi --store .pi migrate --backup
-```
-
-JSON output:
-
-```bash
-./target/debug/pi --store .pi migrate --dry-run --json
-```
-
-## Belief revision
-
-Reinforce a record:
-
-```bash
-./target/debug/pi --store .pi reinforce <record_id> \
-  --evidence-uri test:reinforcement \
-  --evidence-kind test \
-  --reason "new validation supports this stored claim" \
-  --apply
-```
-
-Supersede a record:
-
-```bash
-./target/debug/pi --store .pi supersede <record_id> \
-  --class requirement \
-  --claim "Updated governed claim." \
-  --project pi-governance-rs \
-  --tag belief-revision \
-  --evidence-uri conversation:supersede \
-  --reason "the previous claim was refined" \
-  --apply \
-  --force
-```
-
-Tombstone a record:
-
-```bash
-./target/debug/pi --store .pi tombstone <record_id> \
-  --evidence-uri review:tombstone \
-  --evidence-kind human-review \
-  --reason "record is no longer valid but must remain auditable" \
-  --apply \
-  --force
-```
-
-Contest and resolve a record:
-
-```bash
-./target/debug/pi --store .pi contest <record_id> \
-  --evidence-uri review:contest \
-  --evidence-kind human-review \
-  --reason "new evidence disputes this stored claim" \
-  --apply \
-  --force
-
-./target/debug/pi --store .pi resolve-contest <record_id> \
-  --resolution uphold \
-  --evidence-uri review:uphold \
-  --evidence-kind human-review \
-  --reason "review confirmed this claim should remain active" \
-  --apply \
-  --force
-```
-
-## Portable import/export
-
-v0.6.0 adds portable JSON bundles for moving governed memory between stores, machines, or coding agents.
-
-Export all records, patches, and events:
-
-```bash
-./target/debug/pi --store .pi export --output /tmp/pi-export.json
-```
-
-Export only a project-relevant slice:
-
-```bash
-./target/debug/pi --store .pi export \
-  --project pi-governance-rs \
-  --output /tmp/pi-project-export.json
-```
-
-Export a redacted bundle:
-
-```bash
-./target/debug/pi --store .pi export \
-  --project pi-governance-rs \
-  --redacted \
-  --output /tmp/pi-redacted-export.json
-```
-
-Dry-run an import:
-
-```bash
-./target/debug/pi --store /tmp/pi-import-store import /tmp/pi-export.json --dry-run --json
-```
-
-Import with backup:
-
-```bash
-./target/debug/pi --store /tmp/pi-import-store import /tmp/pi-export.json --backup
-```
-
-Import is merge-only: duplicate record, patch, and event IDs are skipped rather than overwritten.
-
-## MCP stdio mode
-
-Run the MCP server directly:
-
-```bash
-./target/debug/pi --store /absolute/path/to/.pi mcp-stdio
-```
-
-Manual tools/list smoke test:
-
-```bash
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
-| ./target/debug/pi --store /absolute/path/to/.pi mcp-stdio
-```
-
-MCP tools include:
+Expected version for this release candidate:
 
 ```text
-pi.retrieve_context
-pi.propose_record
-pi.supersede_record
-pi.tombstone_record
-pi.reinforce_record
-pi.contest_record
-pi.resolve_contest
-pi.apply_patch
-pi.list_patches
-pi.inspect_patch
-pi.migrate_schema
-pi.export_store
-pi.import_store
-pi.doctor
-pi.list_records
+pi 1.0.0-rc.8
 ```
 
-## v0.6.0 changes
-
-- Adds `StoreExportBundle`, `StoreExportOptions`, `StoreImportOptions`, and `StoreImportReport`.
-- Adds `pi export` and `pi import` CLI commands.
-- Adds MCP tools `pi.export_store` and `pi.import_store`.
-- Adds merge-only import semantics that skip duplicate IDs instead of overwriting.
-- Adds optional backup before actual imports.
-- Adds project-filtered and redacted exports.
-- Adds store and engine tests for export/import behavior.
-- Updates package, CLI, and MCP server version to `0.6.0`.
-
-## Validation
+## CLI Usage
 
 ```bash
-cargo check --workspace
-cargo test --workspace
-cargo build -p pi-cli
-./target/debug/pi --version
+# Initialize and propose governed memory
+pi --store .pi init
+pi --store .pi propose --claim "Release validation requires tests." --evidence "release-checklist"
+
+# Review and apply/reject/defer patches
+pi --store .pi review
+pi --store .pi review <patch-id> --apply
+pi --store .pi review <patch-id> --reject --reason "not accurate"
+pi --store .pi review <patch-id> --defer --reason "needs more evidence"
+pi --store .pi apply <patch-id>
+
+# Inspect patches and records
+pi --store .pi list-patches
+pi --store .pi inspect-patch <patch-id>
+pi --store .pi list
+pi --store .pi inspect-record <record-id>
+
+# Retrieve local context
+pi --store .pi retrieve "release workflow" --retriever hybrid --explain
+
+# Maintenance, audit, and export
+pi --store .pi maintenance scan
+pi --store .pi doctor
+pi --store .pi export --redacted --output pi-export.redacted.json
+
+# MCP onboarding
+pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --yes
+pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
 ```
 
-Expected:
+### Command Matrix
 
-```text
-pi 1.0.0-rc.4
-```
+The rc.8 CLI includes `init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `review`, `demo`, `agent-instructions`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `inspect-record`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `mcp-install`, `mcp-doctor`, `smoke-test`, `release-audit`, and `changelog`.
 
-## v0.8.0 namespace isolation
+See [docs/wiki/04-CLI-Guide.md](docs/wiki/04-CLI-Guide.md) for the full command guide.
 
-PI supports logical namespace isolation while continuing to use the same JSONL store files. Existing records without namespace metadata deserialize into the `default` namespace, and existing CLI/MCP calls without namespace arguments continue to use `default`.
+## MCP Setup
 
-Namespaces are logical filters, not separate physical stores. v0.8.0 does not split files or introduce a database; record IDs remain globally unique in the current implementation, so duplicate imported IDs are skipped even if namespaces differ.
-
-CLI examples:
-
-```bash
-pi --namespace pi-governance-rs propose --class requirement --claim "Namespace isolation prevents cross-project memory leakage." --evidence-uri conversation:v0.8.0 --apply
-
-pi --namespace pi-governance-rs retrieve "namespace isolation" --project pi-governance-rs --explain
-
-pi namespace list
-pi namespace doctor
-
-pi --namespace pi-governance-rs export --output /tmp/pi-governance-export.json
-
-pi --namespace sandbox import /tmp/pi-governance-export.json --dry-run
-```
-
-MCP tools accept an optional `namespace` string argument, defaulting to `default`, including `pi.retrieve_context`, `pi.propose_record`, belief-revision tools, export/import, list, and doctor-style tools. Namespace inspection is available through `pi.list_namespaces` and `pi.namespace_doctor`.
-
-Export/import behavior:
-
-- `pi export` exports the current namespace.
-- `pi --namespace x export` exports namespace `x`.
-- `pi export --all-namespaces` exports all namespaces.
-- `pi import bundle.json` imports records into the current namespace, rewriting bundle record namespaces.
-- `pi import bundle.json --preserve-namespaces` keeps namespaces from the bundle.
-
-## v0.9.0 policy profiles and operating modes
-
-PI stores policy configuration at `.pi/config.json`. If the file is absent, PI uses an in-memory default config with `default_policy: standard` and no namespace overrides. Policies are resolved by namespace override, then default policy, then `standard`.
-
-Profiles:
-
-- `permissive`: ordinary proposals and reinforcement are allowed; supersede is allowed with a warning; identity rules, tombstones, contests, and destructive contest resolutions still require manual review.
-- `standard`: preserves the existing governance behavior.
-- `strict`: all mutation operations require manual review unless explicitly applied with `--force`; hard validation failures remain rejects.
-
-Manual-review decisions can still be applied with `--force`. Rejects remain rejects in every profile.
-
-CLI examples:
-
-```bash
-pi config show
-pi config set-policy default strict
-pi config set-policy sandbox permissive
-
-pi --namespace sandbox propose \
-  --class requirement \
-  --claim "Sandbox can use permissive policy for local experimentation." \
-  --evidence-uri smoke:v0.9.0 \
-  --apply
-
-pi policy doctor
-pi policy explain supersede
-```
-
-MCP tools include `pi.config_show`, `pi.config_set_policy`, `pi.policy_doctor`, and `pi.policy_explain`. Mutation responses include the effective `policy_profile` where practical.
-
-## v0.10.0 release hardening and adapter polish
-
-Build locally with `cargo build -p pi-cli`, then run `./target/debug/pi --version`.
-Quickstart: `pi init`, `pi propose --class requirement --claim "..." --evidence-uri conversation:... --apply`, then `pi retrieve "..."`.
-
-### MCP setup
-
-Generate adapter snippets and install/diagnose local client configs with:
+PI runs as an MCP stdio server and can generate client configuration for OpenCode, Codex CLI, and PI agent/shared MCP setups.
 
 ```bash
 pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
-pi mcp-config codex --command /path/to/pi --store /path/to/.pi --namespace default
-pi mcp-config pi-agent --command /path/to/pi --store /path/to/.pi --namespace default
-
 pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
 pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --yes
-pi mcp-install codex --command /path/to/pi --store /path/to/.pi --namespace default --yes
-pi mcp-install pi-agent --command /path/to/pi --store /path/to/.pi --namespace default --yes
-
 pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
-pi mcp-doctor codex --command /path/to/pi --store /path/to/.pi --namespace default
-pi mcp-doctor pi-agent --command /path/to/pi --store /path/to/.pi --namespace default
 ```
 
-Existing `pi mcp-config claude`, `pi mcp-config cursor`, and `pi mcp-config inspector` behavior remains available.
+Restart the MCP client after installation. Clients may expose prefixed tool names such as `pi.retrieve_context`, `pi-governance_pi_retrieve_context`, `pi_governance_pi.retrieve_context`, or `mcp__pi_governance__.pi_retrieve_context`.
 
-Some clients display or route PI tools with client/server-prefixed names, such as `pi-governance_pi_retrieve_context` or `pi_governance_pi.retrieve_context`. These are equivalent to `pi.retrieve_context`. The `pi.inspect_record` MCP tool remains deferred unless implemented separately; use the CLI `pi inspect-record` for record inspection.
+## Core Concepts
 
-### Command matrix
+- **Store:** local JSONL source of truth, normally `.pi`.
+- **Record:** governed memory claim with class, confidence, evidence, namespace, and status.
+- **Patch:** proposed durable mutation awaiting review or application.
+- **Evidence:** reference explaining why a claim or change exists.
+- **Namespace:** isolation boundary for projects or clients.
+- **Policy profile:** review strictness and validation behavior.
+- **MCP server:** stdio interface exposing PI tools to clients.
+- **Maintenance scan:** local health scan for stale patches, contested records, weak evidence, duplicates, and summaries.
+- **Retriever mode:** deterministic, lexical, or hybrid local retrieval.
 
-`init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `review`, `demo`, `agent-instructions`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `inspect-record`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `mcp-install`, `mcp-doctor`, `smoke-test`, `release-audit`, `changelog`.
+## Safety Model
 
-### JSON diagnostics and smoke tests
+PI uses patch-before-mutation. Durable memory is not silently rewritten: proposed changes can be applied, rejected, deferred, contested, resolved, superseded, or tombstoned. Destructive hard delete is avoided in favor of auditable tombstones. Namespace isolation keeps stores and clients scoped. Redacted export is best-effort and must be reviewed before sharing; PI is not a secret scanner or DLP system.
 
-```bash
-pi doctor --json
-pi namespace doctor --json
-pi policy doctor --json
-pi smoke-test
-pi smoke-test --json
-```
+## Interoperability Status
 
-### Release checklist
+| Client | rc.8 Status |
+| --- | --- |
+| OpenCode | pass |
+| Codex CLI | pass |
+| PI agent | pass |
 
-```bash
-cargo check --workspace
-cargo test --workspace
-cargo build -p pi-cli
-./target/debug/pi --version
-./target/debug/pi smoke-test
-./target/debug/pi smoke-test --json
-./target/debug/pi release-audit
-./target/debug/pi release-audit --json
-./target/debug/pi doctor --json
-git status
-```
+Tested capabilities include `retrieve_context`, `propose_record`, `list_patches`, `inspect_patch`, `inspect_record`, `list_records`, `maintenance_scan`, `doctor`, `smoke_test`, namespace propagation, and structuredContent compatibility.
 
-Version history is maintained in `CHANGELOG.md`.
+## Documentation
 
-## v0.10.1 audit and release-candidate cleanup
+Start with [docs/WIKI_INDEX.md](docs/WIKI_INDEX.md). Key pages:
 
-Run `pi release-audit` or `pi release-audit --json` before release-candidate tagging. The audit covers JSON diagnostics, smoke tests, changelog coverage, README command matrix coverage, and MCP adapter config generation. Hidden Unicode and secret/path scans should be run with the documented grep commands in the release checklist and should avoid `.pi`, `target`, and generated exports.
+- [Installation](docs/wiki/03-Installation.md)
+- [CLI Guide](docs/wiki/04-CLI-Guide.md)
+- [MCP Setup](docs/wiki/05-MCP-Setup.md)
+- [Agent Interoperability](docs/wiki/06-Agent-Interoperability.md)
+- [Release and Deployment](docs/wiki/13-Release-And-Deployment.md)
+- [QA and Test Matrix](docs/wiki/14-QA-And-Test-Matrix.md)
+- [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md)
+- [Release Strategy](docs/RELEASE_STRATEGY.md)
+- [Stable v1 Gate](docs/STABLE_V1_GATE.md)
 
-## v1.0.0-rc.1 first release candidate
+## Deferred / Not in rc.8
 
-This release candidate freezes the public CLI command-name surface and MCP tool names documented in `RELEASE.md`. Output details may still receive compatibility fixes before stable `v1.0.0`; no new governance semantics are added in this release-candidate packaging sprint.
+- capture / `pi capture --stdin`
+- persistent FTS/BM25 index
+- memory capsules
+- relationship edges
+- dashboard/TUI
+- hosted MCP endpoint
+- connectors
+- vector backend
+- graph backend
+- team RBAC/SSO
+- cloud sync
 
-Run the release checklist before tagging:
+## Release Strategy
 
-```bash
-cargo check --workspace
-cargo test --workspace
-cargo build -p pi-cli
-./target/debug/pi --version
-./target/debug/pi smoke-test
-./target/debug/pi release-audit
-```
+`v1.0.0-rc.8` is the stable-release candidate. No new features should be added before stable unless a blocker appears. Stable release requires the final checklist in [docs/STABLE_V1_GATE.md](docs/STABLE_V1_GATE.md) and [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md).
 
-## v1.0.0-rc.2 release-candidate soak and compatibility pass
+## License
 
-This release candidate verifies fresh-user install, README examples, MCP client config, MCP smoke flows, clean-store import/export portability, namespace and policy behavior after fresh init, JSON diagnostics, and release-audit output. It adds no new governance semantics and preserves the frozen CLI command names and MCP tool names from `v1.0.0-rc.1`.
-
-## v1.0.0-rc.3 OSS usability, governed skills, and coding-agent integration
-
-Adds `pi review`, `pi demo`, `pi agent-instructions`, governed skill examples, security documentation, memory-poisoning guidance, codebase-memory-mcp complement documentation, pi-persistent-intelligence compatibility notes, and a first-10-minutes quickstart. No governance semantics are changed.
-
-## v1.0.0-rc.8 release-quality additions
-
-- MCP `pi.inspect_record` parity for CLI `inspect-record`.
-- Review actions: `pi review --apply <patch-id>`, `pi review --reject <patch-id> --reason "..."`, and `pi review --defer <patch-id> --reason "..."`.
-- Read-only maintenance scan: `pi maintenance scan` and `pi maintenance scan --json`.
-- Retrieval modes: `pi retrieve "query" --retriever deterministic|lexical|hybrid --explain`.
-- Redacted exports include redaction metadata. Redaction is best-effort; review before sharing.
-- Schema docs: `docs/schema/`.
+No license file is currently present in this repository. A license file should be added before public release.

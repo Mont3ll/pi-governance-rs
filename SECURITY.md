@@ -38,3 +38,12 @@ PI assumes the local user controls the machine and can inspect the store. It hel
 ## rc.8 Redacted Export Warning
 
 Redacted export metadata reports fields checked and redacted, but redaction is best-effort. Users must review exports before sharing. PI is not a secret scanner, DLP system, or encrypted secret store.
+
+## Release Documentation Links
+
+- [Wiki index](docs/WIKI_INDEX.md)
+- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
+- [Release strategy](docs/RELEASE_STRATEGY.md)
+- [Stable v1 gate](docs/STABLE_V1_GATE.md)
+- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
+- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)

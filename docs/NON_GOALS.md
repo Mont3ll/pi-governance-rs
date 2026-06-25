@@ -37,3 +37,12 @@ Release-quality improvements now included in rc.8: MCP record inspection, review
 Post-stable quality improvements: `pi capture --stdin`, FTS/BM25 persistent index if still needed, memory capsules, relationship edges, maintenance auto-suggestions as governed patches, and expanded machine-readable schemas.
 
 Product expansion remains deferred: dashboard/TUI, hosted MCP endpoint, connectors, vector backend, graph backend, team RBAC/SSO, central audit logs, and cloud sync.
+
+## Release Documentation Links
+
+- [Wiki index](docs/WIKI_INDEX.md)
+- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
+- [Release strategy](docs/RELEASE_STRATEGY.md)
+- [Stable v1 gate](docs/STABLE_V1_GATE.md)
+- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
+- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)

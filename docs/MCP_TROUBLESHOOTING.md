@@ -142,3 +142,12 @@ Expected MCP tools include:
 ## rc.8 MCP Notes
 
 rc.8 adds `pi.inspect_record` and `pi.maintenance_scan`. `pi.retrieve_context` accepts `retriever` values `deterministic`, `lexical`, and `hybrid`. Some clients still show prefixed tool names; these are equivalent to the canonical `pi.*` names.
+
+## Release Documentation Links
+
+- [Wiki index](docs/WIKI_INDEX.md)
+- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
+- [Release strategy](docs/RELEASE_STRATEGY.md)
+- [Stable v1 gate](docs/STABLE_V1_GATE.md)
+- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
+- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)

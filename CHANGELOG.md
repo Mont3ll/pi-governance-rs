@@ -75,3 +75,12 @@
 - v0.3.0 store locking and schema versioning
 - v0.2.0 patch visibility and safer apply flow
 - v0.1.0 initial Rust PI port
+
+## Release Documentation Links
+
+- [Wiki index](docs/WIKI_INDEX.md)
+- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
+- [Release strategy](docs/RELEASE_STRATEGY.md)
+- [Stable v1 gate](docs/STABLE_V1_GATE.md)
+- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
+- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)

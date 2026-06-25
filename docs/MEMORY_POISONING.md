@@ -35,3 +35,12 @@ Agent instructions should say when to retrieve PI memory, how to treat contested
 ## rc.8 Maintenance and Redaction Notes
 
 `pi maintenance scan` is read-only and does not create suggestions or mutate memory. Redacted export is best-effort and does not replace user review. PI is not a secret scanner or DLP system; do not store secrets in PI.
+
+## Release Documentation Links
+
+- [Wiki index](docs/WIKI_INDEX.md)
+- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
+- [Release strategy](docs/RELEASE_STRATEGY.md)
+- [Stable v1 gate](docs/STABLE_V1_GATE.md)
+- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
+- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)

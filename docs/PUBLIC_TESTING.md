@@ -96,3 +96,12 @@ Use the GitHub issue templates for bugs, usability feedback, MCP setup issues, m
 ## rc.8 Release-Quality Checks
 
 Test `pi.inspect_record` through MCP when available, `pi maintenance scan`, review queue actions (`review --apply`, `review --reject`, `review --defer`), and retrieval modes (`deterministic`, `lexical`, `hybrid`). Redacted export is best-effort; review bundles before sharing.
+
+## Release Documentation Links
+
+- [Wiki index](docs/WIKI_INDEX.md)
+- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
+- [Release strategy](docs/RELEASE_STRATEGY.md)
+- [Stable v1 gate](docs/STABLE_V1_GATE.md)
+- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
+- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)
