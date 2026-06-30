@@ -33,3 +33,38 @@
 ---
 
 Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CHECKLIST.md), [Release strategy](../RELEASE_STRATEGY.md), [Stable v1 gate](../STABLE_V1_GATE.md).
+
+## Moved Into rc.9
+
+- automatic correction capture as deterministic candidate capture
+- manual memory_write equivalent through `pi capture`
+- memory-worth scoring
+- inbox candidate workflow
+- scoped context injection
+- session search
+- session decisions
+- minimal trust classes/durability/source kind
+- minimal verification gates
+- recall x-ray
+- explicit L1/L2/L3 layers
+- minimal reinforcement event compatibility
+
+## Still Deferred After rc.9
+
+- deep reinforcement maintenance weighting
+- LLM consolidation
+- qmd semantic search
+- vault integration
+- background job queue
+- memory graph
+- memory timeline
+- procedure candidates
+- skill draft artifacts
+- meta-consolidation automation
+- dashboard/TUI
+- hosted MCP
+- connectors
+- vector backend
+- graph backend
+- team RBAC/SSO
+- cloud sync

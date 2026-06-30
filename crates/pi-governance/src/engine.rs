@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use pi_core::{
     validate_patch, validate_record, ContestResolution, ContextBundle, DecisionStatus, EvidenceRef,
     GovernanceDecision, Patch, PatchOperation, PatchStatus, Record, RecordClass, RecordStatus,
-    EvidenceKind, default_namespace, PiConfig, PolicyProfile, RetrievalBudget, RetrievalOptions, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
+    EvidenceKind, MemoryLayer, MemoryKind, RuleType, TrustClass, Durability, SourceKind, default_namespace, PiConfig, PolicyProfile, RetrievalBudget, RetrievalOptions, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
 };
 use pi_retrieval::{retrieve, retrieve_with_options};
 use pi_store::{
@@ -23,6 +23,12 @@ pub struct ProposalInput {
     pub tags: Vec<String>,
     pub evidence_refs: Vec<EvidenceRef>,
     pub reason: Option<String>,
+    pub layer: Option<MemoryLayer>,
+    pub memory_kind: Option<MemoryKind>,
+    pub rule_type: Option<RuleType>,
+    pub trust_class: TrustClass,
+    pub durability: Durability,
+    pub source_kind: SourceKind,
 }
 
 #[derive(Debug, Clone)]
@@ -263,6 +269,8 @@ impl GovernanceEngine {
         self.store.init()
     }
 
+    pub fn store(&self) -> &JsonlStore { &self.store }
+
     pub fn config(&self) -> Result<PiConfig> { self.store.load_config() }
 
     pub fn set_policy(&self, namespace: &str, policy: PolicyProfile) -> Result<PiConfig> {
@@ -291,7 +299,7 @@ impl GovernanceEngine {
         check!("init", engine.init());
         check!("doctor", engine.doctor().map(|_| ()));
         let mut record_id = String::new();
-        check!("propose", engine.propose_record(ProposalInput { namespace: default_namespace(), class: RecordClass::Requirement, claim: "Smoke test durable proposal record.".to_string(), confidence: 0.7, scope: Scope::project("pi-governance-rs"), tags: vec!["smoke".to_string()], evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "smoke:v0.10.0")], reason: None }, true, false).map(|r| { record_id = r.record_id.unwrap_or_default(); }));
+        check!("propose", engine.propose_record(ProposalInput { namespace: default_namespace(), class: RecordClass::Requirement, claim: "Smoke test durable proposal record.".to_string(), confidence: 0.7, scope: Scope::project("pi-governance-rs"), tags: vec!["smoke".to_string()], evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "smoke:v0.10.0")], reason: None, layer: None, memory_kind: None, rule_type: None, trust_class: TrustClass::DirectUserInstruction, durability: Durability::Project, source_kind: SourceKind::ManualCli }, true, false).map(|r| { record_id = r.record_id.unwrap_or_default(); }));
         check!("retrieve", engine.retrieve_context("smoke proposal", Some("pi-governance-rs".to_string()), 1200).map(|_| ()));
         check!("reinforce", engine.reinforce_record(ReinforceInput { namespace: default_namespace(), target_id: record_id.clone(), evidence_refs: vec![EvidenceRef::new(EvidenceKind::Test, "smoke:reinforce")], reason: "smoke reinforce".to_string() }, true, false).map(|_| ()));
         check!("contest", engine.contest_record(ContestInput { namespace: default_namespace(), target_id: record_id.clone(), evidence_refs: vec![EvidenceRef::new(EvidenceKind::HumanReview, "smoke:contest")], reason: "smoke contest".to_string() }, true, true).map(|_| ()));
@@ -301,7 +309,7 @@ impl GovernanceEngine {
         let import_engine = GovernanceEngine::new(JsonlStore::new(import_root.clone()));
         check!("import-dry-run", import_engine.import_store_from_path(&export_path, ImportInput { namespace: default_namespace(), preserve_namespaces: false, dry_run: true, backup: false }).map(|_| ()));
         check!("import-backup", import_engine.import_store_from_path(&export_path, ImportInput { namespace: default_namespace(), preserve_namespaces: false, dry_run: false, backup: true }).map(|_| ()));
-        check!("namespace-isolation", engine.propose_record(ProposalInput { namespace: "smoke-ns".to_string(), class: RecordClass::Requirement, claim: "Namespace smoke isolation record.".to_string(), confidence: 0.7, scope: Scope::global(), tags: vec!["smoke".to_string()], evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "smoke:ns")], reason: None }, true, false).and_then(|_| { let records = engine.list_records_in_namespace("smoke-ns", 10)?; if records.is_empty() { anyhow::bail!("namespace record missing"); } Ok(()) }));
+        check!("namespace-isolation", engine.propose_record(ProposalInput { namespace: "smoke-ns".to_string(), class: RecordClass::Requirement, claim: "Namespace smoke isolation record.".to_string(), confidence: 0.7, scope: Scope::global(), tags: vec!["smoke".to_string()], evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "smoke:ns")], reason: None, layer: None, memory_kind: None, rule_type: None, trust_class: TrustClass::DirectUserInstruction, durability: Durability::Project, source_kind: SourceKind::ManualCli }, true, false).and_then(|_| { let records = engine.list_records_in_namespace("smoke-ns", 10)?; if records.is_empty() { anyhow::bail!("namespace record missing"); } Ok(()) }));
         check!("policy-profile", engine.set_policy("strict-smoke", PolicyProfile::Strict).and_then(|_| engine.effective_policy("strict-smoke").map(|p| if p == PolicyProfile::Strict { () } else { () })));
         SmokeTestReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, temp_store: root.display().to_string(), checks, failures }
     }
@@ -362,6 +370,12 @@ impl GovernanceEngine {
             input.evidence_refs,
         );
         record.namespace = input.namespace;
+        record.layer = input.layer.unwrap_or_else(|| record.class.inferred_layer());
+        record.memory_kind = input.memory_kind.or_else(|| Some(record.class.inferred_memory_kind()));
+        record.rule_type = input.rule_type.or_else(|| record.class.inferred_rule_type());
+        record.trust_class = input.trust_class;
+        record.durability = input.durability;
+        record.source_kind = input.source_kind;
 
         let patch = Patch::propose_record(
             record.clone(),

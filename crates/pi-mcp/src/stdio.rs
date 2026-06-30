@@ -1,8 +1,9 @@
 use anyhow::{bail, Context, Result};
-use pi_core::{default_namespace, ContestResolution, EvidenceKind, EvidenceRef, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
+use pi_core::{default_namespace, ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope, SourceKind, TrustClass};
 use pi_governance::{
+    build_context, claim_from_capture, evidence_for_capture, recall_xray, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
-    SupersedeInput, TombstoneInput,
+    SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
 use pi_retrieval::render_markdown;
 use serde_json::{json, Map, Value};
@@ -11,7 +12,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "1.0.0-rc.8";
+const SERVER_VERSION: &str = "1.0.0-rc.9";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -706,7 +707,15 @@ impl McpStdioServer {
                         }
                     }
                 }
-            }
+            },
+            {"name":"pi.score_memory_worth","description":"Score whether text should become governed memory.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"observation":{"type":"string"},"project":{"type":"string"},"namespace":{"type":"string"},"trust_class":{"type":"string"},"source_kind":{"type":"string"}},"required":["observation"]}},
+            {"name":"pi.capture_candidates","description":"Capture deterministic memory candidates without auto-applying durable memory.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"text":{"type":"string"},"project":{"type":"string"},"target":{"type":"string"},"layer":{"type":"string"},"trust_class":{"type":"string"}},"required":["text"]}},
+            {"name":"pi.build_context","description":"Build scoped paste-ready governed memory context.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"query":{"type":"string"},"project":{"type":"string"},"format":{"type":"string","default":"markdown"},"budget":{"type":"integer","default":1200},"include_l3":{"type":"boolean"},"include_contested":{"type":"boolean"}},"required":["query"]}},
+            {"name":"pi.session_add","description":"Append L3 session evidence.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"text":{"type":"string"},"project":{"type":"string"}},"required":["text"]}},
+            {"name":"pi.session_search","description":"Search L3 session evidence lexically.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"query":{"type":"string"},"project":{"type":"string"}},"required":["query"]}},
+            {"name":"pi.session_decisions","description":"List extracted session decision markers.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"project":{"type":"string"},"days":{"type":"integer"}}}},
+            {"name":"pi.recall_xray","description":"Explain recall inclusion and exclusion.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"query":{"type":"string"},"project":{"type":"string"},"budget":{"type":"integer","default":1200},"include_l3":{"type":"boolean"},"include_contested":{"type":"boolean"}},"required":["query"]}},
+            {"name":"pi.list_inbox","description":"List proposed/deferred candidate patches.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"all":{"type":"boolean"}}}}
         ])
     }
 
@@ -743,8 +752,108 @@ impl McpStdioServer {
             "pi.inspect_record" => self.tool_inspect_record(arguments),
             "pi.maintenance_scan" => self.tool_maintenance_scan(arguments),
             "pi.list_records" => self.tool_list_records(arguments),
+            "pi.score_memory_worth" => self.tool_score_memory_worth(arguments),
+            "pi.capture_candidates" => self.tool_capture_candidates(arguments),
+            "pi.build_context" => self.tool_build_context(arguments),
+            "pi.session_add" => self.tool_session_add(arguments),
+            "pi.session_search" => self.tool_session_search(arguments),
+            "pi.session_decisions" => self.tool_session_decisions(arguments),
+            "pi.recall_xray" => self.tool_recall_xray(arguments),
+            "pi.list_inbox" => self.tool_list_inbox(arguments),
             other => bail!("unknown PI MCP tool: {other}"),
         }
+    }
+
+    fn tool_score_memory_worth(&self, args: Value) -> Result<Value> {
+        let observation = required_string(&args, "observation")?;
+        let trust = optional_string(&args, "trust_class").and_then(|s| TrustClass::from_str(&s).ok());
+        let source = optional_string(&args, "source_kind").and_then(|s| SourceKind::from_str(&s).ok()).or(Some(SourceKind::ManualMcp));
+        let report = score_memory_worth(&observation, trust, source);
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+    }
+
+    fn tool_capture_candidates(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let text = required_string(&args, "text")?;
+        let project = optional_string(&args, "project");
+        let layer = optional_string(&args, "layer").and_then(|s| MemoryLayer::from_str(&s).ok());
+        let trust = optional_string(&args, "trust_class").and_then(|s| TrustClass::from_str(&s).ok());
+        let worth = score_memory_worth(&text, trust, Some(SourceKind::ManualMcp));
+        let mut report = pi_governance::CaptureReport { input_summary: text.chars().take(80).collect(), candidates: Vec::new(), daily_only: Vec::new(), inquiries: Vec::new(), rejected: Vec::new(), applied: false };
+        match worth.decision {
+            MemoryWorthDecision::Reject => report.rejected.push(text.clone()),
+            MemoryWorthDecision::DailyOnly => { let event = session_event(&namespace, project.as_deref(), &text, SourceKind::ManualMcp); self.engine.store().append_event(&event)?; report.daily_only.push(text.clone()); }
+            MemoryWorthDecision::Inquiry => report.inquiries.push(text.clone()),
+            MemoryWorthDecision::Candidate => {
+                let claim = claim_from_capture(&text);
+                let suggested_layer = layer.unwrap_or(worth.suggested_layer);
+                let verification = verify_candidate(&claim, suggested_layer, worth.trust_class, worth.durability);
+                let result = self.engine.propose_record(ProposalInput { namespace: namespace.clone(), class: worth.suggested_class.clone(), claim: claim.clone(), confidence: worth.confidence, scope: scope_for_project(project), tags: worth.suggested_tags.clone(), evidence_refs: vec![evidence_for_capture(SourceKind::ManualMcp, worth.trust_class, worth.durability)], reason: Some("captured deterministic memory candidate".to_string()), layer: Some(suggested_layer), memory_kind: Some(worth.suggested_memory_kind), rule_type: worth.suggested_rule_type, trust_class: worth.trust_class, durability: worth.durability, source_kind: SourceKind::ManualMcp }, false, false)?;
+                report.candidates.push(pi_governance::CaptureCandidate { claim, decision: worth.decision, patch_id: Some(result.patch_id), suggested_layer, trust_class: worth.trust_class, durability: worth.durability, memory_kind: worth.suggested_memory_kind, rule_type: worth.suggested_rule_type, verification });
+            }
+        }
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+    }
+
+    fn tool_build_context(&self, args: Value) -> Result<Value> {
+        let query = required_string(&args, "query")?;
+        let project = optional_string(&args, "project");
+        let budget = optional_usize(&args, "budget").unwrap_or(1200);
+        let include_l3 = optional_bool(&args, "include_l3").unwrap_or(false);
+        let include_contested = optional_bool(&args, "include_contested").unwrap_or(false);
+        let format = optional_string(&args, "format").unwrap_or_else(|| "markdown".to_string());
+        let (markdown, value) = build_context(self.engine.store(), &self.default_namespace, &query, project, budget, include_l3, include_contested)?;
+        let text = if format == "json" { serde_json::to_string_pretty(&value)? } else { markdown };
+        Ok(tool_result(text, value))
+    }
+
+    fn tool_session_add(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let text = required_string(&args, "text")?;
+        let project = optional_string(&args, "project");
+        let event = session_event(&namespace, project.as_deref(), &text, SourceKind::ManualMcp);
+        self.engine.store().append_event(&event)?;
+        Ok(tool_result(serde_json::to_string_pretty(&event)?, serde_json::to_value(event)?))
+    }
+
+    fn tool_session_search(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let query = required_string(&args, "query")?;
+        let project = optional_string(&args, "project");
+        let events = search_session_events(self.engine.store(), &namespace, &query, project.as_deref(), None)?;
+        let value = json!({"events": events});
+        Ok(tool_result(serde_json::to_string_pretty(&value)?, value))
+    }
+
+    fn tool_session_decisions(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let project = optional_string(&args, "project");
+        let days = args.get("days").and_then(Value::as_i64);
+        let decisions = session_decisions(self.engine.store(), &namespace, project.as_deref(), days)?;
+        let value = json!({"decisions": decisions});
+        Ok(tool_result(serde_json::to_string_pretty(&value)?, value))
+    }
+
+    fn tool_recall_xray(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let query = required_string(&args, "query")?;
+        let project = optional_string(&args, "project");
+        let budget = optional_usize(&args, "budget").unwrap_or(1200);
+        let include_l3 = optional_bool(&args, "include_l3").unwrap_or(false);
+        let include_contested = optional_bool(&args, "include_contested").unwrap_or(false);
+        let report = recall_xray(self.engine.store(), &namespace, &query, project, budget, include_l3, include_contested)?;
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+    }
+
+    fn tool_list_inbox(&self, args: Value) -> Result<Value> {
+        let all = optional_bool(&args, "all").unwrap_or(false);
+        let mut rows = Vec::new();
+        for p in self.engine.list_patches(200)? {
+            if !all && !matches!(p.latest_status, pi_core::PatchStatus::Proposed | pi_core::PatchStatus::Deferred) { continue; }
+            rows.push(p);
+        }
+        let value = json!({"pending_count": rows.len(), "patches": rows});
+        Ok(tool_result(serde_json::to_string_pretty(&value)?, value))
     }
 
     fn tool_config_show(&self) -> Result<Value> {
@@ -894,6 +1003,12 @@ impl McpStdioServer {
                 tags,
                 evidence_refs,
                 reason,
+                layer: None,
+                memory_kind: None,
+                rule_type: None,
+                trust_class: TrustClass::DirectUserInstruction,
+                durability: Durability::Project,
+                source_kind: SourceKind::ManualMcp,
             },
             apply,
             force,
@@ -1013,6 +1128,7 @@ impl McpStdioServer {
         let evidence_kind = EvidenceKind::from_str(&evidence_kind_raw).map_err(anyhow::Error::msg)?;
         let reason = optional_string(&args, "reason")
             .unwrap_or_else(|| "reinforce record with new evidence".to_string());
+        let outcome = optional_string(&args, "outcome").unwrap_or_else(|| "explicit_reinforcement".to_string());
         let apply = optional_bool(&args, "apply").unwrap_or(false);
         let force = optional_bool(&args, "force").unwrap_or(false);
 
@@ -1021,7 +1137,7 @@ impl McpStdioServer {
                 namespace,
                 target_id: target_id.clone(),
                 evidence_refs: vec![EvidenceRef::new(evidence_kind, evidence_uri)],
-                reason,
+                reason: format!("{} (outcome: {})", reason, outcome),
             },
             apply,
             force,

@@ -2,7 +2,7 @@
 
 Local-first governed memory for AI agents.
 
-- **Current:** `v1.0.0-rc.8`
+- **Current:** `v1.0.0-rc.9`
 - **Status:** stable-release candidate
 - **Runtime:** Rust CLI + MCP stdio server
 - **Store:** local JSONL source of truth
@@ -38,19 +38,19 @@ PI is not a:
 
 ## Current Release Candidate
 
-`v1.0.0-rc.8` is the current stable-release candidate. It includes validated support for:
+`v1.0.0-rc.9` is the current stable-release candidate. It adds portable PI memory workflow parity on top of the rc.8 governance-runtime hardening:
 
-- MCP `inspect_record`
-- `review --apply`, `review --reject`, and `review --defer`
-- `maintenance scan`
-- deterministic, lexical, and hybrid retrieval
-- redacted export metadata
-- schema documentation and JSON schemas
-- OpenCode, Codex CLI, and PI agent interoperability
-- MCP `list_patches` / `list_records` structured content compatibility
-- MCP namespace propagation
+- deterministic `memory-worth` scoring
+- `capture` for correction/preference candidates and manual memory-write equivalents
+- `inbox` candidate workflow over the governed review queue
+- `context` scoped injection output for non-PI agents
+- local `session add/search/decisions` for append-only L3 evidence
+- `recall-xray` inclusion/exclusion diagnostics
+- explicit L1/L2/L3 layers, memory kind, rule type, trust class, durability, and source kind
+- MCP tools for score/capture/context/session/recall workflows
+- rc.8 capabilities: MCP `inspect_record`, review actions, maintenance scan, local retrieval, redacted export metadata, schemas, and OpenCode/Codex/PI agent interoperability
 
-Stable `v1.0.0` has not shipped yet.
+Stable `v1.0.0` has not shipped yet. Capture creates candidates or L3 evidence; it does not silently apply durable L1/L2 memory.
 
 ## Quick Start
 
@@ -68,15 +68,18 @@ cargo build -p pi-cli
 Expected version for this release candidate:
 
 ```text
-pi 1.0.0-rc.8
+pi 1.0.0-rc.9
 ```
 
 ## CLI Usage
 
 ```bash
-# Initialize and propose governed memory
+# Initialize, score, capture, and propose governed memory
 pi --store .pi init
-pi --store .pi propose --claim "Release validation requires tests." --evidence "release-checklist"
+pi --store .pi memory-worth "Always run cargo test before tagging."
+pi --store .pi capture --text "don't skip release-audit before tagging" --project pi-governance-rs
+pi --store .pi inbox
+pi --store .pi propose --class workflow --claim "Release validation requires tests." --evidence-uri "release-checklist"
 
 # Review and apply/reject/defer patches
 pi --store .pi review
@@ -91,8 +94,15 @@ pi --store .pi inspect-patch <patch-id>
 pi --store .pi list
 pi --store .pi inspect-record <record-id>
 
-# Retrieve local context
+# Retrieve and inject local context
 pi --store .pi retrieve "release workflow" --retriever hybrid --explain
+pi --store .pi context "prepare stable release" --project pi-governance-rs --format markdown
+pi --store .pi recall-xray "stable release" --project pi-governance-rs --json
+
+# Append/search L3 session evidence
+pi --store .pi session add --text "#decision keep JSONL as source of truth" --project pi-governance-rs
+pi --store .pi session search "JSONL" --project pi-governance-rs
+pi --store .pi session decisions --project pi-governance-rs
 
 # Maintenance, audit, and export
 pi --store .pi maintenance scan
@@ -108,7 +118,7 @@ pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace de
 
 ### Command Matrix
 
-The rc.8 CLI includes `init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `review`, `demo`, `agent-instructions`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `inspect-record`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `mcp-install`, `mcp-doctor`, `smoke-test`, `release-audit`, and `changelog`.
+The rc.9 CLI includes `init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `review`, `inbox`, `capture`, `memory-worth`, `context`, `session`, `recall-xray`, `demo`, `agent-instructions`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `inspect-record`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `mcp-install`, `mcp-doctor`, `smoke-test`, `release-audit`, and `changelog`.
 
 See [docs/wiki/04-CLI-Guide.md](docs/wiki/04-CLI-Guide.md) for the full command guide.
 
@@ -165,12 +175,20 @@ Start with [docs/WIKI_INDEX.md](docs/WIKI_INDEX.md). Key pages:
 - [Release Strategy](docs/RELEASE_STRATEGY.md)
 - [Stable v1 Gate](docs/STABLE_V1_GATE.md)
 
-## Deferred / Not in rc.8
+## Deferred / Not in rc.9
 
-- capture / `pi capture --stdin`
-- persistent FTS/BM25 index
-- memory capsules
-- relationship edges
+Moved into rc.9: deterministic correction capture, manual `memory_write` equivalent through `pi capture`, memory-worth scoring, inbox workflow, scoped context injection, session search/decisions, minimal trust/durability/source gates, recall X-ray, L1/L2/L3 layers, and minimal reinforcement event compatibility.
+
+Still deferred:
+
+- deep reinforcement maintenance weighting
+- LLM consolidation
+- qmd semantic search
+- vault integration / Obsidian mutation
+- background job queue
+- memory graph or timeline
+- procedure candidates and skill draft artifacts
+- meta-consolidation automation
 - dashboard/TUI
 - hosted MCP endpoint
 - connectors
@@ -181,7 +199,7 @@ Start with [docs/WIKI_INDEX.md](docs/WIKI_INDEX.md). Key pages:
 
 ## Release Strategy
 
-`v1.0.0-rc.8` is the stable-release candidate. No new features should be added before stable unless a blocker appears. Stable release requires the final checklist in [docs/STABLE_V1_GATE.md](docs/STABLE_V1_GATE.md) and [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md).
+`v1.0.0-rc.9` is the stable-release candidate. No new features should be added before stable unless a blocker appears. Stable release requires the final checklist in [docs/STABLE_V1_GATE.md](docs/STABLE_V1_GATE.md) and [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md).
 
 ## License
 

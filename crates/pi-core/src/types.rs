@@ -48,6 +48,131 @@ impl FromStr for PolicyProfile {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryLayer {
+    L1Identity,
+    L2Playbook,
+    L3Session,
+}
+
+impl MemoryLayer {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::L1Identity => "l1_identity",
+            Self::L2Playbook => "l2_playbook",
+            Self::L3Session => "l3_session",
+        }
+    }
+}
+
+impl Default for MemoryLayer { fn default() -> Self { Self::L2Playbook } }
+
+impl fmt::Display for MemoryLayer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.as_str()) }
+}
+
+impl FromStr for MemoryLayer {
+    type Err = String;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input.trim().to_lowercase().replace('_', "-").as_str() {
+            "l1" | "l1-identity" | "identity" => Ok(Self::L1Identity),
+            "l2" | "l2-playbook" | "playbook" => Ok(Self::L2Playbook),
+            "l3" | "l3-session" | "session" => Ok(Self::L3Session),
+            _ => Err(format!("unknown memory layer: {input}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryKind { Fact, Event, Instruction, Task }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum RuleType { AvoidPattern, PreferPattern, Convention, Architecture, Workflow, Preference, Testing, Correction, Tool }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum TrustClass { DirectUserInstruction, UserCorrection, AgentInference, RepositoryText, GeneratedContent, ThirdPartyDocumentation, CodebaseAnalysis, HumanReview, Unknown }
+
+impl Default for TrustClass { fn default() -> Self { Self::Unknown } }
+impl fmt::Display for TrustClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match self {
+            Self::DirectUserInstruction => "direct_user_instruction",
+            Self::UserCorrection => "user_correction",
+            Self::AgentInference => "agent_inference",
+            Self::RepositoryText => "repository_text",
+            Self::GeneratedContent => "generated_content",
+            Self::ThirdPartyDocumentation => "third_party_documentation",
+            Self::CodebaseAnalysis => "codebase_analysis",
+            Self::HumanReview => "human_review",
+            Self::Unknown => "unknown",
+        };
+        write!(f, "{value}")
+    }
+}
+impl FromStr for TrustClass {
+    type Err = String;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input.trim().to_lowercase().replace('-', "_").as_str() {
+            "direct_user_instruction" => Ok(Self::DirectUserInstruction),
+            "user_correction" => Ok(Self::UserCorrection),
+            "agent_inference" => Ok(Self::AgentInference),
+            "repository_text" => Ok(Self::RepositoryText),
+            "generated_content" => Ok(Self::GeneratedContent),
+            "third_party_documentation" => Ok(Self::ThirdPartyDocumentation),
+            "codebase_analysis" => Ok(Self::CodebaseAnalysis),
+            "human_review" => Ok(Self::HumanReview),
+            "unknown" => Ok(Self::Unknown),
+            _ => Err(format!("unknown trust class: {input}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum Durability { Temporary, Task, Project, LongTerm, Unknown }
+
+impl Default for Durability { fn default() -> Self { Self::Unknown } }
+impl FromStr for Durability {
+    type Err = String;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input.trim().to_lowercase().replace('-', "_").as_str() {
+            "temporary" => Ok(Self::Temporary),
+            "task" => Ok(Self::Task),
+            "project" => Ok(Self::Project),
+            "long_term" => Ok(Self::LongTerm),
+            "unknown" => Ok(Self::Unknown),
+            _ => Err(format!("unknown durability: {input}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceKind { ManualCli, ManualMcp, SessionText, TranscriptFile, Stdin, AgentObservation, CodebaseAnalysis, ImportedBundle, Unknown }
+
+impl Default for SourceKind { fn default() -> Self { Self::Unknown } }
+impl FromStr for SourceKind {
+    type Err = String;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input.trim().to_lowercase().replace('-', "_").as_str() {
+            "manual_cli" => Ok(Self::ManualCli),
+            "manual_mcp" => Ok(Self::ManualMcp),
+            "session_text" => Ok(Self::SessionText),
+            "transcript_file" => Ok(Self::TranscriptFile),
+            "stdin" => Ok(Self::Stdin),
+            "agent_observation" => Ok(Self::AgentObservation),
+            "codebase_analysis" => Ok(Self::CodebaseAnalysis),
+            "imported_bundle" => Ok(Self::ImportedBundle),
+            "unknown" => Ok(Self::Unknown),
+            _ => Err(format!("unknown source kind: {input}")),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordClass {
@@ -80,6 +205,32 @@ impl RecordClass {
             RecordClass::Workflow => "workflow",
             RecordClass::Observation => "observation",
             RecordClass::EvidenceNote => "evidence_note",
+        }
+    }
+
+    pub fn inferred_layer(&self) -> MemoryLayer {
+        match self {
+            RecordClass::IdentityRule => MemoryLayer::L1Identity,
+            RecordClass::Observation | RecordClass::EvidenceNote => MemoryLayer::L3Session,
+            _ => MemoryLayer::L2Playbook,
+        }
+    }
+
+    pub fn inferred_memory_kind(&self) -> MemoryKind {
+        match self {
+            RecordClass::Workflow | RecordClass::Preference | RecordClass::Correction | RecordClass::Requirement => MemoryKind::Instruction,
+            RecordClass::Observation | RecordClass::EvidenceNote => MemoryKind::Event,
+            _ => MemoryKind::Fact,
+        }
+    }
+
+    pub fn inferred_rule_type(&self) -> Option<RuleType> {
+        match self {
+            RecordClass::Workflow => Some(RuleType::Workflow),
+            RecordClass::Preference => Some(RuleType::Preference),
+            RecordClass::Correction => Some(RuleType::Correction),
+            RecordClass::Requirement => Some(RuleType::Convention),
+            _ => None,
         }
     }
 }
@@ -213,6 +364,12 @@ pub struct EvidenceRef {
     pub kind: EvidenceKind,
     pub uri: String,
     pub note: Option<String>,
+    #[serde(default)]
+    pub trust_class: TrustClass,
+    #[serde(default)]
+    pub durability: Durability,
+    #[serde(default)]
+    pub source_kind: SourceKind,
 }
 
 impl EvidenceRef {
@@ -222,6 +379,9 @@ impl EvidenceRef {
             kind,
             uri: uri.into(),
             note: None,
+            trust_class: TrustClass::Unknown,
+            durability: Durability::Unknown,
+            source_kind: SourceKind::Unknown,
         }
     }
 }
@@ -238,6 +398,18 @@ pub struct Record {
     pub evidence: Vec<EvidenceRef>,
     pub confidence: f32,
     pub status: RecordStatus,
+    #[serde(default)]
+    pub layer: MemoryLayer,
+    #[serde(default)]
+    pub memory_kind: Option<MemoryKind>,
+    #[serde(default)]
+    pub rule_type: Option<RuleType>,
+    #[serde(default)]
+    pub trust_class: TrustClass,
+    #[serde(default)]
+    pub durability: Durability,
+    #[serde(default)]
+    pub source_kind: SourceKind,
     pub scope: Scope,
     pub tags: Vec<String>,
     pub supersedes: Vec<String>,
@@ -255,6 +427,9 @@ impl Record {
         evidence: Vec<EvidenceRef>,
     ) -> Self {
         let now = Utc::now();
+        let layer = class.inferred_layer();
+        let memory_kind = class.inferred_memory_kind();
+        let rule_type = class.inferred_rule_type();
 
         Self {
             schema_version: current_schema_version(),
@@ -265,6 +440,12 @@ impl Record {
             evidence,
             confidence,
             status: RecordStatus::Active,
+            layer,
+            memory_kind: Some(memory_kind),
+            rule_type,
+            trust_class: TrustClass::Unknown,
+            durability: Durability::Unknown,
+            source_kind: SourceKind::Unknown,
             scope,
             tags,
             supersedes: Vec::new(),

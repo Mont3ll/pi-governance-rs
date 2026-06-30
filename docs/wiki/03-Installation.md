@@ -10,7 +10,7 @@ cargo build -p pi-cli
 Expected for the current stable-release candidate:
 
 ```text
-pi 1.0.0-rc.8
+pi 1.0.0-rc.9
 ```
 
 ## Troubleshooting Build Failures

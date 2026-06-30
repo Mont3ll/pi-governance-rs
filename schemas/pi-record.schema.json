@@ -1,1 +1,19 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"PI Record","type":"object","required":["id","namespace","class","claim","status"],"properties":{"id":{"type":"string"},"namespace":{"type":"string"},"class":{"type":"string"},"claim":{"type":"string"},"status":{"type":"string"}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PI Record",
+  "type": "object",
+  "required": ["id", "namespace", "class", "claim", "status"],
+  "properties": {
+    "id": { "type": "string" },
+    "namespace": { "type": "string" },
+    "class": { "type": "string" },
+    "claim": { "type": "string" },
+    "status": { "type": "string" },
+    "layer": { "enum": ["l1_identity", "l2_playbook", "l3_session"] },
+    "memory_kind": { "enum": ["fact", "event", "instruction", "task"] },
+    "rule_type": { "enum": ["avoid_pattern", "prefer_pattern", "convention", "architecture", "workflow", "preference", "testing", "correction", "tool"] },
+    "trust_class": { "enum": ["direct_user_instruction", "user_correction", "agent_inference", "repository_text", "generated_content", "third_party_documentation", "codebase_analysis", "human_review", "unknown"] },
+    "durability": { "enum": ["temporary", "task", "project", "long_term", "unknown"] },
+    "source_kind": { "enum": ["manual_cli", "manual_mcp", "session_text", "transcript_file", "stdin", "agent_observation", "codebase_analysis", "imported_bundle", "unknown"] }
+  }
+}

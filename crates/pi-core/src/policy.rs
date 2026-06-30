@@ -16,6 +16,11 @@ pub fn validate_record(record: &Record, existing: &[Record]) -> GovernanceDecisi
         return GovernanceDecision::reject("claim is too short to be durable memory");
     }
 
+    let lower_claim = claim.to_lowercase();
+    if ["api_key", "apikey", "secret=", "password", "private key", "begin rsa", "begin openssh"].iter().any(|needle| lower_claim.contains(needle)) {
+        return GovernanceDecision::reject("secret-like content must not be stored as durable memory");
+    }
+
     if !(0.0..=1.0).contains(&record.confidence) {
         return GovernanceDecision::reject("confidence must be between 0.0 and 1.0");
     }
@@ -26,8 +31,21 @@ pub fn validate_record(record: &Record, existing: &[Record]) -> GovernanceDecisi
         decision.escalate_to_manual("durable record class requires at least one evidence reference");
     }
 
-    if record.class.is_high_sensitivity() {
+    if record.class.is_high_sensitivity() || record.layer == MemoryLayer::L1Identity {
         decision.escalate_to_manual("identity-level rules require manual review or explicit force");
+    }
+
+    match record.trust_class {
+        TrustClass::RepositoryText => decision.escalate_to_manual("repository text cannot auto-apply as durable memory"),
+        TrustClass::GeneratedContent => decision.escalate_to_manual("generated content cannot auto-apply as durable memory"),
+        TrustClass::ThirdPartyDocumentation => decision.escalate_to_manual("third-party documentation requires manual review"),
+        TrustClass::CodebaseAnalysis => decision.escalate_to_manual("codebase analysis is supporting evidence only until confirmed"),
+        TrustClass::AgentInference | TrustClass::Unknown => decision.escalate_to_manual("low-trust or unknown source requires manual review"),
+        TrustClass::DirectUserInstruction | TrustClass::UserCorrection | TrustClass::HumanReview => {}
+    }
+
+    if matches!(record.durability, Durability::Temporary | Durability::Task) && record.layer != MemoryLayer::L3Session {
+        decision.escalate_to_manual("temporary or task durability should remain L3/session unless explicitly reviewed");
     }
 
     let normalized = normalize_claim(&record.claim);

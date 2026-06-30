@@ -2,7 +2,7 @@
 
 ## Release Principles
 
-PI Governance releases should be conservative, auditable, and easy to verify from source. `v1.0.0-rc.8` is the stable-release candidate; stable `v1.0.0` has not shipped yet.
+PI Governance releases should be conservative, auditable, and easy to verify from source. `v1.0.0-rc.9` is the stable-release candidate; stable `v1.0.0` has not shipped yet.
 
 ## Why rc.8 Is the Stable-release Candidate
 
@@ -15,7 +15,7 @@ The stable release should be a release-only pass from rc.8 unless a blocker appe
 ## Stable Release Process
 
 1. Re-run full workspace, CLI, MCP, interop, docs, security, fresh clone, and archive checks.
-2. If no blockers appear, bump `1.0.0-rc.8` to `1.0.0`.
+2. If no blockers appear, bump `1.0.0-rc.9` to `1.0.0`.
 3. Update README, CHANGELOG, wiki docs, release docs, and product guide stable wording.
 4. Re-run all checks after the bump.
 5. Tag `v1.0.0` only after all gates pass.
@@ -56,3 +56,7 @@ Keep previous tags and do not delete tags. If stable has an issue, document the 
 ## Post-release Patch Policy
 
 Patch releases should be small, targeted, documented, and independently verified through the same core checks that guard stable.
+
+## rc.9 Portable Workflow Parity
+
+`v1.0.0-rc.9` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.

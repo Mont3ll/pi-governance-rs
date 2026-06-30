@@ -1,5 +1,12 @@
 # Changelog
 
+- v1.0.0-rc.9 — portable PI memory workflow parity
+  - Adds explicit L1/L2/L3 memory layers, memory kind, rule type, trust class, durability, and source kind metadata.
+  - Adds deterministic `memory-worth` scoring.
+  - Adds `capture` for correction/preference candidates and manual daily/long-term memory-write equivalents.
+  - Adds `inbox`, `context`, `session add/search/decisions`, and `recall-xray` CLI workflows.
+  - Adds MCP `pi.score_memory_worth`, `pi.capture_candidates`, `pi.build_context`, `pi.session_add`, `pi.session_search`, `pi.session_decisions`, and `pi.recall_xray`.
+  - Keeps durable L1/L2 memory patch-governed; capture never silently applies durable memory.
 - v1.0.0-rc.8 — release-quality governance, review ergonomics, and retrieval hardening
   - Adds MCP `pi.inspect_record` parity.
   - Adds review queue actions: `review --apply`, `review --reject`, and `review --defer`.

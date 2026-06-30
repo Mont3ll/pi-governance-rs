@@ -1,6 +1,6 @@
 # PI Governance Wiki Index
 
-These markdown files are prepared so maintainers can copy them into a GitHub Wiki. They describe the `v1.0.0-rc.8` stable-release candidate; stable `v1.0.0` has not shipped yet.
+These markdown files are prepared so maintainers can copy them into a GitHub Wiki. They describe the `v1.0.0-rc.9` stable-release candidate; stable `v1.0.0` has not shipped yet.
 
 - [Home](wiki/Home.md)
 - [01 Overview](wiki/01-Overview.md)
@@ -21,3 +21,7 @@ These markdown files are prepared so maintainers can copy them into a GitHub Wik
 - [16 Roadmap and Deferred Features](wiki/16-Roadmap-And-Deferred-Features.md)
 
 Release-preparation docs: [Deployment checklist](DEPLOYMENT_CHECKLIST.md), [Release strategy](RELEASE_STRATEGY.md), and [Stable v1 gate](STABLE_V1_GATE.md).
+
+## rc.9 Portable Workflow Parity
+
+`v1.0.0-rc.9` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.

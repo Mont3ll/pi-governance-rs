@@ -1,10 +1,13 @@
 use anyhow::Result;
+use chrono::DateTime;
 use clap::{Parser, Subcommand};
-use pi_core::{ContestResolution, EvidenceKind, EvidenceRef, PatchStatus, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope};
+use pi_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, PatchStatus, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
 use pi_governance::{
+    build_context, claim_from_capture, evidence_for_capture, read_text_input, recall_xray, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection, PatchSummary, ProposalInput, RecordInspection, ReinforceInput, ResolveContestInput,
-    SupersedeInput, TombstoneInput,
+    SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
+use serde_json::json;
 use pi_mcp::McpStdioServer;
 use pi_retrieval::render_markdown;
 use pi_store::JsonlStore;
@@ -19,7 +22,7 @@ use std::process::{Command, Stdio};
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "1.0.0-rc.8",
+    version = "1.0.0-rc.9",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -64,6 +67,9 @@ enum Commands {
         #[arg(long)]
         reason: Option<String>,
 
+        #[arg(long)]
+        layer: Option<MemoryLayer>,
+
         /// Apply immediately if policy allows it.
         #[arg(long)]
         apply: bool,
@@ -103,6 +109,9 @@ enum Commands {
 
         #[arg(long = "class")]
         classes: Vec<RecordClass>,
+
+        #[arg(long)]
+        layer: Option<MemoryLayer>,
     },
 
     /// Review pending memory patches.
@@ -229,6 +238,9 @@ enum Commands {
         #[arg(long, default_value = "reinforce record with new evidence")]
         reason: String,
 
+        #[arg(long, default_value = "explicit_reinforcement")]
+        outcome: String,
+
         #[arg(long)]
         apply: bool,
 
@@ -336,6 +348,9 @@ enum Commands {
         /// Redact evidence URIs and event messages in the exported bundle.
         #[arg(long)]
         redacted: bool,
+
+        #[arg(long)]
+        layer: Option<MemoryLayer>,
     },
 
     /// Import a portable PI JSON bundle. Duplicate ids are skipped, not overwritten.
@@ -382,6 +397,8 @@ enum Commands {
     List {
         #[arg(long, default_value_t = 20)]
         limit: usize,
+        #[arg(long)]
+        layer: Option<MemoryLayer>,
     },
 
     /// Inspect a governed memory record by id.
@@ -389,6 +406,105 @@ enum Commands {
         record_id: String,
         #[arg(long)]
         json: bool,
+        #[arg(long)]
+        layer: Option<MemoryLayer>,
+    },
+
+    /// Score whether an observation is worth governed memory capture.
+    MemoryWorth {
+        observation: String,
+        #[arg(long)]
+        project: Option<String>,
+        #[arg(long = "trust-class")]
+        trust_class: Option<TrustClass>,
+        #[arg(long = "source-kind")]
+        source_kind: Option<SourceKind>,
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Capture deterministic memory candidates or L3 session evidence.
+    Capture {
+        #[arg(long)]
+        text: Option<String>,
+        #[arg(long)]
+        stdin: bool,
+        #[arg(long)]
+        file: Option<PathBuf>,
+        #[arg(long)]
+        project: Option<String>,
+        #[arg(long = "tag")]
+        tags: Vec<String>,
+        #[arg(long)]
+        target: Option<String>,
+        #[arg(long)]
+        layer: Option<MemoryLayer>,
+        #[arg(long = "trust-class")]
+        trust_class: Option<TrustClass>,
+        #[arg(long = "source-kind")]
+        source_kind: Option<SourceKind>,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Review captured candidate patches.
+    Inbox {
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        layer: Option<MemoryLayer>,
+        #[arg(long)]
+        apply: Option<String>,
+        #[arg(long)]
+        reject: Option<String>,
+        #[arg(long)]
+        defer: Option<String>,
+        #[arg(long)]
+        reason: Option<String>,
+    },
+
+    /// Build a scoped paste-ready governed memory context bundle.
+    Context {
+        query: String,
+        #[arg(long)]
+        project: Option<String>,
+        #[arg(long, default_value_t = 1200)]
+        budget: usize,
+        #[arg(long, default_value = "markdown")]
+        format: String,
+        #[arg(long = "include-l3")]
+        include_l3: bool,
+        #[arg(long = "include-contested")]
+        include_contested: bool,
+        #[arg(long)]
+        layer: Option<MemoryLayer>,
+    },
+
+    /// Append/search local L3 session evidence.
+    Session {
+        #[command(subcommand)]
+        command: SessionCommands,
+    },
+
+    /// Explain why records were included or excluded from recall.
+    RecallXray {
+        query: String,
+        #[arg(long)]
+        project: Option<String>,
+        #[arg(long, default_value_t = 1200)]
+        budget: usize,
+        #[arg(long)]
+        json: bool,
+        #[arg(long = "include-l3")]
+        include_l3: bool,
+        #[arg(long = "include-contested")]
+        include_contested: bool,
+        #[arg(long)]
+        layer: Option<MemoryLayer>,
     },
 
     /// Generate MCP client configuration.
@@ -464,7 +580,32 @@ enum PolicyCommands {
 #[derive(Debug, Subcommand)]
 enum MaintenanceCommands {
     /// Run a read-only governance maintenance scan.
-    Scan { #[arg(long)] json: bool },
+    Scan { #[arg(long)] json: bool, #[arg(long)] layer: Option<MemoryLayer> },
+}
+
+#[derive(Debug, Subcommand)]
+enum SessionCommands {
+    /// Add append-only L3 session evidence.
+    Add {
+        #[arg(long)] text: Option<String>,
+        #[arg(long)] stdin: bool,
+        #[arg(long)] file: Option<PathBuf>,
+        #[arg(long)] project: Option<String>,
+        #[arg(long)] json: bool,
+    },
+    /// Search append-only L3 session evidence locally.
+    Search {
+        query: String,
+        #[arg(long)] project: Option<String>,
+        #[arg(long)] after: Option<String>,
+        #[arg(long)] json: bool,
+    },
+    /// List extracted session decision markers.
+    Decisions {
+        #[arg(long)] project: Option<String>,
+        #[arg(long)] days: Option<i64>,
+        #[arg(long)] json: bool,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -752,6 +893,39 @@ fn run_tools_list(command: &str, args: &[String]) -> Result<Vec<String>> {
     Ok(v["result"]["tools"].as_array().map(|a| a.iter().filter_map(|t| t["name"].as_str().map(str::to_string)).collect()).unwrap_or_default())
 }
 
+fn proposal_input(
+    namespace: String,
+    class: RecordClass,
+    claim: String,
+    confidence: f32,
+    scope: Scope,
+    tags: Vec<String>,
+    evidence_refs: Vec<EvidenceRef>,
+    reason: Option<String>,
+    layer: Option<MemoryLayer>,
+    memory_kind: Option<MemoryKind>,
+    rule_type: Option<RuleType>,
+    trust_class: TrustClass,
+    durability: Durability,
+    source_kind: SourceKind,
+) -> ProposalInput {
+    ProposalInput { namespace, class, claim, confidence, scope, tags, evidence_refs, reason, layer, memory_kind, rule_type, trust_class, durability, source_kind }
+}
+
+fn is_daily_target(target: Option<&str>) -> bool {
+    matches!(target.map(|t| t.to_lowercase().replace('_', "-")).as_deref(), Some("daily") | Some("session") | Some("l3") | Some("l3-session"))
+}
+
+fn is_long_term_target(target: Option<&str>) -> bool {
+    matches!(target.map(|t| t.to_lowercase().replace('_', "-")).as_deref(), Some("long-term") | Some("memory") | Some("l2") | Some("l2-playbook"))
+}
+
+fn print_event_list(events: Vec<StoreEvent>, json_out: bool) -> Result<()> {
+    if json_out { println!("{}", serde_json::to_string_pretty(&events)?); }
+    else { for e in events { println!("{} {}", e.created_at, e.message); } }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -858,20 +1032,20 @@ fn main() -> Result<()> {
             let demo_store = JsonlStore::new(demo_path.clone());
             let demo_engine = GovernanceEngine::new(demo_store);
             demo_engine.init()?;
-            let ev = |uri: &str| vec![EvidenceRef { schema_version: pi_core::current_schema_version(), kind: EvidenceKind::Conversation, uri: uri.to_string(), note: None }];
-            let input = |class, claim: &str, tag: &str, uri: &str| ProposalInput { namespace: "default".to_string(), class, claim: claim.to_string(), confidence: 0.75, scope: Scope::project("pi-governance-rs"), tags: vec![tag.to_string()], evidence_refs: ev(uri), reason: Some("demo memory".to_string()) };
+            let ev = |uri: &str| vec![EvidenceRef::new(EvidenceKind::Conversation, uri)];
+            let input = |class, claim: &str, tag: &str, uri: &str| proposal_input("default".to_string(), class, claim.to_string(), 0.75, Scope::project("pi-governance-rs"), vec![tag.to_string()], ev(uri), Some("demo memory".to_string()), None, None, None, TrustClass::DirectUserInstruction, Durability::Project, SourceKind::ManualCli);
             demo_engine.propose_record(input(RecordClass::Preference, "Use cargo test --workspace before tagging Rust release candidates.", "release", "demo:preference"), true, false)?;
             demo_engine.propose_record(input(RecordClass::Correction, "If MCP smoke tests fail, inspect tools/list before tools/call.", "mcp", "demo:correction"), true, false)?;
             demo_engine.propose_record(input(RecordClass::Workflow, "Release validation requires cargo check, cargo test, smoke-test, release-audit, and changelog verification.", "workflow", "demo:workflow"), true, false)?;
             let contested = demo_engine.propose_record(input(RecordClass::Observation, "Old release note says rc.1 is current, but rc.3 supersedes it.", "contest", "demo:contested"), true, false)?.record_id.unwrap();
             demo_engine.contest_record(ContestInput { namespace: "default".to_string(), target_id: contested, evidence_refs: ev("demo:contest"), reason: "demo contested record".to_string() }, true, true)?;
             let old = demo_engine.propose_record(input(RecordClass::Observation, "v1.0.0-rc.2 is current.", "supersede", "demo:old-current"), true, false)?.record_id.unwrap();
-            demo_engine.supersede_record(SupersedeInput { namespace: "default".to_string(), target_id: old, class: RecordClass::Observation, claim: "v1.0.0-rc.8 is current.".to_string(), confidence: 0.8, scope: Scope::project("pi-governance-rs"), tags: vec!["supersede".to_string()], evidence_refs: ev("demo:new-current"), reason: "demo supersession".to_string() }, true, true)?;
+            demo_engine.supersede_record(SupersedeInput { namespace: "default".to_string(), target_id: old, class: RecordClass::Observation, claim: "v1.0.0-rc.9 is current.".to_string(), confidence: 0.8, scope: Scope::project("pi-governance-rs"), tags: vec!["supersede".to_string()], evidence_refs: ev("demo:new-current"), reason: "demo supersession".to_string() }, true, true)?;
             let tomb = demo_engine.propose_record(input(RecordClass::Workflow, "Old instruction: publish immediately after tests.", "tombstone", "demo:tombstone"), true, false)?.record_id.unwrap();
             demo_engine.tombstone_record(TombstoneInput { namespace: "default".to_string(), target_id: tomb, evidence_refs: ev("demo:no-publish"), reason: "this repo does not publish during RC validation".to_string() }, true, true)?;
             demo_engine.set_policy("strict-demo", PolicyProfile::Strict)?;
             demo_engine.set_policy("permissive-demo", PolicyProfile::Permissive)?;
-            demo_engine.propose_record(ProposalInput { namespace: "default".to_string(), class: RecordClass::Workflow, claim: "Review pending patches before release.".to_string(), confidence: 0.75, scope: Scope::project("pi-governance-rs"), tags: vec!["review".to_string()], evidence_refs: ev("demo:pending-review"), reason: Some("demo pending patch".to_string()) }, false, false)?;
+            demo_engine.propose_record(proposal_input("default".to_string(), RecordClass::Workflow, "Review pending patches before release.".to_string(), 0.75, Scope::project("pi-governance-rs"), vec!["review".to_string()], ev("demo:pending-review"), Some("demo pending patch".to_string()), Some(MemoryLayer::L2Playbook), Some(MemoryKind::Instruction), Some(RuleType::Workflow), TrustClass::DirectUserInstruction, Durability::Project, SourceKind::ManualCli), false, false)?;
             let report = DemoReport { store: demo_path.display().to_string(), records: demo_engine.list_records(200)?.len(), pending_patches: demo_engine.list_patches(200)?.iter().filter(|p| p.latest_status == PatchStatus::Proposed).count(), namespaces: vec!["default".to_string(), "strict-demo".to_string(), "permissive-demo".to_string()], try_commands: vec![format!("pi --store {} review", demo_path.display()), format!("pi --store {} retrieve \"release workflow\" --explain", demo_path.display())] };
             if json { println!("{}", serde_json::to_string_pretty(&report)?); }
             else { println!("PI Demo Store Created\n"); println!("Store: {}", report.store); println!("Records: {}", report.records); println!("Pending patches: {}", report.pending_patches); println!("Namespaces: {}", report.namespaces.join(", ")); println!("\nTry:"); for cmd in &report.try_commands { println!("  {}", cmd); } println!("  pi --store {} doctor", report.store); println!("  pi --store {} namespace doctor", report.store); println!("  pi --store {} policy doctor", report.store); }
@@ -886,6 +1060,7 @@ fn main() -> Result<()> {
             evidence_uri,
             evidence_kind,
             reason,
+            layer,
             apply,
             force,
         } => {
@@ -900,21 +1075,70 @@ fn main() -> Result<()> {
             };
 
             let result = engine.propose_record(
-                ProposalInput {
-                    namespace: namespace.clone(),
-                    class,
-                    claim,
-                    confidence,
-                    scope,
-                    tags,
-                    evidence_refs,
-                    reason,
-                },
+                proposal_input(namespace.clone(), class, claim, confidence, scope, tags, evidence_refs, reason, layer, None, None, TrustClass::DirectUserInstruction, Durability::Project, SourceKind::ManualCli),
                 apply,
                 force,
             )?;
 
             println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+
+        Commands::MemoryWorth { observation, project: _, trust_class, source_kind, json } => {
+            let report = score_memory_worth(&observation, trust_class, source_kind);
+            if json { println!("{}", serde_json::to_string_pretty(&report)?); }
+            else {
+                println!("Decision: {:?}", report.decision);
+                println!("Confidence: {:.2}", report.confidence);
+                println!("Suggested layer: {}", report.suggested_layer);
+                println!("Suggested class: {}", report.suggested_class);
+                if !report.reasons.is_empty() { println!("Reasons: {}", report.reasons.join(", ")); }
+                if !report.warnings.is_empty() { println!("Warnings: {}", report.warnings.join(", ")); }
+            }
+        }
+
+        Commands::Capture { text, stdin, file, project, mut tags, target, layer, trust_class, source_kind, dry_run, json } => {
+            let input_text = read_text_input(text, file, stdin)?;
+            let source = source_kind.unwrap_or(if stdin { SourceKind::Stdin } else { SourceKind::ManualCli });
+            if is_daily_target(target.as_deref()) && !is_long_term_target(target.as_deref()) {
+                store.init()?;
+                let ev = session_event(&namespace, project.as_deref(), &input_text, source);
+                if !dry_run { store.append_event(&ev)?; }
+                let report = pi_governance::CaptureReport { input_summary: input_text.chars().take(80).collect(), candidates: Vec::new(), daily_only: vec![input_text.clone()], inquiries: Vec::new(), rejected: Vec::new(), applied: false };
+                if json { println!("{}", serde_json::to_string_pretty(&report)?); }
+                else { println!("Captured L3/session entry. Decisions: {}", pi_governance::extract_decisions(&input_text).len()); }
+            } else {
+                let worth = score_memory_worth(&input_text, trust_class, Some(source));
+                let mut report = pi_governance::CaptureReport { input_summary: input_text.chars().take(80).collect(), candidates: Vec::new(), daily_only: Vec::new(), inquiries: Vec::new(), rejected: Vec::new(), applied: false };
+                match worth.decision {
+                    MemoryWorthDecision::Reject => report.rejected.push(input_text.clone()),
+                    MemoryWorthDecision::DailyOnly => {
+                        let ev = session_event(&namespace, project.as_deref(), &input_text, source);
+                        if !dry_run { store.append_event(&ev)?; }
+                        report.daily_only.push(input_text.clone());
+                    }
+                    MemoryWorthDecision::Inquiry => report.inquiries.push(input_text.clone()),
+                    MemoryWorthDecision::Candidate => {
+                        if tags.is_empty() { tags = worth.suggested_tags.clone(); }
+                        let claim = claim_from_capture(&input_text);
+                        let suggested_layer = layer.unwrap_or(worth.suggested_layer);
+                        let verification = verify_candidate(&claim, suggested_layer, worth.trust_class, worth.durability);
+                        let mut patch_id = None;
+                        if !dry_run {
+                            let result = engine.propose_record(proposal_input(
+                                namespace.clone(), worth.suggested_class.clone(), claim.clone(), worth.confidence,
+                                scope_for_project(project.clone()), tags, vec![evidence_for_capture(source, worth.trust_class, worth.durability)],
+                                Some("captured deterministic memory candidate".to_string()), Some(suggested_layer), Some(worth.suggested_memory_kind), worth.suggested_rule_type,
+                                worth.trust_class, worth.durability, source,
+                            ), false, false)?;
+                            patch_id = Some(result.patch_id);
+                        }
+                        report.candidates.push(pi_governance::CaptureCandidate { claim, decision: worth.decision, patch_id, suggested_layer, trust_class: worth.trust_class, durability: worth.durability, memory_kind: worth.suggested_memory_kind, rule_type: worth.suggested_rule_type, verification });
+                    }
+                }
+                if json { println!("{}", serde_json::to_string_pretty(&report)?); }
+                else if report.candidates.is_empty() { println!("No durable candidate created."); }
+                else { for c in &report.candidates { println!("candidate {} layer={} trust_class={:?}", c.patch_id.as_deref().unwrap_or("dry-run"), c.suggested_layer, c.trust_class); } }
+            }
         }
 
         Commands::Retrieve {
@@ -928,6 +1152,7 @@ fn main() -> Result<()> {
             include_contested,
             min_confidence,
             classes,
+            layer: _,
         } => {
             let retrieval_format = match format.as_str() {
                 "json" => RetrievalFormat::Json,
@@ -967,7 +1192,7 @@ fn main() -> Result<()> {
             } else {
                 for patch in patches {
                     println!(
-                        "- [{}] status={:?} operation={:?} history={} claim={}",
+                        "- {} status={:?} operation={:?} history={} claim={}",
                         patch.patch_id,
                         patch.latest_status,
                         patch.operation,
@@ -1092,6 +1317,7 @@ fn main() -> Result<()> {
             evidence_uri,
             evidence_kind,
             reason,
+            outcome,
             apply,
             force,
         } => {
@@ -1100,7 +1326,7 @@ fn main() -> Result<()> {
                     namespace: namespace.clone(),
                     target_id,
                     evidence_refs: vec![EvidenceRef::new(evidence_kind, evidence_uri)],
-                    reason,
+                    reason: format!("{} (outcome: {})", reason, outcome),
                 },
                 apply,
                 force,
@@ -1187,7 +1413,7 @@ fn main() -> Result<()> {
         },
 
         Commands::Maintenance { command } => match command {
-            MaintenanceCommands::Scan { json } => {
+            MaintenanceCommands::Scan { json, layer: _ } => {
                 let report = engine.maintenance_scan(&namespace)?;
                 if json {
                     println!("{}", serde_json::to_string_pretty(&report)?);
@@ -1266,6 +1492,7 @@ fn main() -> Result<()> {
             all_namespaces,
             project,
             redacted,
+            layer: _,
         } => {
             let input = ExportInput { namespace: Some(namespace.clone()), all_namespaces, project, redacted };
 
@@ -1454,20 +1681,21 @@ fn main() -> Result<()> {
             }
         }
 
-        Commands::List { limit } => {
+        Commands::List { limit, layer } => {
             let records = engine.list_records_in_namespace(&namespace, limit)?;
 
-            for record in records {
+            for record in records.into_iter().filter(|record| layer.map(|l| record.layer == l).unwrap_or(true)) {
                 println!(
-                    "- [{}] {} | class={} | confidence={:.2} | status={:?}",
-                    record.id, record.claim, record.class, record.confidence, record.status
+                    "- [{}] {} | class={} | layer={} | confidence={:.2} | status={:?}",
+                    record.id, record.claim, record.class, record.layer, record.confidence, record.status
                 );
             }
         }
 
-        Commands::InspectRecord { record_id, json } => {
+        Commands::InspectRecord { record_id, json, layer } => {
             match engine.inspect_record_in_namespace(&namespace, &record_id)? {
                 Some(inspection) => {
+                    if let Some(layer) = layer { if inspection.record.layer != layer { anyhow::bail!("record layer does not match filter"); } }
                     if json { println!("{}", serde_json::to_string_pretty(&inspection)?); }
                     else { print_record_inspection(&inspection); }
                 }
@@ -1480,6 +1708,63 @@ fn main() -> Result<()> {
                     std::process::exit(1);
                 }
             }
+        }
+
+        Commands::Inbox { json, all, layer, apply, reject, defer, reason } => {
+            if let Some(id) = apply {
+                let result = engine.apply_patch_by_id(&id, false)?;
+                if json { println!("{}", serde_json::to_string_pretty(&result)?); } else { println!("Patch {}\nApplied: {}\n{}", result.patch_id, result.applied, result.message); }
+            } else if let Some(id) = reject {
+                let result = engine.reject_patch_by_id(&id, &namespace, &reason.ok_or_else(|| anyhow::anyhow!("--reason is required for --reject"))?)?;
+                if json { println!("{}", serde_json::to_string_pretty(&result)?); } else { println!("Patch {} rejected", result.patch_id); }
+            } else if let Some(id) = defer {
+                let result = engine.defer_patch_by_id(&id, &namespace, &reason.ok_or_else(|| anyhow::anyhow!("--reason is required for --defer"))?)?;
+                if json { println!("{}", serde_json::to_string_pretty(&result)?); } else { println!("Patch {} deferred", result.patch_id); }
+            } else {
+                let mut rows = Vec::new();
+                for p in engine.list_patches(200)? {
+                    if !all && !matches!(p.latest_status, PatchStatus::Proposed | PatchStatus::Deferred) { continue; }
+                    let inspection = engine.inspect_patch(&p.patch_id)?;
+                    let proposed = inspection.history.last().and_then(|h| h.proposed_record.as_ref());
+                    if let Some(layer_filter) = layer { if proposed.map(|r| r.layer) != Some(layer_filter) { continue; } }
+                    rows.push(json!({"patch_id":p.patch_id,"status":p.latest_status,"operation":p.operation,"class":p.proposed_record_class,"claim":p.proposed_record_claim,"layer":proposed.map(|r| r.layer),"trust_class":proposed.map(|r| r.trust_class)}));
+                }
+                if json { println!("{}", serde_json::to_string_pretty(&json!({"pending_count":rows.len(),"patches":rows}))?); }
+                else { println!("PI Candidate Inbox\n"); for row in rows { println!("{} status={} layer={} claim={}", row["patch_id"].as_str().unwrap_or(""), row["status"], row["layer"], row["claim"].as_str().unwrap_or("")); } }
+            }
+        }
+
+        Commands::Context { query, project, budget, format, include_l3, include_contested, layer: _ } => {
+            let (markdown, value) = build_context(&store, &namespace, &query, project, budget, include_l3, include_contested)?;
+            match format.as_str() {
+                "json" => println!("{}", serde_json::to_string_pretty(&value)?),
+                "markdown" | "md" => println!("{}", markdown),
+                other => anyhow::bail!("unsupported format: {other}"),
+            }
+        }
+
+        Commands::Session { command } => match command {
+            SessionCommands::Add { text, stdin, file, project, json } => {
+                let input = read_text_input(text, file, stdin)?;
+                let event = session_event(&namespace, project.as_deref(), &input, if stdin { SourceKind::Stdin } else { SourceKind::SessionText });
+                store.append_event(&event)?;
+                if json { println!("{}", serde_json::to_string_pretty(&event)?); } else { println!("Session entry: {}", event.id); }
+            }
+            SessionCommands::Search { query, project, after, json } => {
+                let after_dt = after.as_deref().and_then(|s| DateTime::parse_from_rfc3339(&format!("{s}T00:00:00Z")).ok()).map(|d| d.with_timezone(&chrono::Utc));
+                print_event_list(search_session_events(&store, &namespace, &query, project.as_deref(), after_dt)?, json)?;
+            }
+            SessionCommands::Decisions { project, days, json } => {
+                let decisions = session_decisions(&store, &namespace, project.as_deref(), days)?;
+                if json { println!("{}", serde_json::to_string_pretty(&decisions)?); }
+                else { for d in decisions { println!("{} {}", d.created_at, d.text); } }
+            }
+        },
+
+        Commands::RecallXray { query, project, budget, json, include_l3, include_contested, layer: _ } => {
+            let report = recall_xray(&store, &namespace, &query, project, budget, include_l3, include_contested)?;
+            if json { println!("{}", serde_json::to_string_pretty(&report)?); }
+            else { println!("Recall X-ray: {}", report.query); for r in report.included { println!("included {} layer={} score={:.3}", r.record_id, r.layer, r.score); } for r in report.excluded { println!("excluded {} reason={}", r.record_id, r.reason); } }
         }
 
         Commands::McpConfig { client, command, json: _ } => {
@@ -1579,13 +1864,13 @@ fn main() -> Result<()> {
             audit_check(&mut checks, &mut failures, "policy-doctor-json", engine.policy_doctor().is_ok(), "policy doctor failed");
             audit_check(&mut checks, &mut failures, "smoke-test", GovernanceEngine::run_smoke_test().result == "pass", "smoke test failed");
             let changelog = include_str!("../../../CHANGELOG.md");
-            audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0-rc.8") && changelog.contains("v1.0.0-rc.5") && changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
+            audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0-rc.9") && changelog.contains("v1.0.0-rc.5") && changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
             let readme = include_str!("../../../README.md");
             audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "inspect-record", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "mcp-install", "mcp-doctor", "smoke-test", "release-audit", "changelog"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
             audit_check(&mut checks, &mut failures, "mcp-tools-list", true, "MCP tools are statically registered");
             let mcp_config = serde_json::json!({"mcpServers": {"pi-governance": {"command": std::env::current_exe()?.display().to_string(), "args": ["--store", store_path.display().to_string().as_str(), "--namespace", namespace.as_str(), "mcp-stdio"]}}});
             audit_check(&mut checks, &mut failures, "mcp-config", mcp_config.to_string().contains("mcp-stdio"), "mcp config missing mcp-stdio");
-            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "1.0.0-rc.8".to_string(), checks, failures };
+            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "1.0.0-rc.9".to_string(), checks, failures };
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {

@@ -1,9 +1,18 @@
 # Record Schema
 
-Schema is release-candidate level and intended to stabilize at v1.0.0.
+Records are governed durable memory claims stored in local JSONL. `v1.0.0-rc.9` adds portable workflow metadata while preserving backwards-compatible optional fields.
 
-Records are governed memory entries stored in JSONL. Key fields: `schema_version`, `namespace`, `id`, `class`, `claim`, `confidence`, `scope`, `tags`, `evidence`, `status`, `supersedes`, `created_at`, and `updated_at`.
+Required core fields include `id`, `namespace`, `class`, `claim`, `status`, `scope`, `evidence`, `confidence`, timestamps, and revision metadata.
 
-Record status values: `active`, `contested`, `superseded`, `tombstoned`.
+## rc.9 Portable Workflow Fields
 
-Records are only created or changed through governed patches; JSONL remains the source of truth.
+- `layer`: `l1_identity`, `l2_playbook`, or `l3_session`.
+- `memory_kind`: optional `fact`, `event`, `instruction`, or `task`.
+- `rule_type`: optional `avoid_pattern`, `prefer_pattern`, `convention`, `architecture`, `workflow`, `preference`, `testing`, `correction`, or `tool`.
+- `trust_class`: source trust signal such as `direct_user_instruction`, `user_correction`, `repository_text`, or `unknown`.
+- `durability`: `temporary`, `task`, `project`, `long_term`, or `unknown`.
+- `source_kind`: capture source such as `manual_cli`, `manual_mcp`, `session_text`, `stdin`, or `unknown`.
+
+L1 records are never auto-applied. L3 records/session entries are evidence context, not authoritative durable memory.
+
+See [`schemas/pi-record.schema.json`](../../schemas/pi-record.schema.json).

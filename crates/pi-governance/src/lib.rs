@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod workflow;
 
 pub use engine::{
     ApplyPatchResult, ContestInput, DoctorReport, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection,
@@ -6,3 +7,4 @@ pub use engine::{
     PatchSummary, ProposalInput, ProposalResult, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput,
 };
+pub use workflow::*;

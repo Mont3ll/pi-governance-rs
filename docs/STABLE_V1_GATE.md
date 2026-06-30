@@ -1,6 +1,6 @@
 # Stable v1 Gate
 
-`v1.0.0-rc.8` is the current stable-release candidate. Stable `v1.0.0` must not be tagged or published until every gate passes.
+`v1.0.0-rc.9` is the current stable-release candidate. Stable `v1.0.0` must not be tagged or published until every gate passes.
 
 ## Hard Pass/Fail Gates
 
@@ -17,7 +17,7 @@
 
 ## Final Stable Release Checklist
 
-- [ ] Bump `1.0.0-rc.8` to `1.0.0`.
+- [ ] Bump `1.0.0-rc.9` to `1.0.0`.
 - [ ] Update README.
 - [ ] Update CHANGELOG.
 - [ ] Update docs/wiki.
@@ -49,7 +49,11 @@ pi 1.0.0
 For rc.8 release-candidate validation, expected output remains:
 
 ```text
-pi 1.0.0-rc.8
+pi 1.0.0-rc.9
 ```
 
 See [docs/DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md), [docs/RELEASE_STRATEGY.md](RELEASE_STRATEGY.md), [docs/wiki/13-Release-And-Deployment.md](wiki/13-Release-And-Deployment.md), and [docs/wiki/14-QA-And-Test-Matrix.md](wiki/14-QA-And-Test-Matrix.md).
+
+## rc.9 Portable Workflow Parity
+
+`v1.0.0-rc.9` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.

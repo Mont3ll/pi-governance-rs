@@ -1,193 +1,37 @@
-# Release candidate notes
+# Release Notes
 
+Stable `v1.0.0` has not shipped yet.
 
+## v1.0.0-rc.9 portable PI memory workflow parity
 
+`v1.0.0-rc.9` is the current stable-release candidate. It adds the missing portable workflow layer from the original PI memory workflow while keeping durable L1/L2 memory patch-governed.
 
+Added in rc.9:
 
-## v1.0.0-rc.8 release-quality hardening notes
+- explicit L1/L2/L3 memory layers
+- optional `memory_kind` and `rule_type`
+- trust class, durability, and source kind signals
+- deterministic `memory-worth` scoring
+- deterministic `capture` candidate extraction from text/stdin/files
+- manual `memory_write` equivalent through `pi capture --target daily|long-term`
+- `inbox` candidate review workflow
+- scoped `context` output for non-PI agents
+- local `session add`, `session search`, and `session decisions`
+- `recall-xray` inclusion/exclusion diagnostics
+- MCP tools for score/capture/context/session/recall workflows
+- minimal verification gates for low-trust sources, L1 records, and secret-like content
 
-`v1.0.0-rc.8` is the current release-quality governance, review ergonomics, and retrieval hardening release candidate. It adds MCP record inspection parity, review queue actions, read-only maintenance scan, local deterministic lexical/hybrid retrieval modes, redacted export metadata, and schema documentation. It does not add capture, embeddings, vector databases, graph backends, hosted services, connectors, or stable `v1.0.0`.
+Safety notes:
 
-## v1.0.0-rc.4 documentation notes
+- Capture creates candidates or L3 session evidence; it does not silently apply durable L1/L2 records.
+- L1 identity memory always requires review.
+- L3 session/event data is append-only evidence context, not authoritative durable memory.
+- Repository text, generated content, third-party documentation, and codebase analysis cannot bypass manual review.
 
-`v1.0.0-rc.4` is the current release-candidate documentation consistency pass. It cleans README duplication, stale version references, command examples, MCP documentation, security and memory-poisoning wording, and adds `docs/product-guide.html`. It does not claim stable `v1.0.0` has shipped and does not change governance semantics.
+## v1.0.0-rc.8 release-quality governance hardening
 
-## v1.0.0-rc.3 usability notes
+rc.8 added MCP record inspection parity, review queue actions, read-only maintenance scan, local deterministic lexical/hybrid retrieval modes, redacted export metadata, and schema documentation.
 
-`v1.0.0-rc.3` focuses on open-source usability. It adds a review inbox (`pi review`), a safe demo store (`pi demo`), agent instruction output, governed skill examples, security documentation, memory-poisoning guidance, codebase-memory-mcp complement documentation, and pi-persistent-intelligence compatibility notes. It does not change existing governance semantics or remove/rename CLI commands or MCP tools.
+## Still Deferred
 
-## v1.0.0-rc.2 compatibility notes
-
-`v1.0.0-rc.2` is a release-candidate soak and compatibility pass. It verifies fresh-user clean clone installation, README examples, MCP client configuration, MCP smoke flows, clean-store import/export portability, namespace and policy behavior after fresh init, JSON diagnostics, and release-audit output. It adds no new governance semantics and does not remove or rename any CLI commands or MCP tools.
-
-## v1.0.0-rc.1 — first release candidate
-
-This sprint is a release-candidate packaging sprint only. It adds no new governance semantics and preserves the JSONL store, existing CLI behavior, and existing MCP behavior.
-
-## Public CLI surface freeze
-
-The following command names are considered part of the release-candidate public surface for the current release-candidate line (introduced in `v1.0.0-rc.1`):
-
-```text
-init
-doctor
-migrate
-config
-policy
-namespace
-propose
-apply
-reinforce
-supersede
-tombstone
-contest
-resolve-contest
-retrieve
-export
-import
-list
-list-patches
-inspect-patch
-mcp-stdio
-mcp-config
-smoke-test
-release-audit
-changelog
-```
-
-Command names are frozen for the release-candidate line. Output details may still receive compatibility fixes before stable `v1.0.0`.
-
-## MCP schema freeze
-
-MCP tool names are frozen for the release-candidate line. The governed memory tool surface includes:
-
-```text
-pi.retrieve_context
-pi.propose_record
-pi.apply_patch
-pi.list_patches
-pi.inspect_patch
-pi.migrate_schema
-pi.doctor
-pi.list_records
-pi.reinforce_record
-pi.supersede_record
-pi.tombstone_record
-pi.contest_record
-pi.resolve_contest
-pi.export_store
-pi.import_store
-pi.config_show
-pi.config_set_policy
-pi.policy_doctor
-pi.policy_explain
-pi.smoke_test
-pi.mcp_config
-pi.changelog
-pi.list_namespaces
-pi.namespace_doctor
-```
-
-Confirm with:
-
-```bash
-STORE="/path/to/.pi"
-BIN="/path/to/pi"
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
-| "$BIN" --store "$STORE" mcp-stdio
-```
-
-## Fresh-user install flow
-
-```bash
-git clone <repo-url>
-cd pi-governance-rs
-cargo build -p pi-cli
-./target/debug/pi init
-./target/debug/pi smoke-test
-./target/debug/pi mcp-config claude
-```
-
-Use generic local paths such as `/path/to/pi` and `/path/to/.pi` in public examples and MCP client configuration.
-
-## Clean clone verification
-
-Verify the release candidate in a temporary local clone:
-
-```bash
-git clone <repo-url> pi-governance-rs-rc1-clone
-cd pi-governance-rs-rc1-clone
-git checkout v1.0.0-rc.4
-cargo check --workspace
-cargo test --workspace
-cargo build -p pi-cli
-./target/debug/pi --version
-./target/debug/pi smoke-test
-./target/debug/pi release-audit
-```
-
-Expected version output:
-
-```text
-pi 1.0.0-rc.4
-```
-
-## Archive content verification
-
-Release archives should include source and documentation files such as:
-
-```text
-Cargo.toml
-Cargo.lock
-README.md
-CHANGELOG.md
-RELEASE.md
-crates/
-```
-
-Release archives must not include local runtime data or generated local artifacts:
-
-```text
-.pi/
-target/
-.env
-local export files
-local import files
-local backups
-```
-
-## Release checklist dry run
-
-```bash
-cargo check --workspace
-cargo test --workspace
-cargo build -p pi-cli
-./target/debug/pi --version
-./target/debug/pi smoke-test
-./target/debug/pi smoke-test --json | python -m json.tool >/dev/null
-./target/debug/pi release-audit
-./target/debug/pi release-audit --json | python -m json.tool >/dev/null
-./target/debug/pi changelog
-./target/debug/pi mcp-config claude
-git status --short
-```
-
-## Release notes
-
-`v1.0.0-rc.1` verifies:
-
-- public CLI surface freeze
-- MCP tool-name freeze
-- fresh clone verification
-- archive content verification
-- release checklist verification
-- no new governance semantics
-
-## Release Documentation Links
-
-- [Wiki index](docs/WIKI_INDEX.md)
-- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
-- [Release strategy](docs/RELEASE_STRATEGY.md)
-- [Stable v1 gate](docs/STABLE_V1_GATE.md)
-- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
-- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)
+Deep reinforcement maintenance weighting, LLM consolidation, qmd semantic search, vault integration, background job queues, memory graph/timeline, procedure candidates, skill draft artifacts, meta-consolidation automation, dashboard/TUI, hosted MCP, connectors, vector backend, graph backend, team RBAC/SSO, and cloud sync remain deferred.

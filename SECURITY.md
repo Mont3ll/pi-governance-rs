@@ -47,3 +47,7 @@ Redacted export metadata reports fields checked and redacted, but redaction is b
 - [Stable v1 gate](docs/STABLE_V1_GATE.md)
 - [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
 - [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)
+
+## rc.9 Trust and Capture Safety
+
+`pi capture` creates governed candidates or append-only L3 session evidence. It must not be used to store secrets. L1 records are never auto-applied, and low-trust sources such as repository text, generated content, third-party documentation, codebase analysis, and unknown sources require review.

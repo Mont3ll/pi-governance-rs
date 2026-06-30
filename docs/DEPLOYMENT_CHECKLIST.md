@@ -1,6 +1,6 @@
 # Deployment Checklist
 
-`v1.0.0-rc.8` is the current stable-release candidate. Stable `v1.0.0` has not shipped yet.
+`v1.0.0-rc.9` is the current stable-release candidate. Stable `v1.0.0` has not shipped yet.
 
 ## Pre-release Local Checks
 
@@ -94,3 +94,7 @@ Expected: no hidden/bidi matches, no public-doc local path leakage, and only doc
 - [ ] Tags are not deleted.
 - [ ] Known issue documented if stable issue is found.
 - [ ] Patch release plan prepared if needed.
+
+## rc.9 Portable Workflow Parity
+
+`v1.0.0-rc.9` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.
