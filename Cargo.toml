@@ -13,7 +13,11 @@ resolver = "2"
 edition = "2021"
 version = "1.0.0"
 license = "MIT OR Apache-2.0"
-repository = "https://example.invalid/pi-governance-rs"
+repository = "https://github.com/Mont3ll/pi-governance-rs"
+description = "Local-first governed memory CLI and MCP stdio server for AI agents."
+readme = "README.md"
+keywords = ["mcp", "memory", "governance", "ai-agents"]
+categories = ["command-line-utilities", "development-tools"]
 
 [workspace.dependencies]
 anyhow = "1"
@@ -23,8 +27,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 
-pi-core = { path = "crates/pi-core" }
-pi-store = { path = "crates/pi-store" }
-pi-retrieval = { path = "crates/pi-retrieval" }
-pi-governance = { path = "crates/pi-governance" }
-pi-mcp = { path = "crates/pi-mcp" }
+pi-core = { version = "1.0.0", path = "crates/pi-core" }
+pi-store = { version = "1.0.0", path = "crates/pi-store" }
+pi-retrieval = { version = "1.0.0", path = "crates/pi-retrieval" }
+pi-governance = { version = "1.0.0", path = "crates/pi-governance" }
+pi-mcp = { version = "1.0.0", path = "crates/pi-mcp" }

@@ -37,12 +37,36 @@ Both projects implement or map to the shared PI memory contract.
 
 Users who use multiple agents can use `pi-governance-rs` as the global governed memory runtime. Users who want pi-agent-native capture, curation, and recall UX can use `pi-persistent-intelligence`. Users may use both together through compatible PI memory bundles.
 
+## Installation
+
+### From source
+
+```bash
+git clone https://github.com/Mont3ll/pi-governance-rs
+cd pi-governance-rs
+cargo build -p pi-cli
+./target/debug/pi --version
+```
+
+### From Git
+
+```bash
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.0 pi-cli
+pi --version
+```
+
+### From crates.io
+
+```bash
+cargo install pi-cli
+pi --version
+```
+
+Note: crates.io publishing may still be pending until explicitly published.
+
 ## Quick Start
 
 ```bash
-git clone <repository-url> pi-governance-rs
-cd pi-governance-rs
-cargo build -p pi-cli
 ./target/debug/pi --version
 ./target/debug/pi demo --store /tmp/pi-demo-store --reset
 ./target/debug/pi --store /tmp/pi-demo-store memory-worth "Always run release-audit before tagging."
@@ -111,6 +135,8 @@ See [docs/wiki/04-CLI-Guide.md](docs/wiki/04-CLI-Guide.md) for the full command 
 
 PI Governance owns the global MCP server because it exists to make governed PI memory available to Codex, Claude, OpenCode, Cursor, PI agent, and other MCP-capable harnesses.
 
+pi-governance-rs is a local-first MCP stdio server. The MCP client launches the pi binary as a subprocess. This keeps governed memory on the user's machine by default. No hosted MCP service is provided by default.
+
 ```bash
 pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
 pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
@@ -175,6 +201,12 @@ Tested capabilities include `score_memory_worth`, `capture_candidates`, `build_c
 
 Start with [docs/WIKI_INDEX.md](docs/WIKI_INDEX.md). Key pages:
 
+- [Install and packaging guide](docs/INSTALL.md)
+- [Packaging](docs/PACKAGING.md)
+- [MCP Server Sharing](docs/MCP_SERVER_SHARING.md)
+- [MCP Registry Prep](docs/MCP_REGISTRY_PREP.md)
+- [GitHub Release Plan](docs/GITHUB_RELEASE_PLAN.md)
+- [Publishing Checklist](docs/PUBLISHING_CHECKLIST.md)
 - [Installation](docs/wiki/03-Installation.md)
 - [CLI Guide](docs/wiki/04-CLI-Guide.md)
 - [MCP Setup](docs/wiki/05-MCP-Setup.md)
@@ -198,4 +230,4 @@ PI Governance does not add a hosted service, database, vector store, graph backe
 
 ## License
 
-No license file is currently present in this repository. A license file should be added before public distribution.
+Licensed under either of Apache License, Version 2.0 or MIT License at your option. See [LICENSE](LICENSE), [LICENSE-APACHE](LICENSE-APACHE), and [LICENSE-MIT](LICENSE-MIT).

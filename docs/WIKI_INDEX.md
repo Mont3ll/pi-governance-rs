@@ -20,7 +20,7 @@ These markdown files are prepared so maintainers can copy them into a GitHub Wik
 - [15 Troubleshooting](wiki/15-Troubleshooting.md)
 - [16 Roadmap and Deferred Features](wiki/16-Roadmap-And-Deferred-Features.md)
 
-Release-preparation docs: [Deployment checklist](DEPLOYMENT_CHECKLIST.md), [Release strategy](RELEASE_STRATEGY.md), and [Stable v1 gate](STABLE_V1_GATE.md).
+Release-preparation docs: [Install](INSTALL.md), [Packaging](PACKAGING.md), [MCP server sharing](MCP_SERVER_SHARING.md), [Publishing checklist](PUBLISHING_CHECKLIST.md), [GitHub release plan](GITHUB_RELEASE_PLAN.md), [MCP Registry prep](MCP_REGISTRY_PREP.md), [Deployment checklist](DEPLOYMENT_CHECKLIST.md), [Release strategy](RELEASE_STRATEGY.md), and [Stable v1 gate](STABLE_V1_GATE.md).
 
 ## Portable Workflow Parity
 

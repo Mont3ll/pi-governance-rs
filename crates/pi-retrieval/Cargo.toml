@@ -3,6 +3,11 @@ name = "pi-retrieval"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+description.workspace = true
+readme = "../../README.md"
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 pi-core.workspace = true

@@ -35,3 +35,24 @@ rc.8 added MCP record inspection parity, review queue actions, read-only mainten
 ## Still Deferred
 
 Deep reinforcement maintenance weighting, LLM consolidation, qmd semantic search, vault integration, background job queues, memory graph/timeline, procedure candidates, skill draft artifacts, meta-consolidation automation, dashboard/TUI, hosted MCP, connectors, vector backend, graph backend, team RBAC/SSO, and cloud sync remain deferred.
+
+
+## Packaging and distribution
+
+Repository: https://github.com/Mont3ll/pi-governance-rs
+
+License: MIT OR Apache-2.0. See `LICENSE`, `LICENSE-APACHE`, and `LICENSE-MIT`.
+
+Install from Git:
+
+```bash
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.0 pi-cli
+```
+
+Install from crates.io after explicit publication approval:
+
+```bash
+cargo install pi-cli
+```
+
+The MCP server is local stdio by default; no hosted MCP service is included in v1.0.0.

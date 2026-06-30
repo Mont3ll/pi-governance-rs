@@ -1,6 +1,7 @@
 # Changelog
 
 - v1.0.0 — stable portable PI memory governance release
+  - Adds public repository, dual-license, packaging, install, MCP sharing, GitHub release planning, and MCP Registry preparation documentation.
   - Promotes v1.0.0-rc.9 to stable.
   - Provides standalone CLI/MCP PI memory governance for MCP-capable agents.
   - Includes capture, memory-worth scoring, inbox, L1/L2/L3 layers, trust/durability/source metadata, verification gates, context builder, session search/decisions, recall-xray, maintenance scan, import/export, and redacted export metadata.

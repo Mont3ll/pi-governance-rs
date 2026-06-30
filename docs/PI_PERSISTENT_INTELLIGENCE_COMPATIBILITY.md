@@ -45,3 +45,11 @@ The compatibility layer is import/export and shared schemas, not a dependency re
 - Repository/generated/third-party content requires review.
 - Tombstones prevent re-promotion.
 - Redacted export is best-effort and user-reviewed.
+
+
+## Packaging Status
+
+Repository: https://github.com/Mont3ll/pi-governance-rs
+License: MIT OR Apache-2.0
+
+`pi-governance-rs` can be installed from source or Git and may be installed from crates.io after explicit publication approval. It is a local stdio MCP server by default and does not provide a hosted service in v1.0.0.

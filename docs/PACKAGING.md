@@ -1,0 +1,80 @@
+# Packaging
+
+Repository: https://github.com/Mont3ll/pi-governance-rs
+License: MIT OR Apache-2.0
+
+## Cargo package layout
+
+This repository is a Cargo workspace. The binary crate is `crates/pi-cli`, the package name is `pi-cli`, and the installed binary name is `pi`.
+
+Workspace crates:
+
+- `pi-core`
+- `pi-store`
+- `pi-retrieval`
+- `pi-governance`
+- `pi-mcp`
+- `pi-cli`
+
+## Binary crate
+
+`crates/pi-cli` produces the public `pi` binary. It depends on the internal workspace crates above.
+
+## cargo install
+
+From a local source checkout:
+
+```bash
+cargo install --path crates/pi-cli --force
+pi --version
+```
+
+## cargo install --git
+
+```bash
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.0 pi-cli
+pi --version
+```
+
+## crates.io package
+
+Once crates.io publishing is explicitly approved, the intended public command is:
+
+```bash
+cargo install pi-cli
+```
+
+Because `pi-cli` depends on workspace crates, crates.io publishing must publish the supporting crates first. Current intended order:
+
+1. `pi-core`
+2. `pi-store`
+3. `pi-retrieval`
+4. `pi-governance`
+5. `pi-mcp`
+6. `pi-cli`
+
+Do not publish without explicit approval.
+
+## Package dry-run
+
+Run package checks before any publish:
+
+```bash
+cargo package -p pi-core --list
+cargo package -p pi-core
+cargo publish -p pi-core --dry-run
+```
+
+Then repeat for dependent crates after each upstream package is available on crates.io, or record the dependency-resolution blocker.
+
+## GitHub release binaries
+
+GitHub releases may include source archives, a relative patch, checksums, and optional compiled platform binaries. Cross-platform binaries are optional and should only be produced when toolchains are configured.
+
+## Archive verification
+
+Verify source archives with a fresh extraction, `cargo check --workspace`, `cargo test --workspace`, `cargo build -p pi-cli`, `pi smoke-test`, and `pi release-audit`.
+
+## Included and excluded files
+
+Packages should include Rust sources, tests, `Cargo.toml`, `Cargo.lock` where Cargo includes it for binaries, README text, schemas, examples, documentation, and license files. Local stores, `.pi/`, `target/`, `.env`, private config, and download artifacts must remain excluded.

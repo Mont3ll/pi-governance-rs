@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Security fixes are considered for the current release-candidate line (`v1.0.0-rc.4` as of this document) and the latest tagged release.
+Security fixes are considered for the current stable release line (`v1.0.0`) and the latest tagged release.
 
 ## Reporting Vulnerabilities
 
@@ -51,3 +51,11 @@ Redacted export metadata reports fields checked and redacted, but redaction is b
 ## Trust and Capture Safety
 
 `pi capture` creates governed candidates or append-only L3 session evidence. It must not be used to store secrets. L1 records are never auto-applied, and low-trust sources such as repository text, generated content, third-party documentation, codebase analysis, and unknown sources require review.
+
+
+## Repository and License
+
+Repository: https://github.com/Mont3ll/pi-governance-rs
+License: MIT OR Apache-2.0
+
+Packaging, GitHub release, crates.io, and MCP Registry operations require explicit maintainer approval.
