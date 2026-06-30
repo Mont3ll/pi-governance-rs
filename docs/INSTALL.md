@@ -11,27 +11,27 @@ License: MIT OR Apache-2.0
 ```bash
 git clone https://github.com/Mont3ll/pi-governance-rs
 cd pi-governance-rs
-cargo build -p pi-cli
+cargo build -p pi-governance-rs
 ./target/debug/pi --version
 ```
 
 Expected version:
 
 ```text
-pi 1.0.0
+pi 1.0.1
 ```
 
 ## Install from Git tag
 
 ```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.0 pi-cli
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.1 pi-governance-rs
 pi --version
 ```
 
 ## Install from crates.io once published
 
 ```bash
-cargo install pi-cli
+cargo install pi-governance-rs
 pi --version
 ```
 

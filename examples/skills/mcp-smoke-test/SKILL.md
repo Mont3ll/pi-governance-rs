@@ -21,7 +21,7 @@ Use this after changing MCP configuration, stdio behavior, or tool schemas.
 
 ## Prerequisites
 
-- `cargo build -p pi-cli` has completed.
+- `cargo build -p pi-governance-rs` has completed.
 - A PI store exists or a temporary store is selected.
 
 ## Workflow

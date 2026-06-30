@@ -1,4 +1,4 @@
-use pi_core::{RankedRecord, Record, RecordClass, RecordStatus, ScopeLevel, ScoreBreakdown};
+use pi_governance_core::{RankedRecord, Record, RecordClass, RecordStatus, ScopeLevel, ScoreBreakdown};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 

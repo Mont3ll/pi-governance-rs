@@ -1,5 +1,5 @@
-use pi_core::{EvidenceKind, EvidenceRef, Record, RecordClass, RecordStatus, RetrievalFormat, RetrievalOptions, Scope};
-use pi_retrieval::retrieve_with_options;
+use pi_governance_core::{EvidenceKind, EvidenceRef, Record, RecordClass, RecordStatus, RetrievalFormat, RetrievalOptions, Scope};
+use pi_governance_retrieval::retrieve_with_options;
 
 fn rec(class: RecordClass, claim: &str, project: Option<&str>, tags: Vec<&str>, confidence: f32, status: RecordStatus) -> Record {
     let mut record = Record::new(

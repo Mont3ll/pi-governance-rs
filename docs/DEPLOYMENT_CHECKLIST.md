@@ -13,7 +13,7 @@
 ```bash
 cargo check --workspace
 cargo test --workspace
-cargo build -p pi-cli
+cargo build -p pi-governance-rs
 ```
 
 ## CLI Checks

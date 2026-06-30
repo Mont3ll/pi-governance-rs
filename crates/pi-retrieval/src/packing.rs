@@ -1,4 +1,4 @@
-use pi_core::RankedRecord;
+use pi_governance_core::RankedRecord;
 
 pub fn estimate_tokens(input: &str) -> usize {
     ((input.chars().count() + 3) / 4).max(1) + 24

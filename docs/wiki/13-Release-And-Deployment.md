@@ -14,7 +14,7 @@ v1.0.0 is the stable public release promoted from rc.9 after local validation, d
 
 ## Stable v1.0.0 Gate
 
-Required gates: `cargo check --workspace` pass, `cargo test --workspace` pass, `cargo build -p pi-cli` pass, `pi --version` shows `1.0.0`, smoke-test pass, release-audit pass, fresh clone verification pass, archive content verification pass, OpenCode install/doctor pass with live rc.9 environmental/client-run limitation documented, Codex CLI interoperability pass, PI agent interoperability pass, MCP setup/install/doctor pass, hidden/bidi scan no matches, secret scan no real secrets, local path scan no public path leakage, README stable wording correct, CHANGELOG stable entry correct, docs stable wording correct, schemas validate, and product guide updated.
+Required gates: `cargo check --workspace` pass, `cargo test --workspace` pass, `cargo build -p pi-governance-rs` pass, `pi --version` shows `1.0.0`, smoke-test pass, release-audit pass, fresh clone verification pass, archive content verification pass, OpenCode install/doctor pass with live rc.9 environmental/client-run limitation documented, Codex CLI interoperability pass, PI agent interoperability pass, MCP setup/install/doctor pass, hidden/bidi scan no matches, secret scan no real secrets, local path scan no public path leakage, README stable wording correct, CHANGELOG stable entry correct, docs stable wording correct, schemas validate, and product guide updated.
 
 ## Deployment Targets
 
@@ -63,4 +63,4 @@ Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CH
 Repository: https://github.com/Mont3ll/pi-governance-rs
 License: MIT OR Apache-2.0
 
-Install from source with `cargo build -p pi-cli`, from Git with `cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.0 pi-cli`, or from crates.io with `cargo install pi-cli` after crates.io publishing is explicitly approved. `pi-governance-rs` is a standalone local stdio MCP server by default; it does not provide a hosted service in v1.0.0. It remains compatible with `pi-persistent-intelligence` through the shared PI memory contract.
+Install from source with `cargo build -p pi-governance-rs`, from Git with `cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.1 pi-governance-rs`, or from crates.io with `cargo install pi-governance-rs` after crates.io publishing is explicitly approved. `pi-governance-rs` is a standalone local stdio MCP server by default; it does not provide a hosted service in v1.0.0. It remains compatible with `pi-persistent-intelligence` through the shared PI memory contract.

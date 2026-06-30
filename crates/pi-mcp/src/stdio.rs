@@ -1,18 +1,18 @@
 use anyhow::{bail, Context, Result};
-use pi_core::{default_namespace, ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope, SourceKind, TrustClass};
-use pi_governance::{
+use pi_governance_core::{default_namespace, ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope, SourceKind, TrustClass};
+use pi_governance_engine::{
     build_context, claim_from_capture, evidence_for_capture, recall_xray, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
-use pi_retrieval::render_markdown;
+use pi_governance_retrieval::render_markdown;
 use serde_json::{json, Map, Value};
 use std::io::{self, BufRead, Write};
 use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "1.0.0";
+const SERVER_VERSION: &str = "1.0.1";
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -779,7 +779,7 @@ impl McpStdioServer {
         let layer = optional_string(&args, "layer").and_then(|s| MemoryLayer::from_str(&s).ok());
         let trust = optional_string(&args, "trust_class").and_then(|s| TrustClass::from_str(&s).ok());
         let worth = score_memory_worth(&text, trust, Some(SourceKind::ManualMcp));
-        let mut report = pi_governance::CaptureReport { input_summary: text.chars().take(80).collect(), candidates: Vec::new(), daily_only: Vec::new(), inquiries: Vec::new(), rejected: Vec::new(), applied: false };
+        let mut report = pi_governance_engine::CaptureReport { input_summary: text.chars().take(80).collect(), candidates: Vec::new(), daily_only: Vec::new(), inquiries: Vec::new(), rejected: Vec::new(), applied: false };
         match worth.decision {
             MemoryWorthDecision::Reject => report.rejected.push(text.clone()),
             MemoryWorthDecision::DailyOnly => { let event = session_event(&namespace, project.as_deref(), &text, SourceKind::ManualMcp); self.engine.store().append_event(&event)?; report.daily_only.push(text.clone()); }
@@ -789,7 +789,7 @@ impl McpStdioServer {
                 let suggested_layer = layer.unwrap_or(worth.suggested_layer);
                 let verification = verify_candidate(&claim, suggested_layer, worth.trust_class, worth.durability);
                 let result = self.engine.propose_record(ProposalInput { namespace: namespace.clone(), class: worth.suggested_class.clone(), claim: claim.clone(), confidence: worth.confidence, scope: scope_for_project(project), tags: worth.suggested_tags.clone(), evidence_refs: vec![evidence_for_capture(SourceKind::ManualMcp, worth.trust_class, worth.durability)], reason: Some("captured deterministic memory candidate".to_string()), layer: Some(suggested_layer), memory_kind: Some(worth.suggested_memory_kind), rule_type: worth.suggested_rule_type, trust_class: worth.trust_class, durability: worth.durability, source_kind: SourceKind::ManualMcp }, false, false)?;
-                report.candidates.push(pi_governance::CaptureCandidate { claim, decision: worth.decision, patch_id: Some(result.patch_id), suggested_layer, trust_class: worth.trust_class, durability: worth.durability, memory_kind: worth.suggested_memory_kind, rule_type: worth.suggested_rule_type, verification });
+                report.candidates.push(pi_governance_engine::CaptureCandidate { claim, decision: worth.decision, patch_id: Some(result.patch_id), suggested_layer, trust_class: worth.trust_class, durability: worth.durability, memory_kind: worth.suggested_memory_kind, rule_type: worth.suggested_rule_type, verification });
             }
         }
         Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
@@ -849,7 +849,7 @@ impl McpStdioServer {
         let all = optional_bool(&args, "all").unwrap_or(false);
         let mut rows = Vec::new();
         for p in self.engine.list_patches(200)? {
-            if !all && !matches!(p.latest_status, pi_core::PatchStatus::Proposed | pi_core::PatchStatus::Deferred) { continue; }
+            if !all && !matches!(p.latest_status, pi_governance_core::PatchStatus::Proposed | pi_governance_core::PatchStatus::Deferred) { continue; }
             rows.push(p);
         }
         let value = json!({"pending_count": rows.len(), "patches": rows});

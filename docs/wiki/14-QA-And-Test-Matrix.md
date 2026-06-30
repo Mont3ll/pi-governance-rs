@@ -4,7 +4,7 @@
 | --- | --- | --- | --- | --- |
 | cargo check | `cargo check --workspace` | pass | pass | required |
 | cargo test | `cargo test --workspace` | pass | pass | required |
-| cargo build | `cargo build -p pi-cli` | pass | pass | required |
+| cargo build | `cargo build -p pi-governance-rs` | pass | pass | required |
 | version | `pi --version` | `pi 1.0.0` | pass | must show `pi 1.0.0` |
 | demo | `pi demo` | demo store created | pass | required |
 | review | `pi review` | queue visible | pass | required |
@@ -55,4 +55,4 @@ Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CH
 Repository: https://github.com/Mont3ll/pi-governance-rs
 License: MIT OR Apache-2.0
 
-Install from source with `cargo build -p pi-cli`, from Git with `cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.0 pi-cli`, or from crates.io with `cargo install pi-cli` after crates.io publishing is explicitly approved. `pi-governance-rs` is a standalone local stdio MCP server by default; it does not provide a hosted service in v1.0.0. It remains compatible with `pi-persistent-intelligence` through the shared PI memory contract.
+Install from source with `cargo build -p pi-governance-rs`, from Git with `cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.1 pi-governance-rs`, or from crates.io with `cargo install pi-governance-rs` after crates.io publishing is explicitly approved. `pi-governance-rs` is a standalone local stdio MCP server by default; it does not provide a hosted service in v1.0.0. It remains compatible with `pi-persistent-intelligence` through the shared PI memory contract.

@@ -7,7 +7,7 @@ name: pi-governance-rs
 description: Local-first governed memory CLI and MCP stdio server for AI agents.
 runtime: local stdio
 language: Rust
-install: cargo install pi-cli
+install: cargo install pi-governance-rs
 binary: pi
 server command: pi --store /path/to/.pi --namespace default mcp-stdio
 categories:

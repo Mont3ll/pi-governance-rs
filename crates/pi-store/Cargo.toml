@@ -1,5 +1,5 @@
 [package]
-name = "pi-store"
+name = "pi-governance-store"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -14,4 +14,4 @@ anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
-pi-core.workspace = true
+pi-governance-core.workspace = true

@@ -30,7 +30,7 @@ Use this before tagging a PI Rust release.
 
 1. Run `cargo check --workspace`.
 2. Run `cargo test --workspace`.
-3. Run `cargo build -p pi-cli`.
+3. Run `cargo build -p pi-governance-rs`.
 4. Run `./target/debug/pi --version`.
 5. Run `./target/debug/pi smoke-test`.
 6. Run `./target/debug/pi release-audit`.

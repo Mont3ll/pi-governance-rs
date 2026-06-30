@@ -1,4 +1,4 @@
-use pi_core::{
+use pi_governance_core::{
     ContextBlock, ContextBundle, RankedRecord, Record, RecordClass, RetrievalBudget,
     RetrievalFormat, RetrievalOptions,
 };
@@ -28,7 +28,7 @@ pub fn retrieve(
     retrieve_with_options(records, RetrievalOptions {
         query: query.into(),
         retriever: "deterministic".to_string(),
-        namespace: pi_core::default_namespace(),
+        namespace: pi_governance_core::default_namespace(),
         project,
         budget: budget.max_tokens,
         format: RetrievalFormat::Markdown,

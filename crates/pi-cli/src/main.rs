@@ -1,16 +1,16 @@
 use anyhow::Result;
 use chrono::DateTime;
 use clap::{Parser, Subcommand};
-use pi_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, PatchStatus, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
-use pi_governance::{
+use pi_governance_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, PatchStatus, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
+use pi_governance_engine::{
     build_context, claim_from_capture, evidence_for_capture, read_text_input, recall_xray, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection, PatchSummary, ProposalInput, RecordInspection, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
 use serde_json::json;
-use pi_mcp::McpStdioServer;
-use pi_retrieval::render_markdown;
-use pi_store::JsonlStore;
+use pi_governance_mcp::McpStdioServer;
+use pi_governance_retrieval::render_markdown;
+use pi_governance_store::JsonlStore;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -22,7 +22,7 @@ use std::process::{Command, Stdio};
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "1.0.0",
+    version = "1.0.1",
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -1103,12 +1103,12 @@ fn main() -> Result<()> {
                 store.init()?;
                 let ev = session_event(&namespace, project.as_deref(), &input_text, source);
                 if !dry_run { store.append_event(&ev)?; }
-                let report = pi_governance::CaptureReport { input_summary: input_text.chars().take(80).collect(), candidates: Vec::new(), daily_only: vec![input_text.clone()], inquiries: Vec::new(), rejected: Vec::new(), applied: false };
+                let report = pi_governance_engine::CaptureReport { input_summary: input_text.chars().take(80).collect(), candidates: Vec::new(), daily_only: vec![input_text.clone()], inquiries: Vec::new(), rejected: Vec::new(), applied: false };
                 if json { println!("{}", serde_json::to_string_pretty(&report)?); }
-                else { println!("Captured L3/session entry. Decisions: {}", pi_governance::extract_decisions(&input_text).len()); }
+                else { println!("Captured L3/session entry. Decisions: {}", pi_governance_engine::extract_decisions(&input_text).len()); }
             } else {
                 let worth = score_memory_worth(&input_text, trust_class, Some(source));
-                let mut report = pi_governance::CaptureReport { input_summary: input_text.chars().take(80).collect(), candidates: Vec::new(), daily_only: Vec::new(), inquiries: Vec::new(), rejected: Vec::new(), applied: false };
+                let mut report = pi_governance_engine::CaptureReport { input_summary: input_text.chars().take(80).collect(), candidates: Vec::new(), daily_only: Vec::new(), inquiries: Vec::new(), rejected: Vec::new(), applied: false };
                 match worth.decision {
                     MemoryWorthDecision::Reject => report.rejected.push(input_text.clone()),
                     MemoryWorthDecision::DailyOnly => {
@@ -1132,7 +1132,7 @@ fn main() -> Result<()> {
                             ), false, false)?;
                             patch_id = Some(result.patch_id);
                         }
-                        report.candidates.push(pi_governance::CaptureCandidate { claim, decision: worth.decision, patch_id, suggested_layer, trust_class: worth.trust_class, durability: worth.durability, memory_kind: worth.suggested_memory_kind, rule_type: worth.suggested_rule_type, verification });
+                        report.candidates.push(pi_governance_engine::CaptureCandidate { claim, decision: worth.decision, patch_id, suggested_layer, trust_class: worth.trust_class, durability: worth.durability, memory_kind: worth.suggested_memory_kind, rule_type: worth.suggested_rule_type, verification });
                     }
                 }
                 if json { println!("{}", serde_json::to_string_pretty(&report)?); }
@@ -1870,7 +1870,7 @@ fn main() -> Result<()> {
             audit_check(&mut checks, &mut failures, "mcp-tools-list", true, "MCP tools are statically registered");
             let mcp_config = serde_json::json!({"mcpServers": {"pi-governance": {"command": std::env::current_exe()?.display().to_string(), "args": ["--store", store_path.display().to_string().as_str(), "--namespace", namespace.as_str(), "mcp-stdio"]}}});
             audit_check(&mut checks, &mut failures, "mcp-config", mcp_config.to_string().contains("mcp-stdio"), "mcp config missing mcp-stdio");
-            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "1.0.0".to_string(), checks, failures };
+            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "1.0.1".to_string(), checks, failures };
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {

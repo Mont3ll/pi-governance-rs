@@ -1,8 +1,8 @@
-use pi_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, MemoryKind, RecordClass, RuleType, Scope, RecordStatus, SourceKind, TrustClass};
-use pi_governance::{
+use pi_governance_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, MemoryKind, RecordClass, RuleType, Scope, RecordStatus, SourceKind, TrustClass};
+use pi_governance_engine::{
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput, SupersedeInput, TombstoneInput,
 };
-use pi_store::JsonlStore;
+use pi_governance_store::JsonlStore;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -164,7 +164,7 @@ fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Res
         .find(|record| record.id == replacement_id)
         .expect("replacement record should exist");
 
-    assert!(matches!(old.status, pi_core::RecordStatus::Superseded));
+    assert!(matches!(old.status, pi_governance_core::RecordStatus::Superseded));
     assert!(replacement.supersedes.contains(&original_id));
 
     let tombstone = engine.tombstone_record(
@@ -186,7 +186,7 @@ fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Res
         .find(|record| record.id == replacement_id)
         .expect("replacement should remain in audit history");
 
-    assert!(matches!(tombstoned.status, pi_core::RecordStatus::Tombstoned));
+    assert!(matches!(tombstoned.status, pi_governance_core::RecordStatus::Tombstoned));
 
     fs::remove_dir_all(root)?;
     Ok(())
@@ -354,7 +354,7 @@ fn engine_exports_and_imports_portable_bundle() -> anyhow::Result<()> {
 
 fn write_bundle_fixture(
     root: &std::path::Path,
-    bundle: &pi_store::StoreExportBundle,
+    bundle: &pi_governance_store::StoreExportBundle,
 ) -> anyhow::Result<PathBuf> {
     let path = root.join("bundle.json");
     fs::write(&path, serde_json::to_string_pretty(bundle)?)?;

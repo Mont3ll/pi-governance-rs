@@ -1,6 +1,6 @@
-use pi_governance::GovernanceEngine;
-use pi_mcp::McpStdioServer;
-use pi_store::JsonlStore;
+use pi_governance_engine::GovernanceEngine;
+use pi_governance_mcp::McpStdioServer;
+use pi_governance_store::JsonlStore;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use pi_core::{Patch, Record, SchemaFileAudit, StoreEvent};
+use pi_governance_core::{Patch, Record, SchemaFileAudit, StoreEvent};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;

@@ -354,24 +354,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
-name = "pi-cli"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "pi-core",
- "pi-governance",
- "pi-mcp",
- "pi-retrieval",
- "pi-store",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "pi-core"
-version = "1.0.0"
+name = "pi-governance-core"
+version = "1.0.1"
 dependencies = [
  "chrono",
  "serde",
@@ -379,45 +363,61 @@ dependencies = [
 ]
 
 [[package]]
-name = "pi-governance"
-version = "1.0.0"
+name = "pi-governance-engine"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "chrono",
- "pi-core",
- "pi-retrieval",
- "pi-store",
+ "pi-governance-core",
+ "pi-governance-retrieval",
+ "pi-governance-store",
  "serde",
  "serde_json",
 ]
 
 [[package]]
-name = "pi-mcp"
-version = "1.0.0"
+name = "pi-governance-mcp"
+version = "1.0.1"
 dependencies = [
  "anyhow",
- "pi-core",
- "pi-governance",
- "pi-retrieval",
- "pi-store",
+ "pi-governance-core",
+ "pi-governance-engine",
+ "pi-governance-retrieval",
+ "pi-governance-store",
  "serde_json",
 ]
 
 [[package]]
-name = "pi-retrieval"
-version = "1.0.0"
+name = "pi-governance-retrieval"
+version = "1.0.1"
 dependencies = [
- "pi-core",
+ "pi-governance-core",
  "serde_json",
 ]
 
 [[package]]
-name = "pi-store"
-version = "1.0.0"
+name = "pi-governance-rs"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "chrono",
- "pi-core",
+ "clap",
+ "pi-governance-core",
+ "pi-governance-engine",
+ "pi-governance-mcp",
+ "pi-governance-retrieval",
+ "pi-governance-store",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "pi-governance-store"
+version = "1.0.1"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "pi-governance-core",
  "serde",
  "serde_json",
 ]

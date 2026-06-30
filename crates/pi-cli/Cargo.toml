@@ -1,5 +1,5 @@
 [package]
-name = "pi-cli"
+name = "pi-governance-rs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -19,8 +19,8 @@ clap.workspace = true
 chrono.workspace = true
 serde_json.workspace = true
 serde.workspace = true
-pi-core.workspace = true
-pi-store.workspace = true
-pi-retrieval.workspace = true
-pi-governance.workspace = true
-pi-mcp.workspace = true
+pi-governance-core.workspace = true
+pi-governance-store.workspace = true
+pi-governance-retrieval.workspace = true
+pi-governance-engine.workspace = true
+pi-governance-mcp.workspace = true

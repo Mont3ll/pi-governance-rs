@@ -1,12 +1,12 @@
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Utc};
-use pi_core::{
+use pi_governance_core::{
     validate_patch, validate_record, ContestResolution, ContextBundle, DecisionStatus, EvidenceRef,
     GovernanceDecision, Patch, PatchOperation, PatchStatus, Record, RecordClass, RecordStatus,
     EvidenceKind, MemoryLayer, MemoryKind, RuleType, TrustClass, Durability, SourceKind, default_namespace, PiConfig, PolicyProfile, RetrievalBudget, RetrievalOptions, SchemaFileAudit, Scope, StoreEvent, CURRENT_SCHEMA_VERSION,
 };
-use pi_retrieval::{retrieve, retrieve_with_options};
-use pi_store::{
+use pi_governance_retrieval::{retrieve, retrieve_with_options};
+use pi_governance_store::{
     JsonlStore, SchemaMigrationOptions, SchemaMigrationReport, StoreExportBundle,
     StoreExportOptions, StoreImportOptions, StoreImportReport,
 };
@@ -791,7 +791,7 @@ impl GovernanceEngine {
     }
 
     fn ensure_record_in_namespace_locked(
-        session: &pi_store::JsonlStoreWriteSession<'_>,
+        session: &pi_governance_store::JsonlStoreWriteSession<'_>,
         record_id: &str,
         namespace: &str,
     ) -> Result<()> {
@@ -803,7 +803,7 @@ impl GovernanceEngine {
     }
 
     fn apply_patch_object_locked(
-        session: &pi_store::JsonlStoreWriteSession<'_>,
+        session: &pi_governance_store::JsonlStoreWriteSession<'_>,
         patch: &Patch,
         force: bool,
     ) -> Result<()> {

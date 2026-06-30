@@ -1,5 +1,5 @@
-use pi_core::CURRENT_SCHEMA_VERSION;
-use pi_store::{JsonlStore, SchemaMigrationOptions};
+use pi_governance_core::CURRENT_SCHEMA_VERSION;
+use pi_governance_store::{JsonlStore, SchemaMigrationOptions};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -69,8 +69,8 @@ fn migrates_legacy_jsonl_schema_versions_with_backup() -> anyhow::Result<()> {
 
 #[test]
 fn exports_and_imports_portable_bundle_without_overwriting_duplicates() -> anyhow::Result<()> {
-    use pi_core::{EvidenceKind, EvidenceRef, Record, RecordClass, Scope};
-    use pi_store::{StoreExportOptions, StoreImportOptions};
+    use pi_governance_core::{EvidenceKind, EvidenceRef, Record, RecordClass, Scope};
+    use pi_governance_store::{StoreExportOptions, StoreImportOptions};
 
     let source_root = temp_store_dir("export-source");
     let target_root = temp_store_dir("export-target");

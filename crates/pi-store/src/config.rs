@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use pi_core::PiConfig;
+use pi_governance_core::PiConfig;
 use std::fs;
 
 use crate::jsonl::JsonlStore;

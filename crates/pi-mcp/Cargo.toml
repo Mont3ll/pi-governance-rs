@@ -1,5 +1,5 @@
 [package]
-name = "pi-mcp"
+name = "pi-governance-mcp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,9 +12,9 @@ categories.workspace = true
 [dependencies]
 anyhow.workspace = true
 serde_json.workspace = true
-pi-core.workspace = true
-pi-governance.workspace = true
-pi-retrieval.workspace = true
+pi-governance-core.workspace = true
+pi-governance-engine.workspace = true
+pi-governance-retrieval.workspace = true
 
 [dev-dependencies]
-pi-store.workspace = true
+pi-governance-store.workspace = true

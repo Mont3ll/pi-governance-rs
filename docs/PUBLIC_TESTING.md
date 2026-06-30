@@ -18,14 +18,14 @@ PI is ready for controlled testing by coding-agent users, MCP users, developer-t
 ```bash
 git clone <repo-url>
 cd pi-governance-rs
-cargo build -p pi-cli
+cargo build -p pi-governance-rs
 ./target/debug/pi --version
 ```
 
 ## 10-Minute Test
 
 ```bash
-cargo build -p pi-cli
+cargo build -p pi-governance-rs
 ./target/debug/pi demo --store /tmp/pi-public-test-demo --reset
 ./target/debug/pi --store /tmp/pi-public-test-demo review
 ./target/debug/pi --store /tmp/pi-public-test-demo retrieve "release workflow" --explain

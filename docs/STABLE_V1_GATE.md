@@ -34,7 +34,7 @@
 ```bash
 cargo check --workspace
 cargo test --workspace
-cargo build -p pi-cli
+cargo build -p pi-governance-rs
 ./target/debug/pi --version
 ./target/debug/pi smoke-test
 ./target/debug/pi release-audit

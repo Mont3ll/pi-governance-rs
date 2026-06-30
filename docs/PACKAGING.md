@@ -5,7 +5,7 @@ License: MIT OR Apache-2.0
 
 ## Cargo package layout
 
-This repository is a Cargo workspace. The binary crate is `crates/pi-cli`, the package name is `pi-cli`, and the installed binary name is `pi`.
+This repository is a Cargo workspace. The binary crate is `crates/pi-cli`, the package name is `pi-governance-rs`, and the installed binary name is `pi`.
 
 Workspace crates:
 
@@ -18,7 +18,7 @@ Workspace crates:
 
 ## Binary crate
 
-`crates/pi-cli` produces the public `pi` binary. It depends on the internal workspace crates above.
+`crates/pi-cli` remains the binary crate directory and produces the public `pi` binary. It depends on the internal workspace crates above.
 
 ## cargo install
 
@@ -32,7 +32,7 @@ pi --version
 ## cargo install --git
 
 ```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.0 pi-cli
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.1 pi-governance-rs
 pi --version
 ```
 
@@ -41,10 +41,10 @@ pi --version
 Once crates.io publishing is explicitly approved, the intended public command is:
 
 ```bash
-cargo install pi-cli
+cargo install pi-governance-rs
 ```
 
-Because `pi-cli` depends on workspace crates, crates.io publishing must publish the supporting crates first. Current intended order:
+Because `pi-governance-rs` depends on workspace crates, crates.io publishing must publish the supporting crates first. Current intended order:
 
 1. `pi-core`
 2. `pi-store`
@@ -73,7 +73,7 @@ GitHub releases may include source archives, a relative patch, checksums, and op
 
 ## Archive verification
 
-Verify source archives with a fresh extraction, `cargo check --workspace`, `cargo test --workspace`, `cargo build -p pi-cli`, `pi smoke-test`, and `pi release-audit`.
+Verify source archives with a fresh extraction, `cargo check --workspace`, `cargo test --workspace`, `cargo build -p pi-governance-rs`, `pi smoke-test`, and `pi release-audit`.
 
 ## Included and excluded files
 

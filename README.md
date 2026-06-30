@@ -2,7 +2,7 @@
 
 Local-first governed memory for AI agents.
 
-- **Current:** `v1.0.0`
+- **Current:** `v1.0.1`
 - **Status:** stable public release
 - **Runtime:** Rust CLI + MCP stdio server
 - **Purpose:** standalone portable PI memory governance for any MCP-capable agent
@@ -44,21 +44,21 @@ Users who use multiple agents can use `pi-governance-rs` as the global governed 
 ```bash
 git clone https://github.com/Mont3ll/pi-governance-rs
 cd pi-governance-rs
-cargo build -p pi-cli
+cargo build -p pi-governance-rs
 ./target/debug/pi --version
 ```
 
 ### From Git
 
 ```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.0 pi-cli
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.1 pi-governance-rs
 pi --version
 ```
 
 ### From crates.io
 
 ```bash
-cargo install pi-cli
+cargo install pi-governance-rs
 pi --version
 ```
 
@@ -82,7 +82,7 @@ Note: crates.io publishing may still be pending until explicitly published.
 Expected version:
 
 ```text
-pi 1.0.0
+pi 1.0.1
 ```
 
 ## CLI Usage
@@ -226,8 +226,11 @@ PI Governance does not add a hosted service, database, vector store, graph backe
 
 ## Release Strategy
 
-`v1.0.0` is the stable public release. Future changes should preserve the public CLI and MCP tool surfaces or provide compatibility aliases.
+`v1.0.1` is the stable public packaging release. Future changes should preserve the public CLI and MCP tool surfaces or provide compatibility aliases.
 
 ## License
 
 Licensed under either of Apache License, Version 2.0 or MIT License at your option. See [LICENSE](LICENSE), [LICENSE-APACHE](LICENSE-APACHE), and [LICENSE-MIT](LICENSE-MIT).
+
+
+Note: v1.0.0 was the first stable GitHub/source release. v1.0.1 updates crates.io package identity before registry publication. No runtime governance behavior changes.

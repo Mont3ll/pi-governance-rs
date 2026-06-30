@@ -42,14 +42,14 @@ OpenCode install/doctor validation passed. A previous live client run was incomp
 ## Install examples
 
 ```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.0 pi-cli
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.1 pi-governance-rs
 pi --version
 ```
 
 After crates.io publishing is explicitly approved:
 
 ```bash
-cargo install pi-cli
+cargo install pi-governance-rs
 ```
 
 ## MCP setup examples

@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Utc};
-use pi_core::{Patch, Record, StoreEvent, CURRENT_SCHEMA_VERSION};
+use pi_governance_core::{Patch, Record, StoreEvent, CURRENT_SCHEMA_VERSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;

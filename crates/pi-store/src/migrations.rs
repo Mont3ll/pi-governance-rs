@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use pi_core::CURRENT_SCHEMA_VERSION;
+use pi_governance_core::CURRENT_SCHEMA_VERSION;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs::{self, File};

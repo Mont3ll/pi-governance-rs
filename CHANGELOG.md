@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.0.1
+
+Packaging-only release preparing crates.io distribution.
+
+Changed:
+- Renamed public Cargo package identity from pi-cli to pi-governance-rs.
+- Namespaced internal crates under pi-governance-*.
+- Kept installed binary name as pi.
+- Updated installation and publishing docs.
+
+No runtime governance behavior changed.
+No MCP tools changed.
+No CLI commands changed.
+
 - v1.0.0 — stable portable PI memory governance release
   - Adds public repository, dual-license, packaging, install, MCP sharing, GitHub release planning, and MCP Registry preparation documentation.
   - Promotes v1.0.0-rc.9 to stable.

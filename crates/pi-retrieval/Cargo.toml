@@ -1,5 +1,5 @@
 [package]
-name = "pi-retrieval"
+name = "pi-governance-retrieval"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,7 +10,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-pi-core.workspace = true
+pi-governance-core.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

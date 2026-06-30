@@ -1,4 +1,4 @@
-use pi_core::{
+use pi_governance_core::{
     validate_patch, validate_record, ContestResolution, DecisionStatus, EvidenceKind, EvidenceRef, Patch, Record, RecordClass, Scope,
 };
 
