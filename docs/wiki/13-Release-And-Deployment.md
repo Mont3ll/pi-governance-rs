@@ -2,7 +2,7 @@
 
 ## Release Philosophy
 
-`v1.0.0-rc.9` is the current validated stable-release candidate. Stable should be release-only if no blockers appear. No new features should land between rc.8 and stable unless required to fix a blocker.
+`v1.0.0` is the current validated stable public release. Stable is release-only from rc.9 with no runtime feature expansion. No runtime feature expansion was added during the stable release pass.
 
 ## Versioning Strategy
 
@@ -10,11 +10,11 @@ Release candidates use `1.0.0-rc.N`; stable uses `1.0.0` only after gates pass.
 
 ## Release Candidate Flow
 
-rc.8 remains the current validated release candidate. Validate locally, validate MCP clients, verify docs, then perform a stable-only version and wording pass if no blockers appear.
+v1.0.0 is the stable public release promoted from rc.9 after local validation, direct MCP validation, PI agent live validation, Codex CLI live validation, and a documented OpenCode client-run limitation.
 
 ## Stable v1.0.0 Gate
 
-Required gates: `cargo check --workspace` pass, `cargo test --workspace` pass, `cargo build -p pi-cli` pass, `pi --version` shows `1.0.0`, smoke-test pass, release-audit pass, fresh clone verification pass, archive content verification pass, OpenCode interoperability pass, Codex CLI interoperability pass, PI agent interoperability pass, MCP setup/install/doctor pass, hidden/bidi scan no matches, secret scan no real secrets, local path scan no public path leakage, README stable wording correct, CHANGELOG stable entry correct, docs stable wording correct, schemas validate, and product guide updated.
+Required gates: `cargo check --workspace` pass, `cargo test --workspace` pass, `cargo build -p pi-cli` pass, `pi --version` shows `1.0.0`, smoke-test pass, release-audit pass, fresh clone verification pass, archive content verification pass, OpenCode install/doctor pass with live rc.9 environmental/client-run limitation documented, Codex CLI interoperability pass, PI agent interoperability pass, MCP setup/install/doctor pass, hidden/bidi scan no matches, secret scan no real secrets, local path scan no public path leakage, README stable wording correct, CHANGELOG stable entry correct, docs stable wording correct, schemas validate, and product guide updated.
 
 ## Deployment Targets
 
@@ -38,7 +38,7 @@ Create the GitHub release only after all gates pass. Attach optional verified as
 
 ## MCP Client Compatibility Strategy
 
-Retest OpenCode, Codex CLI, and PI agent after version bump and before publishing. Confirm client-prefixed tools, namespace propagation, and structuredContent.
+For future releases, retest OpenCode, Codex CLI, and PI agent after version bumps and before publishing. Confirm client-prefixed tools, namespace propagation, and structuredContent.
 
 ## Rollback Strategy
 
@@ -53,6 +53,6 @@ Watch issue reports for MCP client breakage, schema confusion, install failures,
 
 Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CHECKLIST.md), [Release strategy](../RELEASE_STRATEGY.md), [Stable v1 gate](../STABLE_V1_GATE.md).
 
-## rc.9 Portable Workflow Parity
+## Portable Workflow Parity
 
-`v1.0.0-rc.9` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.
+`v1.0.0` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.

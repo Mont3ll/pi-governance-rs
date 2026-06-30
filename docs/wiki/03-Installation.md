@@ -7,10 +7,10 @@ cargo build -p pi-cli
 ./target/debug/pi --version
 ```
 
-Expected for the current stable-release candidate:
+Expected for the current stable public release:
 
 ```text
-pi 1.0.0-rc.9
+pi 1.0.0
 ```
 
 ## Troubleshooting Build Failures

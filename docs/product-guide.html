@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PI Governance v1.0.0-rc.9 Product Guide</title>
+  <title>PI Governance v1.0.0 Product Guide</title>
   <style>
     :root { color-scheme: light dark; --accent:#5b6ee1; --muted:#667085; --card:#f6f7fb; }
     body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; line-height: 1.55; max-width: 1040px; margin: 0 auto; padding: 32px; }
@@ -20,7 +20,7 @@
   <header>
     <p class="muted">PI Governance Rust Port</p>
     <h1>Local-first governed memory for coding agents</h1>
-    <p>Current release candidate: <strong>v1.0.0-rc.9</strong>. Stable v1.0.0 has not shipped yet.</p>
+    <p>Current stable release: <strong>v1.0.0</strong>. Stable v1.0.0 has shipped.</p>
   </header>
 
   <section>
@@ -73,15 +73,15 @@
   <section>
     <h2>Ecosystem fit</h2>
     <p>For public testing, start with docs/PUBLIC_TESTING.md, docs/NON_GOALS.md, and docs/MCP_TROUBLESHOOTING.md. PI complements codebase intelligence MCP servers and skill libraries. Codebase-memory tools answer structural questions about code. Skill libraries package reusable workflows. PI stores governed decisions, corrections, workflows, and revisions across sessions.</p>
-    <p>The recommended split with <code>pi-persistent-intelligence</code> is: Rust PI as the canonical governance engine and source-of-truth runtime; TS PI as SDK, adapters, dashboard, web/product layer, and integration tooling.</p>
+    <p><code>pi-governance-rs</code> is the standalone Rust CLI/MCP runtime. <code>pi-persistent-intelligence</code> is the standalone lightweight pi-agent-native extension. Either can be used alone; together they interoperate through the shared PI memory contract and import/export bundles.</p>
   </section>
 
   <section>
     <h2>Path to stable v1.0.0</h2>
-    <p>The release-candidate line freezes public CLI command names and MCP tool names while allowing documentation and output-level compatibility fixes before stable v1.0.0. This guide reflects v1.0.0-rc.9 and does not claim the stable release has shipped.</p>
+    <p>The stable line preserves public CLI command names and MCP tool names. This guide reflects v1.0.0 as the stable public release.</p>
   </section>
 <section><h2>Release Documentation Links</h2><ul><li><a href="WIKI_INDEX.md">Wiki index</a></li><li><a href="DEPLOYMENT_CHECKLIST.md">Deployment checklist</a></li><li><a href="RELEASE_STRATEGY.md">Release strategy</a></li><li><a href="STABLE_V1_GATE.md">Stable v1 gate</a></li><li><a href="wiki/13-Release-And-Deployment.md">Release and deployment wiki</a></li><li><a href="wiki/14-QA-And-Test-Matrix.md">QA and test matrix</a></li></ul></section>
-<section><h2>rc.9 Portable Workflow Parity</h2><p>v1.0.0-rc.9 adds deterministic memory-worth scoring, capture candidates, inbox review, scoped context output, session search/decisions, recall X-ray, explicit L1/L2/L3 layers, and trust/durability/source verification gates. Capture creates candidates or L3 evidence only; durable L1/L2 records remain patch-governed and stable v1.0.0 has not shipped.</p></section>
+<section><h2>Portable Workflow Parity</h2><p>v1.0.0 includes deterministic memory-worth scoring, capture candidates, inbox review, scoped context output, session search/decisions, recall X-ray, explicit L1/L2/L3 layers, and trust/durability/source verification gates. Capture creates candidates or L3 evidence only; durable L1/L2 records remain patch-governed.</p></section>
 </body>
 </html>
-<!-- rc.8: adds MCP inspect_record, review actions, maintenance scan, deterministic/lexical/hybrid retrievers, redacted export metadata, and schema documentation. Stable v1.0.0 has not shipped yet. -->
+<!-- rc.8: adds MCP inspect_record, review actions, maintenance scan, deterministic/lexical/hybrid retrievers, redacted export metadata, and schema documentation. Stable v1.0.0 has shipped. -->

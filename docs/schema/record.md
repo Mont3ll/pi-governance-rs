@@ -1,10 +1,10 @@
 # Record Schema
 
-Records are governed durable memory claims stored in local JSONL. `v1.0.0-rc.9` adds portable workflow metadata while preserving backwards-compatible optional fields.
+Records are governed durable memory claims stored in local JSONL. `v1.0.0` includes portable workflow metadata while preserving backwards-compatible optional fields.
 
 Required core fields include `id`, `namespace`, `class`, `claim`, `status`, `scope`, `evidence`, `confidence`, timestamps, and revision metadata.
 
-## rc.9 Portable Workflow Fields
+## Portable Workflow Fields
 
 - `layer`: `l1_identity`, `l2_playbook`, or `l3_session`.
 - `memory_kind`: optional `fact`, `event`, `instruction`, or `task`.

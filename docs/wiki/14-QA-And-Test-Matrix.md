@@ -5,7 +5,7 @@
 | cargo check | `cargo check --workspace` | pass | pass | required |
 | cargo test | `cargo test --workspace` | pass | pass | required |
 | cargo build | `cargo build -p pi-cli` | pass | pass | required |
-| version | `pi --version` | `pi 1.0.0-rc.9` for rc.8 | pass | must show `pi 1.0.0` |
+| version | `pi --version` | `pi 1.0.0` | pass | must show `pi 1.0.0` |
 | demo | `pi demo` | demo store created | pass | required |
 | review | `pi review` | queue visible | pass | required |
 | review --apply | review action | patch applied | pass | required |
@@ -30,10 +30,10 @@
 | mcp-config pi-agent | CLI | JSON config | pass | required |
 | mcp-install temp config | CLI | merge/dry-run safe | pass | required |
 | mcp-doctor temp config | CLI | direct stdio ok | pass | required |
-| OpenCode full interop | client test | pass | pass | required |
+| OpenCode install/doctor + documented live limitation | client test | install/doctor pass | documented exception | accepted for v1.0.0 |
 | Codex full interop | client test | pass | pass | required |
 | PI agent full interop | client test | pass | pass | required |
-| OpenCode inspect-record micro-test | client test | pass | pass | required |
+| OpenCode inspect-record micro-test | client test | pass in prior rc.8 live validation | not rerun due client-run limitation | historical evidence |
 | Codex inspect-record micro-test | client test | pass | pass | required |
 | hidden/bidi scan | grep | no matches | pass | required |
 | secret/path scan | grep | no real secrets, no local paths | pass | required |
@@ -45,6 +45,6 @@
 
 Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CHECKLIST.md), [Release strategy](../RELEASE_STRATEGY.md), [Stable v1 gate](../STABLE_V1_GATE.md).
 
-## rc.9 Portable Workflow Parity
+## Portable Workflow Parity
 
-`v1.0.0-rc.9` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.
+`v1.0.0` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.

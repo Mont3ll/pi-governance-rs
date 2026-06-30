@@ -1,12 +1,12 @@
-# PI Governance rc.9 Agent Interoperability Prompt
+# PI Governance v1.0.0 Agent Interoperability Prompt
 
-You are testing PI Governance `v1.0.0-rc.9` portable memory workflow parity through an MCP client. Do not edit repository files. Do not apply proposed memory unless explicitly instructed. Use namespace `interop-test`.
+You are testing PI Governance `v1.0.0` stable portable memory workflow parity through an MCP client. Do not edit repository files. Do not apply proposed memory unless explicitly instructed. Use namespace `interop-test`.
 
 Report:
 
 - CLIENT_NAME
 - tool naming style observed
-- new rc.9 tools visible: `score_memory_worth`, `capture_candidates`, `build_context`, `session_add`, `session_search`, `session_decisions`, `recall_xray`
+- portable workflow tools visible: `score_memory_worth`, `capture_candidates`, `build_context`, `session_add`, `session_search`, `session_decisions`, `recall_xray`
 - capture candidate created
 - candidate left pending
 - context output produced
@@ -28,6 +28,6 @@ Test these tools/capabilities:
 6. `session_search`: search `namespace interop-test`.
 7. `session_decisions`: confirm the decision marker is visible.
 8. `recall_xray`: explain recall for `release tagging`.
-9. Existing rc.8 tools: `retrieve_context`, `propose_record`, `inspect_patch`, `inspect_record`, `maintenance_scan`, `doctor`, and `smoke_test`.
+9. Existing governance tools: `retrieve_context`, `propose_record`, `inspect_patch`, `inspect_record`, `maintenance_scan`, `doctor`, and `smoke_test`.
 
 Expected safety behavior: capture creates candidates or L3/session evidence only. L1/L2 durable memory remains patch-governed.

@@ -1,6 +1,6 @@
 ---
 name: rust-release-check
-description: Validate a Rust PI release candidate before tagging.
+description: Validate a Rust PI release before tagging.
 class: workflow
 domain: software-engineering
 project: pi-governance-rs
@@ -18,7 +18,7 @@ policy: standard
 
 ## When to Use
 
-Use this before tagging a PI Rust release candidate.
+Use this before tagging a PI Rust release.
 
 ## Prerequisites
 
@@ -58,7 +58,7 @@ Store this as governed workflow memory using:
 
 ```bash
 pi propose --class workflow \
-  --claim "Before tagging a Rust PI release candidate, run cargo check, cargo test, build, version, smoke-test, and release-audit." \
+  --claim "Before tagging a Rust PI release, run cargo check, cargo test, build, version, smoke-test, and release-audit." \
   --project pi-governance-rs \
   --tag release \
   --evidence-uri examples:rust-release-check \

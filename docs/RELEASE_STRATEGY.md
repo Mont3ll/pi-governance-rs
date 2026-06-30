@@ -2,20 +2,20 @@
 
 ## Release Principles
 
-PI Governance releases should be conservative, auditable, and easy to verify from source. `v1.0.0-rc.9` is the stable-release candidate; stable `v1.0.0` has not shipped yet.
+PI Governance releases should be conservative, auditable, and easy to verify from source. `v1.0.0` is the stable public release.
 
-## Why rc.8 Is the Stable-release Candidate
+## Historical rc.8 Baseline
 
-rc.8 has validated CLI checks, MCP interoperability, review actions, maintenance scan, local retrieval modes, redacted export metadata, and schema documentation. It is the baseline for a release-only stable pass unless blockers appear.
+rc.8 validated CLI checks, MCP interoperability, review actions, maintenance scan, local retrieval modes, redacted export metadata, and schema documentation. rc.9 added portable workflow parity and is promoted by v1.0.0.
 
 ## Feature Freeze Strategy
 
-The stable release should be a release-only pass from rc.8 unless a blocker appears. Do not add product features, redesign governance semantics, or alter runtime behavior during release preparation.
+The stable release is a release-only pass from rc.9. Do not add product features, redesign governance semantics, or alter runtime behavior during release preparation.
 
 ## Stable Release Process
 
 1. Re-run full workspace, CLI, MCP, interop, docs, security, fresh clone, and archive checks.
-2. If no blockers appear, bump `1.0.0-rc.9` to `1.0.0`.
+2. Stable v1.0.0 bumps the package/runtime version to `1.0.0` without runtime feature expansion.
 3. Update README, CHANGELOG, wiki docs, release docs, and product guide stable wording.
 4. Re-run all checks after the bump.
 5. Tag `v1.0.0` only after all gates pass.
@@ -39,7 +39,7 @@ Change only version identifiers and stable wording required for the release unle
 
 ## Changelog Strategy
 
-`CHANGELOG.md` should clearly distinguish rc.8 status from stable release status and include a stable entry only when stable is being prepared.
+`CHANGELOG.md` keeps historical rc entries and includes a top stable v1.0.0 entry.
 
 ## Documentation Strategy
 
@@ -47,7 +47,7 @@ Docs should stay honest about scope: no embeddings, no vector backend, no hosted
 
 ## MCP Compatibility Strategy
 
-Before stable, verify direct MCP `tools/list`, `mcp-config`, `mcp-install`, `mcp-doctor`, namespace propagation, client-prefixed tool names, and structuredContent compatibility in OpenCode, Codex CLI, and PI agent.
+For stable v1.0.0, direct MCP, `mcp-config`, `mcp-install`, `mcp-doctor`, namespace propagation, client-prefixed tool names, and structuredContent compatibility were validated for PI agent and Codex CLI; OpenCode install/doctor passed, with the live client run documented as an environmental/client-run limitation.
 
 ## Rollback Strategy
 
@@ -57,6 +57,6 @@ Keep previous tags and do not delete tags. If stable has an issue, document the 
 
 Patch releases should be small, targeted, documented, and independently verified through the same core checks that guard stable.
 
-## rc.9 Portable Workflow Parity
+## Portable Workflow Parity
 
-`v1.0.0-rc.9` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.
+`v1.0.0` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.

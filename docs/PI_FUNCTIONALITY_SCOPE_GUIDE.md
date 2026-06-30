@@ -1,6 +1,6 @@
 # PI Functionality Scope Guide
 
-Current release candidate: v1.0.0-rc.9. Stable v1.0.0 has not shipped yet.
+Current stable release: v1.0.0. Stable v1.0.0 has shipped.
 
 ## Release-quality improvements now included in rc.8
 
@@ -40,6 +40,6 @@ Current release candidate: v1.0.0-rc.9. Stable v1.0.0 has not shipped yet.
 - [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
 - [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)
 
-## rc.9 Portable Workflow Parity
+## Portable Workflow Parity
 
-`v1.0.0-rc.9` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.
+`v1.0.0` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.

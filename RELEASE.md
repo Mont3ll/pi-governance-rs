@@ -1,12 +1,12 @@
 # Release Notes
 
-Stable `v1.0.0` has not shipped yet.
+`v1.0.0` is the stable public release.
 
-## v1.0.0-rc.9 portable PI memory workflow parity
+## v1.0.0 portable PI memory workflow parity
 
-`v1.0.0-rc.9` is the current stable-release candidate. It adds the missing portable workflow layer from the original PI memory workflow while keeping durable L1/L2 memory patch-governed.
+`v1.0.0` is the current stable public release. It adds the missing portable workflow layer from the original PI memory workflow while keeping durable L1/L2 memory patch-governed.
 
-Added in rc.9:
+Included in v1.0.0:
 
 - explicit L1/L2/L3 memory layers
 - optional `memory_kind` and `rule_type`

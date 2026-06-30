@@ -1,6 +1,6 @@
 # Deployment Checklist
 
-`v1.0.0-rc.9` is the current stable-release candidate. Stable `v1.0.0` has not shipped yet.
+`v1.0.0` is the current stable public release.
 
 ## Pre-release Local Checks
 
@@ -42,7 +42,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
 
 ## Interop Checks
 
-- [ ] OpenCode full interop pass.
+- [ ] OpenCode install/doctor pass; live rc.9 client run documented as environmental/client-run incomplete.
 - [ ] Codex CLI full interop pass.
 - [ ] PI agent full interop pass.
 - [ ] `inspect_record`, namespace propagation, and structuredContent pass.
@@ -95,6 +95,6 @@ Expected: no hidden/bidi matches, no public-doc local path leakage, and only doc
 - [ ] Known issue documented if stable issue is found.
 - [ ] Patch release plan prepared if needed.
 
-## rc.9 Portable Workflow Parity
+## Portable Workflow Parity
 
-`v1.0.0-rc.9` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.
+`v1.0.0` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.

@@ -34,7 +34,7 @@
 
 Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CHECKLIST.md), [Release strategy](../RELEASE_STRATEGY.md), [Stable v1 gate](../STABLE_V1_GATE.md).
 
-## Moved Into rc.9
+## Moved Into v1.0.0
 
 - automatic correction capture as deterministic candidate capture
 - manual memory_write equivalent through `pi capture`
@@ -49,7 +49,7 @@ Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CH
 - explicit L1/L2/L3 layers
 - minimal reinforcement event compatibility
 
-## Still Deferred After rc.9
+## Still Deferred After v1.0.0
 
 - deep reinforcement maintenance weighting
 - LLM consolidation

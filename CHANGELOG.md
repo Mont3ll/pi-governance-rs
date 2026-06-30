@@ -1,5 +1,12 @@
 # Changelog
 
+- v1.0.0 — stable portable PI memory governance release
+  - Promotes v1.0.0-rc.9 to stable.
+  - Provides standalone CLI/MCP PI memory governance for MCP-capable agents.
+  - Includes capture, memory-worth scoring, inbox, L1/L2/L3 layers, trust/durability/source metadata, verification gates, context builder, session search/decisions, recall-xray, maintenance scan, import/export, and redacted export metadata.
+  - Validated against PI agent and Codex CLI live MCP clients; OpenCode install/doctor passed, while the rc.9 live client run was incomplete due environmental/client-run limitation and did not demonstrate a PI Governance MCP failure.
+  - Documents compatibility with pi-persistent-intelligence through the shared PI memory contract.
+  - Adds no hosted service, database, vector store, graph backend, dashboard, or cloud sync.
 - v1.0.0-rc.9 — portable PI memory workflow parity
   - Adds explicit L1/L2/L3 memory layers, memory kind, rule type, trust class, durability, and source kind metadata.
   - Adds deterministic `memory-worth` scoring.

@@ -137,7 +137,7 @@ Expected MCP tools include:
 
 ## Known Limitation: pi.inspect_record MCP Tool Deferred
 
-`pi inspect-record` exists as a CLI command in rc.5+, but the `pi.inspect_record` MCP tool remains deferred unless added separately in a future release candidate. `mcp-doctor` reports whether it is present or unavailable.
+`pi inspect-record` exists as a CLI command and `pi.inspect_record` is available as an MCP tool in v1.0.0. `mcp-doctor` reports whether the configured client can see it.
 
 ## rc.8 MCP Notes
 
