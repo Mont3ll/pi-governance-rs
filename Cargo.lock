@@ -355,7 +355,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "pi-governance-core"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "chrono",
  "serde",
@@ -364,7 +364,7 @@ dependencies = [
 
 [[package]]
 name = "pi-governance-engine"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -377,7 +377,7 @@ dependencies = [
 
 [[package]]
 name = "pi-governance-mcp"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "pi-governance-core",
@@ -389,7 +389,7 @@ dependencies = [
 
 [[package]]
 name = "pi-governance-retrieval"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "pi-governance-core",
  "serde_json",
@@ -397,7 +397,7 @@ dependencies = [
 
 [[package]]
 name = "pi-governance-rs"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -413,7 +413,7 @@ dependencies = [
 
 [[package]]
 name = "pi-governance-store"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "chrono",

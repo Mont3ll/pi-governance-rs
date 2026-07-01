@@ -42,7 +42,7 @@ OpenCode install/doctor validation passed. A previous live client run was incomp
 ## Install examples
 
 ```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.1 pi-governance-rs
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.2 pi-governance-rs
 pi --version
 ```
 

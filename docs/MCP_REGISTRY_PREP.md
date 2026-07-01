@@ -48,3 +48,6 @@ repository: https://github.com/Mont3ll/pi-governance-rs
 ## Security notes
 
 The server is local stdio. The MCP client launches the `pi` binary as a subprocess. It does not expose a hosted HTTP endpoint by default. Stores remain local unless the user exports, imports, copies, or syncs them.
+
+
+Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.2 completes crates.io publishing and is the public crates.io install target.
