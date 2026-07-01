@@ -12,9 +12,9 @@ Inspect generated config, ensure the client is reading the expected config, and 
 
 Confirm `--namespace`, store path, and MCP config namespace. Use `namespace list` and `namespace doctor`.
 
-## structuredContent Expected Record, Received Array
+## structured content Expected Record, Received Array
 
-Use rc.8 or later docs/tests; structuredContent compatibility was specifically validated in rc.8.
+Use an earlier release candidate or later docs/tests; structured content compatibility was specifically validated in an earlier release candidate.
 
 ## Wrong Binary, Store, or Config Path
 

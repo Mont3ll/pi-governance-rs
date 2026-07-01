@@ -93,7 +93,7 @@ PI uses local plaintext JSONL by default, does not prove memories are true, does
 
 Use the GitHub issue templates for bugs, usability feedback, MCP setup issues, memory governance feedback, or docs feedback. Redact secrets and sensitive store contents.
 
-## rc.8 Release-Quality Checks
+## an earlier release candidate Release-Quality Checks
 
 Test `pi.inspect_record` through MCP when available, `pi maintenance scan`, review queue actions (`review --apply`, `review --reject`, `review --defer`), and retrieval modes (`deterministic`, `lexical`, `hybrid`). Redacted export is best-effort; review bundles before sharing.
 

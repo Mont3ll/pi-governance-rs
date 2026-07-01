@@ -30,9 +30,9 @@ Use codebase intelligence tools to understand repository structure. Use skill li
 
 These are intentionally out of scope for the v1.0.0 release-candidate line.
 
-## rc.8 Deferred Feature Classification
+## an earlier release candidate Deferred Feature Classification
 
-Release-quality improvements now included in rc.8: MCP record inspection, review queue actions, minimal maintenance scan, local lexical/hybrid retrieval hardening, redacted export hardening, and schema documentation.
+Release-quality improvements now included in an earlier release candidate: MCP record inspection, review queue actions, minimal maintenance scan, local lexical/hybrid retrieval hardening, redacted export hardening, and schema documentation.
 
 Post-stable quality improvements: `pi capture --stdin`, FTS/BM25 persistent index if still needed, memory capsules, relationship edges, maintenance auto-suggestions as governed patches, and expanded machine-readable schemas.
 

@@ -2,238 +2,121 @@
 
 Local-first governed memory for AI agents.
 
-- **Current:** `v1.0.3`
-- **Status:** stable public release
-- **Runtime:** Rust CLI + MCP stdio server
-- **Purpose:** standalone portable PI memory governance for any MCP-capable agent
-- **Store:** local JSONL source of truth
+PI Governance provides the `pi` CLI and a local stdio MCP server for capturing, reviewing, retrieving, and sharing durable memory across AI tools without sending your store to a hosted service.
 
-## What PI Governance Is
+## Why PI Governance
 
-PI Governance is a standalone CLI + MCP governed memory runtime. It gives local AI-agent memory a governance layer: every durable belief starts as a patch, carries evidence, can be inspected, and can be applied, rejected, deferred, contested, superseded, or tombstoned.
+AI agents are more useful when they can remember project rules, decisions, preferences, corrections, and workflow notes. PI Governance keeps that memory explicit and reviewable:
 
-It implements the shared PI memory contract with namespaces, projects, layers, memory kinds, rule types, trust classes, durability, source kinds, verification metadata, patch statuses, and record statuses.
+- local JSONL stores you control
+- patch-based writes before durable memory changes
+- confidence, evidence, scope, tags, and namespace metadata
+- retrieval designed for compact context injection
+- MCP tools for agent clients that support local stdio servers
 
-## Who It Is For
+## Install
 
-- users of Codex
-- users of Claude
-- users of OpenCode
-- users of Cursor
-- users of PI agent
-- users of multiple agentic coding harnesses
-- users who want global memory governance without pi-agent
-
-## Relationship to pi-persistent-intelligence
-
-Both projects implement or map to the shared PI memory contract.
-
-- `pi-governance-rs` is the standalone portable Rust CLI/MCP runtime.
-- `pi-persistent-intelligence` is the standalone lightweight pi-agent-native extension.
-- Either project can be used alone.
-- Both can interoperate through export/import and shared schemas.
-- `pi-persistent-intelligence` remains a supported standalone project and does not require Rust.
-- `pi-governance-rs` does not require `pi-persistent-intelligence`.
-
-Users who use multiple agents can use `pi-governance-rs` as the global governed memory runtime. Users who want pi-agent-native capture, curation, and recall UX can use `pi-persistent-intelligence`. Users may use both together through compatible PI memory bundles.
-
-## Installation
-
-### From source
-
-```bash
-git clone https://github.com/Mont3ll/pi-governance-rs
-cd pi-governance-rs
-cargo build -p pi-governance-rs
-./target/debug/pi --version
-```
-
-### From Git
-
-```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.3 pi-governance-rs
-pi --version
-```
-
-### From crates.io
+Install from crates.io:
 
 ```bash
 cargo install pi-governance-rs
 pi --version
 ```
 
-Note: crates.io publishing may still be pending until explicitly published.
+The installed binary is named `pi`.
+
+You can also build from source:
+
+```bash
+git clone https://github.com/Mont3ll/pi-governance-rs.git
+cd pi-governance-rs
+cargo build -p pi-governance-rs
+./target/debug/pi --version
+```
 
 ## Quick Start
 
-```bash
-./target/debug/pi --version
-./target/debug/pi demo --store /tmp/pi-demo-store --reset
-./target/debug/pi --store /tmp/pi-demo-store memory-worth "Always run release-audit before tagging."
-./target/debug/pi --store /tmp/pi-demo-store capture --text "do not skip release-audit before tagging"
-./target/debug/pi --store /tmp/pi-demo-store inbox
-./target/debug/pi --store /tmp/pi-demo-store context "stable release"
-./target/debug/pi --store /tmp/pi-demo-store recall-xray "stable release"
-./target/debug/pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
-./target/debug/pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default
-./target/debug/pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
-```
-
-Expected version:
-
-```text
-pi 1.0.3
-```
-
-## CLI Usage
+Create a demo store and inspect it:
 
 ```bash
-# Initialize, score, capture, and propose governed memory
-pi --store .pi init
-pi --store .pi memory-worth "Always run cargo test before tagging."
-pi --store .pi capture --text "don't skip release-audit before tagging" --project pi-governance-rs
-pi --store .pi inbox
-pi --store .pi propose --class workflow --claim "Release validation requires tests." --evidence-uri "release-checklist"
-
-# Review and apply/reject/defer patches
-pi --store .pi review
-pi --store .pi review <patch-id> --apply
-pi --store .pi review <patch-id> --reject --reason "not accurate"
-pi --store .pi review <patch-id> --defer --reason "needs more evidence"
-pi --store .pi apply <patch-id>
-
-# Inspect patches and records
-pi --store .pi list-patches
-pi --store .pi inspect-patch <patch-id>
-pi --store .pi list
-pi --store .pi inspect-record <record-id>
-
-# Retrieve and inject local context
-pi --store .pi retrieve "release workflow" --retriever hybrid --explain
-pi --store .pi context "prepare stable release" --project pi-governance-rs --format markdown
-pi --store .pi recall-xray "stable release" --project pi-governance-rs --json
-
-# Append/search L3 session evidence
-pi --store .pi session add --text "#decision keep JSONL as source of truth" --project pi-governance-rs
-pi --store .pi session search "JSONL" --project pi-governance-rs
-pi --store .pi session decisions --project pi-governance-rs
-
-# Maintenance, audit, and export/import
-pi --store .pi maintenance scan
+pi demo --store .pi --reset
 pi --store .pi doctor
-pi --store .pi export --redacted --output pi-export.redacted.json
-pi --store .pi import pi-export.redacted.json
+pi --store .pi review
+pi --store .pi retrieve "release workflow" --explain
 ```
 
-### Command Matrix
+Propose memory, review pending patches, and apply approved changes:
 
-The stable CLI includes `init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `review`, `inbox`, `capture`, `memory-worth`, `context`, `session`, `recall-xray`, `demo`, `agent-instructions`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `inspect-record`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `mcp-install`, `mcp-doctor`, `smoke-test`, `release-audit`, and `changelog`.
-
-See [docs/wiki/04-CLI-Guide.md](docs/wiki/04-CLI-Guide.md) for the full command guide.
+```bash
+pi --store .pi propose workflow "Run tests before publishing." --tag release --evidence conversation:today
+pi --store .pi review
+pi --store .pi review --apply <patch-id>
+```
 
 ## MCP Setup
 
-PI Governance owns the global MCP server because it exists to make governed PI memory available to Codex, Claude, OpenCode, Cursor, PI agent, and other MCP-capable harnesses.
-
-pi-governance-rs is a local-first MCP stdio server. The MCP client launches the pi binary as a subprocess. This keeps governed memory on the user's machine by default. No hosted MCP service is provided by default.
+PI Governance can run as a local stdio MCP server:
 
 ```bash
-pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
-pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default
-pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --yes
-pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
+pi mcp-config codex --command "$(which pi)" --store /path/to/.pi --namespace default
+pi mcp-doctor codex --command "$(which pi)" --store /path/to/.pi --namespace default
 ```
 
-Restart the MCP client after installation. Clients may expose prefixed tool names such as `pi.retrieve_context`, `pi-governance_pi_retrieve_context`, `pi_governance_pi.retrieve_context`, or `mcp__pi_governance__.pi_retrieve_context`.
+Use the printed config with your MCP-capable client. The server command is the local `pi` binary with `mcp-stdio` arguments.
 
-## Shared PI Memory Contract
+## Core Workflow
 
-PI Governance implements the shared PI memory contract:
+1. Capture or propose a memory candidate.
+2. Review the patch before it changes durable memory.
+3. Apply, reject, or defer the patch.
+4. Retrieve scoped context for the current agent task.
+5. Export, import, or inspect the store when needed.
 
-| Field | Meaning |
-| --- | --- |
-| `namespace` | isolation boundary for clients, projects, or workflows |
-| `project` | optional project scope |
-| `layer` | `l1_identity`, `l2_playbook`, or `l3_session` |
-| `memory_kind` | `fact`, `event`, `instruction`, or `task` |
-| `rule_type` | workflow/preference/correction/architecture-style classification |
-| `trust_class` | source trust boundary |
-| `durability` | expected lifetime/scope of the memory |
-| `source_kind` | capture/import/source origin |
-| `verification` | deterministic checks and review requirements |
-| patch statuses | `proposed`, `applied`, `rejected`, `deferred` |
-| record statuses | `active`, `contested`, `superseded`, `tombstoned`, `deleted` |
+Common commands include `init`, `doctor`, `migrate`, `config`, `policy`, `namespace`, `propose`, `review`, `inbox`, `capture`, `memory-worth`, `context`, `session`, `recall-xray`, `demo`, `agent-instructions`, `apply`, `reinforce`, `supersede`, `tombstone`, `contest`, `resolve-contest`, `retrieve`, `export`, `import`, `list`, `inspect-record`, `list-patches`, `inspect-patch`, `mcp-stdio`, `mcp-config`, `mcp-install`, `mcp-doctor`, `smoke-test`, `release-audit`, and `changelog`.
 
-Durable L1/L2 memory remains patch-governed. Capture creates candidates or L3/session evidence only. L1 is never auto-applied.
+## Works with MCP Clients
 
-## Public Functionality
+PI Governance runs as a local stdio MCP server. Any MCP-capable client that can launch a local command can connect to the `pi` binary.
 
-- capture
-- memory-worth scoring
-- inbox workflow
-- L1/L2/L3 governed memory layers
-- trust/durability/source metadata
-- verification gates
-- context builder
-- session add/search/decisions
-- recall-xray
-- review queue actions
-- maintenance scan
-- local deterministic, lexical, and hybrid retrieval
-- import/export
-- redacted export
-- MCP tools
-- smoke-test and release-audit
+Common setups include:
 
-## Interoperability Status
+- Codex CLI
+- OpenCode
+- PI agent
+- Claude Desktop or other MCP clients that support local stdio servers
 
-| Client | v1.0.0 status |
-| --- | --- |
-| PI agent | pass |
-| Codex CLI | pass |
-| OpenCode | install/doctor passed; live rc.9 client run incomplete due environmental/client-run limitation |
+Use `pi mcp-config` to print a client configuration and `pi mcp-doctor` to check the setup.
 
-The OpenCode limitation did not demonstrate a PI Governance MCP failure. rc.8 previously passed OpenCode live interoperability. Current validation found no structuredContent regression, namespace regression, MCP schema regression, or direct MCP validation failure.
+```bash
+pi mcp-config codex --command "$(which pi)" --store /path/to/.pi --namespace default
+pi mcp-doctor codex --command "$(which pi)" --store /path/to/.pi --namespace default
+```
 
-Tested capabilities include `score_memory_worth`, `capture_candidates`, `build_context`, `session_add`, `session_search`, `session_decisions`, `recall_xray`, `retrieve_context`, `propose_record`, `list_patches`, `inspect_patch`, `inspect_record`, `list_records`, `maintenance_scan`, `doctor`, `smoke_test`, namespace propagation, and structuredContent compatibility.
+## Relationship to pi-persistent-intelligence
+
+`pi-governance-rs` and `pi-persistent-intelligence` are standalone implementations of the shared PI memory model.
+
+Use `pi-governance-rs` when you want governed memory through CLI or MCP across multiple agents.
+
+Use `pi-persistent-intelligence` when you want the lightweight native memory extension inside PI agent.
+
+They can interoperate through the shared memory contract and compatible import/export formats.
+
+## Security and Privacy
+
+PI Governance is local-first by default. Stores live on disk at the path you choose, and MCP clients connect by launching your local `pi` command.
+
+The governance model is designed to reduce memory poisoning risk by making durable writes explicit, reviewable, and evidence-backed. Review imported stores and pending patches before applying them.
 
 ## Documentation
 
-Start with [docs/WIKI_INDEX.md](docs/WIKI_INDEX.md). Key pages:
-
-- [Install and packaging guide](docs/INSTALL.md)
-- [Packaging](docs/PACKAGING.md)
-- [MCP Server Sharing](docs/MCP_SERVER_SHARING.md)
-- [MCP Registry Prep](docs/MCP_REGISTRY_PREP.md)
-- [GitHub Release Plan](docs/GITHUB_RELEASE_PLAN.md)
-- [Publishing Checklist](docs/PUBLISHING_CHECKLIST.md)
-- [Installation](docs/wiki/03-Installation.md)
-- [CLI Guide](docs/wiki/04-CLI-Guide.md)
-- [MCP Setup](docs/wiki/05-MCP-Setup.md)
-- [Agent Interoperability](docs/wiki/06-Agent-Interoperability.md)
-- [Export, Import, and Redaction](docs/wiki/10-Export-Import-And-Redaction.md)
-- [Schema Reference](docs/wiki/11-Schema-Reference.md)
-- [Release and Deployment](docs/wiki/13-Release-And-Deployment.md)
-- [QA and Test Matrix](docs/wiki/14-QA-And-Test-Matrix.md)
-- [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md)
-- [Release Strategy](docs/RELEASE_STRATEGY.md)
-- [Stable v1 Gate](docs/STABLE_V1_GATE.md)
-- [pi-persistent-intelligence Compatibility](docs/PI_PERSISTENT_INTELLIGENCE_COMPATIBILITY.md)
-
-## Non-goals
-
-PI Governance does not add a hosted service, database, vector store, graph backend, dashboard, connector, cloud sync, or hosted MCP endpoint.
-
-## Release Strategy
-
-`v1.0.3` is the stable public packaging release. Future changes should preserve the public CLI and MCP tool surfaces or provide compatibility aliases.
+- [Installation](docs/INSTALL.md)
+- [MCP server sharing](docs/MCP_SERVER_SHARING.md)
+- [pi-persistent-intelligence compatibility](docs/PI_PERSISTENT_INTELLIGENCE_COMPATIBILITY.md)
+- [Wiki index](docs/WIKI_INDEX.md)
+- [Security policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 
-Licensed under either of Apache License, Version 2.0 or MIT License at your option. See [LICENSE](LICENSE), [LICENSE-APACHE](LICENSE-APACHE), and [LICENSE-MIT](LICENSE-MIT).
-
-
-Note: v1.0.0 was the first stable GitHub/source release. v1.0.3 updates crates.io package identity before registry publication. No runtime governance behavior changes.
-
-
-Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.3 completes crates.io publishing and is the public crates.io install target.
+Licensed under either MIT or Apache-2.0, at your option.

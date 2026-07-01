@@ -7,10 +7,10 @@
 - **Namespace:** isolation scope for records, patches, retrieval, MCP clients, and tests.
 - **Policy profile:** standard, strict, or permissive governance behavior for review requirements.
 - **Record statuses:** active, contested, superseded, and tombstoned. Tombstones preserve history rather than hard-deleting claims.
-- **Retriever modes:** deterministic, lexical, and hybrid. rc.8 uses no embeddings and requires no vector database.
+- **Retriever modes:** deterministic, lexical, and hybrid. an earlier release candidate uses no embeddings and requires no vector database.
 - **Maintenance findings:** scan results such as pending patches, contested records, low-confidence records, missing evidence, duplicates, namespace summary, and policy summary.
 - **Redaction metadata:** metadata attached to redacted exports so reviewers know redaction was best-effort.
-- **MCP structuredContent:** object-shaped responses intended for client compatibility.
+- **MCP structured content:** object-shaped responses intended for client compatibility.
 
 
 ---

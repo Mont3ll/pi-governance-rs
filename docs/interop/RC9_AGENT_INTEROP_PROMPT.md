@@ -13,7 +13,7 @@ Report:
 - session decision extracted
 - recall-xray succeeded
 - namespace `interop-test` respected
-- no structuredContent errors
+- no structured content errors
 - no repo edits
 - no proposal applied unless instructed
 - raw errors, if any

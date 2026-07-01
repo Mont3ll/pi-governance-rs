@@ -1,55 +1,26 @@
 # pi-persistent-intelligence Compatibility
 
-## Stable Relationship
+`pi-governance-rs` and `pi-persistent-intelligence` are standalone implementations of the shared PI memory model.
 
-`pi-governance-rs` and `pi-persistent-intelligence` are separate standalone PI memory implementations.
+Use `pi-governance-rs` when you want governed memory through CLI or MCP across multiple agents.
 
-- `pi-governance-rs` is the standalone Rust CLI/MCP runtime for governed PI memory across Codex, Claude, OpenCode, Cursor, PI agent, and other MCP-capable tools.
-- `pi-persistent-intelligence` is the standalone lightweight pi-agent-native memory extension.
-- Users may use either project alone.
-- Users may use both when they want pi-agent-native capture/curation UX plus global MCP memory governance.
-- Neither project depends on the other to work.
-- `pi-persistent-intelligence` remains a supported standalone project and does not require Rust.
-- `pi-governance-rs` does not require `pi-persistent-intelligence`.
+Use `pi-persistent-intelligence` when you want the lightweight native memory extension inside PI agent.
 
-## Shared PI Memory Contract
+Neither project requires the other.
 
-Both projects implement or map to the shared PI memory contract:
+## Shared memory contract
 
-- records
-- patches
-- candidates/inbox entries
-- evidence
-- inquiries/open questions
-- L3 session entries
-- reinforcement events
-- namespaces
-- profile/project scope
-- `l1_identity`, `l2_playbook`, and `l3_session` layers
-- `memory_kind`, `rule_type`, `trust_class`, `durability`, `source_kind`, and verification metadata
-- active, contested, superseded, tombstoned, and deleted record statuses
-- proposed, applied, rejected, and deferred patch statuses
-- redaction metadata for portable bundles
+Both projects use the same core ideas:
+
+- scoped memory records
+- confidence and evidence metadata
+- review before durable changes
+- import/export formats for moving memory between tools
 
 ## Interoperability
 
-The compatibility layer is import/export and shared schemas, not a dependency relationship.
+Use export and import workflows to move reviewed memory between stores. Review imported records and patches before relying on them in another environment.
 
-`pi-governance-rs` can export and import portable JSON bundles. `pi-persistent-intelligence` v0.12.0 can export/import compatible `pi-governance` bundles and can optionally run bridge diagnostics against an external Rust runtime. The JavaScript package does not run its own MCP server.
+## Safety model
 
-## Safety Contract
-
-- L1 never auto-applies.
-- Capture creates candidates or L3/session evidence, not silent L1/L2 mutation.
-- Low-trust sources cannot auto-apply.
-- Repository/generated/third-party content requires review.
-- Tombstones prevent re-promotion.
-- Redacted export is best-effort and user-reviewed.
-
-
-## Packaging Status
-
-Repository: https://github.com/Mont3ll/pi-governance-rs
-License: MIT OR Apache-2.0
-
-`pi-governance-rs` can be installed from source or Git and may be installed from crates.io after explicit publication approval. It is a local stdio MCP server by default and does not provide a hosted service in v1.0.0.
+PI memory is designed to be explicit and auditable. Keep high-impact rules, corrections, and identity-level claims under review, and prefer evidence-backed records over unreviewed notes.

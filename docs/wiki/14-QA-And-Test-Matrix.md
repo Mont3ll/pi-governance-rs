@@ -1,6 +1,6 @@
 # QA and Test Matrix
 
-| Area | Command/Test | Expected Result | rc.8 Status | Stable Gate |
+| Area | Command/Test | Expected Result | an earlier release candidate Status | Stable Gate |
 | --- | --- | --- | --- | --- |
 | cargo check | `cargo check --workspace` | pass | pass | required |
 | cargo test | `cargo test --workspace` | pass | pass | required |
@@ -30,10 +30,10 @@
 | mcp-config pi-agent | CLI | JSON config | pass | required |
 | mcp-install temp config | CLI | merge/preview safe | pass | required |
 | mcp-doctor temp config | CLI | direct stdio ok | pass | required |
-| OpenCode install/doctor + documented live limitation | client test | install/doctor pass | documented exception | accepted for v1.0.0 |
+| OpenCode install/doctor + documented live limitation | client test | setup checks complete | documented exception | accepted for v1.0.0 |
 | Codex full interop | client test | pass | pass | required |
 | PI agent full interop | client test | pass | pass | required |
-| OpenCode inspect-record micro-test | client test | pass in prior rc.8 live validation | not rerun due client-run limitation | historical evidence |
+| OpenCode inspect-record micro-test | client test | pass in prior an earlier release candidate live validation | not rerun due client-run limitation | historical evidence |
 | Codex inspect-record micro-test | client test | pass | pass | required |
 | hidden/bidi scan | grep | no matches | pass | required |
 | secret/path scan | grep | no real secrets, no local paths | pass | required |

@@ -6,7 +6,7 @@
 
 - [ ] Confirm clean working tree.
 - [ ] Confirm intended branch and tag state.
-- [ ] Confirm no new features are being added after rc.8 unless a issue exists.
+- [ ] Confirm no new features are being added after an earlier release candidate unless a issue exists.
 
 ## Workspace Checks
 
@@ -42,10 +42,10 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
 
 ## Interop Checks
 
-- [ ] OpenCode install/doctor pass; live rc.9 client run documented as environmental/client-run incomplete.
+- [ ] OpenCode setup checks complete; live the final release candidate client run documented as environmental/client-run incomplete.
 - [ ] Codex CLI full interop pass.
 - [ ] PI agent full interop pass.
-- [ ] `inspect_record`, namespace propagation, and structuredContent pass.
+- [ ] `inspect_record`, namespace propagation, and structured content pass.
 
 ## Docs Checks
 

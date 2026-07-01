@@ -20,7 +20,7 @@
 - central audit logs
 - cloud sync
 
-## Already Moved Into rc.8
+## Already Moved Into an earlier release candidate
 
 - MCP `inspect_record`
 - review queue actions

@@ -1,18 +1,18 @@
 # Agent Interoperability
 
-## rc.8 Tested Clients
+## an earlier release candidate Tested Clients
 
 | Client | Status |
 | --- | --- |
-| OpenCode | install/doctor pass; live rc.9 client run incomplete due environmental/client-run limitation |
+| OpenCode | setup checks complete; live the final release candidate client run incomplete due environmental/client-run limitation |
 | Codex CLI | pass |
 | PI agent | pass |
 
 ## Tested Capabilities
 
-`retrieve_context`, `propose_record`, `list_patches`, `inspect_patch`, `inspect_record`, `list_records`, `maintenance_scan`, `doctor`, `smoke_test`, review action discovery, namespace propagation, and structuredContent object compatibility.
+`retrieve_context`, `propose_record`, `list_patches`, `inspect_patch`, `inspect_record`, `list_records`, `maintenance_scan`, `doctor`, `smoke_test`, review action discovery, namespace propagation, and structured content object compatibility.
 
-## rc.8 Interoperability Prompt
+## an earlier release candidate Interoperability Prompt
 
 Use the release-candidate interoperability prompt from the project release-preparation notes for full client validation. The prompt should verify direct MCP `tools/list`, tool calls, namespace propagation, structured content, and client-visible prefixed tool names.
 

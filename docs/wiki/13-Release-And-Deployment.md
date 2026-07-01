@@ -2,7 +2,7 @@
 
 ## Release Philosophy
 
-`v1.0.0` is the current validated stable public release. Stable is release-only from rc.9 with no runtime feature expansion. No runtime feature expansion was added during the stable release pass.
+`v1.0.0` is the current validated stable public release. Stable is release-only from the final release candidate with no runtime feature expansion. No runtime feature expansion was added during the stable release pass.
 
 ## Versioning Strategy
 
@@ -10,11 +10,11 @@ Release candidates use `1.0.0-rc.N`; stable uses `1.0.0` only after gates pass.
 
 ## Release Candidate Flow
 
-v1.0.0 is the stable public release promoted from rc.9 after validation, direct MCP validation, PI agent live validation, Codex CLI live validation, and a documented OpenCode client-run limitation.
+v1.0.0 is the stable public release promoted from the final release candidate after validation, MCP validation, PI agent live validation, Codex CLI live validation, and a documented OpenCode client-run limitation.
 
 ## Stable v1.0.0 Gate
 
-Required gates: `cargo check --workspace` pass, `cargo test --workspace` pass, `cargo build -p pi-governance-rs` pass, `pi --version` shows `1.0.0`, smoke-test pass, release-audit pass, source archive verification pass, archive content verification pass, OpenCode install/doctor pass with live rc.9 environmental/client-run limitation documented, Codex CLI interoperability pass, PI agent interoperability pass, MCP setup/install/doctor pass, hidden/bidi scan no matches, secret scan no real secrets, local path scan no public path leakage, README stable wording correct, CHANGELOG stable entry correct, docs stable wording correct, schemas validate, and product guide updated.
+Required gates: `cargo check --workspace` pass, `cargo test --workspace` pass, `cargo build -p pi-governance-rs` pass, `pi --version` shows `1.0.0`, smoke-test pass, release-audit pass, source archive verification pass, archive content verification pass, OpenCode local stdio setup available, Codex CLI interoperability pass, PI agent interoperability pass, MCP setup/setup checks complete, hidden/bidi scan no matches, secret scan no real secrets, local path scan no public path leakage, README stable wording correct, CHANGELOG stable entry correct, docs stable wording correct, schemas validate, and product guide updated.
 
 ## Deployment Targets
 
@@ -38,7 +38,7 @@ Create the GitHub release only after all gates pass. Attach optional verified as
 
 ## MCP Client Compatibility Strategy
 
-For future releases, retest OpenCode, Codex CLI, and PI agent after version bumps and before publishing. Confirm client-prefixed tools, namespace propagation, and structuredContent.
+For future releases, retest OpenCode, Codex CLI, and PI agent after version bumps and before publishing. Confirm client-prefixed tools, namespace propagation, and structured content.
 
 ## Rollback Strategy
 

@@ -1,6 +1,6 @@
 # Retrieval Guide
 
-PI rc.8 supports deterministic, lexical, and hybrid local retrievers. No embeddings are used in rc.8. No vector database is required. Retrieval remains local and deterministic.
+PI an earlier release candidate supports deterministic, lexical, and hybrid local retrievers. No embeddings are used in an earlier release candidate. No vector database is required. Retrieval remains local and deterministic.
 
 ```bash
 pi --store .pi retrieve "release workflow" --retriever deterministic --explain

@@ -5,7 +5,7 @@
 ## Hard Pass/Fail Gates
 
 - [ ] No known blocking interop failures.
-- [ ] No known structuredContent errors.
+- [ ] No known structured content errors.
 - [ ] No namespace propagation failures.
 - [ ] No release-audit failures.
 - [ ] No tests failing.

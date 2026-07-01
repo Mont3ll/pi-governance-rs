@@ -35,7 +35,7 @@ Only build these when toolchains are configured:
 - No hosted service by default.
 - Compatible with `pi-persistent-intelligence` via import/export and shared schemas.
 
-## OpenCode exception wording
+## OpenCode notes wording
 
 OpenCode install/doctor validation passed. A previous live client run was incomplete due environmental/client-run limitations and did not demonstrate a PI Governance MCP server failure.
 

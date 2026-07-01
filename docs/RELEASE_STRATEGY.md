@@ -4,13 +4,13 @@
 
 PI Governance releases should be conservative, auditable, and easy to verify from source. `v1.0.0` is the stable public release.
 
-## Historical rc.8 Baseline
+## Historical an earlier release candidate Baseline
 
-rc.8 validated CLI checks, MCP interoperability, review actions, maintenance scan, local retrieval modes, redacted export metadata, and schema documentation. rc.9 added portable workflow parity and is promoted by v1.0.0.
+an earlier release candidate validated CLI checks, MCP interoperability, review actions, maintenance scan, local retrieval modes, redacted export metadata, and schema documentation. the final release candidate added portable workflow parity and is promoted by v1.0.0.
 
 ## Feature Freeze Strategy
 
-The stable release is a release-only pass from rc.9. Do not add product features, redesign governance semantics, or alter runtime behavior during release preparation.
+The stable release is a release-only pass from the final release candidate. Do not add product features, redesign governance semantics, or alter runtime behavior during release preparation.
 
 ## Stable Release Process
 
@@ -47,7 +47,7 @@ Docs should stay honest about scope: no embeddings, no vector backend, no hosted
 
 ## MCP Compatibility Strategy
 
-For stable v1.0.0, direct MCP, `mcp-config`, `mcp-install`, `mcp-doctor`, namespace propagation, client-prefixed tool names, and structuredContent compatibility were validated for PI agent and Codex CLI; OpenCode install/doctor passed, with the live client run documented as an environmental/client-run limitation.
+For stable v1.0.0, direct MCP, `mcp-config`, `mcp-install`, `mcp-doctor`, namespace propagation, client-prefixed tool names, and structured content compatibility were validated for PI agent and Codex CLI; OpenCode setup checks completed, with the live client run documented as an environmental/client-run limitation.
 
 ## Rollback Strategy
 

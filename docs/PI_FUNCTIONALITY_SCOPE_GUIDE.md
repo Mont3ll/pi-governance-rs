@@ -2,7 +2,7 @@
 
 Current stable release: v1.0.0. Stable v1.0.0 has shipped.
 
-## Release-quality improvements now included in rc.8
+## Release-quality improvements now included in an earlier release candidate
 
 - MCP record inspection
 - Review queue actions
