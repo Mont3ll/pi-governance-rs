@@ -1,47 +1,51 @@
 # Release Notes
 
-`v1.0.3` is the stable public packaging release.
+## Current release: v1.0.3
 
-## v1.0.0 portable PI memory workflow parity
+`v1.0.3` is the current user-facing crates.io release.
 
-`v1.0.0` is the current stable public release. It adds the missing portable workflow layer from the original PI memory workflow while keeping durable L1/L2 memory patch-governed.
+Install:
 
-Included in v1.0.0:
+```bash
+cargo install pi-governance-rs
+pi --version
+```
 
-- explicit L1/L2/L3 memory layers
-- optional `memory_kind` and `rule_type`
-- trust class, durability, and source kind signals
-- deterministic `memory-worth` scoring
-- deterministic `capture` candidate extraction from text/stdin/files
-- manual `memory_write` equivalent through `pi capture --target daily|long-term`
-- `inbox` candidate review workflow
-- scoped `context` output for non-PI agents
-- local `session add`, `session search`, and `session decisions`
-- `recall-xray` inclusion/exclusion diagnostics
-- MCP tools for score/capture/context/session/recall workflows
-- minimal verification gates for low-trust sources, L1 records, and secret-like content
+The installed command is `pi`.
 
-Safety notes:
+## What PI Governance provides
 
-- Capture creates candidates or L3 session evidence; it does not silently apply durable L1/L2 records.
-- L1 identity memory always requires review.
-- L3 session/event data is append-only evidence context, not authoritative durable memory.
-- Repository text, generated content, third-party documentation, and codebase analysis cannot bypass manual review.
+PI Governance is a local-first governed memory CLI and MCP stdio server for AI agents.
 
-## v1.0.0-rc.8 release-quality governance hardening
+It includes:
 
-rc.8 added MCP record inspection parity, review queue actions, read-only maintenance scan, local deterministic lexical/hybrid retrieval modes, redacted export metadata, and schema documentation.
+- local JSONL memory stores
+- capture and memory-worth scoring
+- inbox and review workflows
+- patch-based durable memory changes
+- L1/L2/L3 memory layers
+- trust, durability, source, evidence, and namespace metadata
+- scoped context output for agent tasks
+- session add/search/decisions
+- recall-xray
+- import/export
+- local stdio MCP tools
 
-## Still Deferred
+## Safety model
 
-Deep reinforcement maintenance weighting, LLM consolidation, qmd semantic search, vault integration, background job queues, memory graph/timeline, procedure candidates, skill draft artifacts, meta-consolidation automation, dashboard/TUI, hosted MCP, connectors, vector backend, graph backend, team RBAC/SSO, and cloud sync remain deferred.
+- Capture creates candidates or session evidence; it does not silently apply durable memory.
+- L1 identity memory requires review.
+- Session data is context/evidence, not authoritative durable memory.
+- Imported stores and patches should be reviewed before use.
+- Secrets, credentials, private keys, passwords, and high-risk personal data should not be stored as durable memory.
 
+## Installation options
 
-## Packaging and distribution
+Install from crates.io:
 
-Repository: https://github.com/Mont3ll/pi-governance-rs
-
-License: MIT OR Apache-2.0. See `LICENSE`, `LICENSE-APACHE`, and `LICENSE-MIT`.
+```bash
+cargo install pi-governance-rs
+```
 
 Install from Git:
 
@@ -49,16 +53,26 @@ Install from Git:
 cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.3 pi-governance-rs
 ```
 
-Install from crates.io after explicit publication approval:
+Build from source:
 
 ```bash
-cargo install pi-governance-rs
+git clone https://github.com/Mont3ll/pi-governance-rs.git
+cd pi-governance-rs
+cargo build -p pi-governance-rs
+./target/debug/pi --version
 ```
 
-The MCP server is local stdio by default; no hosted MCP service is included in v1.0.0.
+## MCP usage
 
+PI Governance runs as a local stdio MCP server. MCP clients connect by launching your local `pi` command.
 
-Note: v1.0.0 was the first stable GitHub/source release. v1.0.3 updates crates.io package identity before registry publication. No runtime governance behavior changes.
+```bash
+pi mcp-config codex --command "$(which pi)" --store /path/to/.pi --namespace default
+pi mcp-doctor codex --command "$(which pi)" --store /path/to/.pi --namespace default
+```
 
+## Compatibility
 
-Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.3 completes crates.io publishing and is the public crates.io install target.
+`pi-governance-rs` can be used by itself through CLI or MCP.
+
+It can also interoperate with `pi-persistent-intelligence` through the shared PI memory contract and compatible import/export formats.
