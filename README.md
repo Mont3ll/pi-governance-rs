@@ -2,7 +2,7 @@
 
 Local-first governed memory for AI agents.
 
-- **Current:** `v1.0.2`
+- **Current:** `v1.0.3`
 - **Status:** stable public release
 - **Runtime:** Rust CLI + MCP stdio server
 - **Purpose:** standalone portable PI memory governance for any MCP-capable agent
@@ -51,7 +51,7 @@ cargo build -p pi-governance-rs
 ### From Git
 
 ```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.2 pi-governance-rs
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.3 pi-governance-rs
 pi --version
 ```
 
@@ -75,14 +75,14 @@ Note: crates.io publishing may still be pending until explicitly published.
 ./target/debug/pi --store /tmp/pi-demo-store context "stable release"
 ./target/debug/pi --store /tmp/pi-demo-store recall-xray "stable release"
 ./target/debug/pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
-./target/debug/pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+./target/debug/pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default
 ./target/debug/pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
 ```
 
 Expected version:
 
 ```text
-pi 1.0.2
+pi 1.0.3
 ```
 
 ## CLI Usage
@@ -122,7 +122,7 @@ pi --store .pi session decisions --project pi-governance-rs
 pi --store .pi maintenance scan
 pi --store .pi doctor
 pi --store .pi export --redacted --output pi-export.redacted.json
-pi --store .pi import pi-export.redacted.json --dry-run
+pi --store .pi import pi-export.redacted.json
 ```
 
 ### Command Matrix
@@ -139,7 +139,7 @@ pi-governance-rs is a local-first MCP stdio server. The MCP client launches the 
 
 ```bash
 pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
-pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default
 pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --yes
 pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
 ```
@@ -226,14 +226,14 @@ PI Governance does not add a hosted service, database, vector store, graph backe
 
 ## Release Strategy
 
-`v1.0.2` is the stable public packaging release. Future changes should preserve the public CLI and MCP tool surfaces or provide compatibility aliases.
+`v1.0.3` is the stable public packaging release. Future changes should preserve the public CLI and MCP tool surfaces or provide compatibility aliases.
 
 ## License
 
 Licensed under either of Apache License, Version 2.0 or MIT License at your option. See [LICENSE](LICENSE), [LICENSE-APACHE](LICENSE-APACHE), and [LICENSE-MIT](LICENSE-MIT).
 
 
-Note: v1.0.0 was the first stable GitHub/source release. v1.0.2 updates crates.io package identity before registry publication. No runtime governance behavior changes.
+Note: v1.0.0 was the first stable GitHub/source release. v1.0.3 updates crates.io package identity before registry publication. No runtime governance behavior changes.
 
 
-Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.2 completes crates.io publishing and is the public crates.io install target.
+Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.3 completes crates.io publishing and is the public crates.io install target.

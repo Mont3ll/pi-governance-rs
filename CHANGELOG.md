@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.2
+## v1.0.3
 
 Packaging-only release preparing crates.io distribution.
 
@@ -89,7 +89,7 @@ No CLI commands changed.
 - v1.0.0-rc.1 — first release candidate
   - Freezes the public CLI command-name surface for the release candidate.
   - Freezes MCP tool names for the release candidate.
-  - Documents fresh clone verification and archive content verification.
+  - Documents source archive verification.
   - Documents release checklist verification.
   - Adds no new governance semantics.
 - v0.10.1 audit and release-candidate cleanup

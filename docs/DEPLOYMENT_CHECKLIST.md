@@ -6,7 +6,7 @@
 
 - [ ] Confirm clean working tree.
 - [ ] Confirm intended branch and tag state.
-- [ ] Confirm no new features are being added after rc.8 unless a blocker exists.
+- [ ] Confirm no new features are being added after rc.8 unless a issue exists.
 
 ## Workspace Checks
 

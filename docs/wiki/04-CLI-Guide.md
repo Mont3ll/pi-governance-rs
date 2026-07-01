@@ -331,7 +331,7 @@ Purpose: import command for governed memory operation, inspection, setup, or val
 Example:
 
 ```bash
-pi --store .pi import pi-export.redacted.json --dry-run
+pi --store .pi import pi-export.redacted.json
 ```
 
 Expected output summary: human-readable or JSON output describing the requested operation, errors, or next review step.
@@ -359,7 +359,7 @@ Purpose: mcp install command for governed memory operation, inspection, setup, o
 Example:
 
 ```bash
-pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default
 ```
 
 Expected output summary: human-readable or JSON output describing the requested operation, errors, or next review step.

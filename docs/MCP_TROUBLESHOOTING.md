@@ -5,7 +5,7 @@ PI MCP stdio can work while an agent client still shows zero PI tools if the act
 ## Quick Diagnosis
 
 1. Generate the expected client config.
-2. Install or dry-run the merge.
+2. Install or preview the merge.
 3. Run `mcp-doctor` before opening the client.
 4. Restart the client after `mcp-install`.
 
@@ -31,7 +31,7 @@ pi mcp-config pi-agent --command /path/to/pi --store /path/to/.pi --namespace de
 Preview first:
 
 ```bash
-pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default
 ```
 
 Install with confirmation bypassed:

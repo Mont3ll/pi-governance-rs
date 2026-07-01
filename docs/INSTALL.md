@@ -18,13 +18,13 @@ cargo build -p pi-governance-rs
 Expected version:
 
 ```text
-pi 1.0.2
+pi 1.0.3
 ```
 
 ## Install from Git tag
 
 ```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.2 pi-governance-rs
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.3 pi-governance-rs
 pi --version
 ```
 
@@ -60,10 +60,10 @@ pi mcp-config codex --command /path/to/pi --store /path/to/.pi --namespace defau
 pi mcp-config pi-agent --command /path/to/pi --store /path/to/.pi --namespace default
 ```
 
-To install into supported client config files, first dry-run, then opt in:
+To install into supported client config files, first preview, then opt in:
 
 ```bash
-pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default
 pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --yes
 pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
 ```
@@ -73,4 +73,4 @@ pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace de
 If `pi` is not found after `cargo install`, add Cargo's binary directory to your shell PATH or call the installed binary by absolute path. To avoid ambiguity in MCP client configs, prefer an absolute command path such as `/path/to/pi`.
 
 
-Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.2 completes crates.io publishing and is the public crates.io install target.
+Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.3 completes crates.io publishing and is the public crates.io install target.

@@ -29,7 +29,7 @@ Local stdio keeps memory files local, avoids a default network listener, avoids 
 
 ```bash
 pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
-pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default
 pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --yes
 pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
 ```
@@ -38,7 +38,7 @@ pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace de
 
 ```bash
 pi mcp-config codex --command /path/to/pi --store /path/to/.pi --namespace default
-pi mcp-install codex --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+pi mcp-install codex --command /path/to/pi --store /path/to/.pi --namespace default
 pi mcp-doctor codex --command /path/to/pi --store /path/to/.pi --namespace default
 ```
 
@@ -46,13 +46,13 @@ pi mcp-doctor codex --command /path/to/pi --store /path/to/.pi --namespace defau
 
 ```bash
 pi mcp-config pi-agent --command /path/to/pi --store /path/to/.pi --namespace default
-pi mcp-install pi-agent --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+pi mcp-install pi-agent --command /path/to/pi --store /path/to/.pi --namespace default
 pi mcp-doctor pi-agent --command /path/to/pi --store /path/to/.pi --namespace default
 ```
 
 ## Claude and Cursor
 
-`pi mcp-config` also supports generic Claude/Cursor-oriented config shapes for clients that accept local command MCP servers. Check the client's current MCP configuration location and prefer dry-run or manual config review before enabling.
+`pi mcp-config` also supports generic Claude/Cursor-oriented config shapes for clients that accept local command MCP servers. Check the client's current MCP configuration location and prefer preview or manual config review before enabling.
 
 ## Verify tools/list
 

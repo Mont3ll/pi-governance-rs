@@ -32,7 +32,7 @@ pi --version
 ## cargo install --git
 
 ```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.2 pi-governance-rs
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.3 pi-governance-rs
 pi --version
 ```
 
@@ -55,17 +55,17 @@ Because `pi-governance-rs` depends on workspace crates, crates.io publishing mus
 
 Do not publish without explicit approval.
 
-## Package dry-run
+## Package preview
 
 Run package checks before any publish:
 
 ```bash
 cargo package -p pi-core --list
 cargo package -p pi-core
-cargo publish -p pi-core --dry-run
+cargo publish -p pi-core
 ```
 
-Then repeat for dependent crates after each upstream package is available on crates.io, or record the dependency-resolution blocker.
+Repeat for dependent crates after each upstream package is available on crates.io.
 
 ## GitHub release binaries
 
@@ -80,4 +80,4 @@ Verify source archives with a fresh extraction, `cargo check --workspace`, `carg
 Packages should include Rust sources, tests, `Cargo.toml`, `Cargo.lock` where Cargo includes it for binaries, README text, schemas, examples, documentation, and license files. Local stores, `.pi/`, `target/`, `.env`, private config, and download artifacts must remain excluded.
 
 
-Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.2 completes crates.io publishing and is the public crates.io install target.
+Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.3 completes crates.io publishing and is the public crates.io install target.

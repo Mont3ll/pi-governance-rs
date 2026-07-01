@@ -10,11 +10,11 @@ Release candidates use `1.0.0-rc.N`; stable uses `1.0.0` only after gates pass.
 
 ## Release Candidate Flow
 
-v1.0.0 is the stable public release promoted from rc.9 after local validation, direct MCP validation, PI agent live validation, Codex CLI live validation, and a documented OpenCode client-run limitation.
+v1.0.0 is the stable public release promoted from rc.9 after validation, direct MCP validation, PI agent live validation, Codex CLI live validation, and a documented OpenCode client-run limitation.
 
 ## Stable v1.0.0 Gate
 
-Required gates: `cargo check --workspace` pass, `cargo test --workspace` pass, `cargo build -p pi-governance-rs` pass, `pi --version` shows `1.0.0`, smoke-test pass, release-audit pass, fresh clone verification pass, archive content verification pass, OpenCode install/doctor pass with live rc.9 environmental/client-run limitation documented, Codex CLI interoperability pass, PI agent interoperability pass, MCP setup/install/doctor pass, hidden/bidi scan no matches, secret scan no real secrets, local path scan no public path leakage, README stable wording correct, CHANGELOG stable entry correct, docs stable wording correct, schemas validate, and product guide updated.
+Required gates: `cargo check --workspace` pass, `cargo test --workspace` pass, `cargo build -p pi-governance-rs` pass, `pi --version` shows `1.0.0`, smoke-test pass, release-audit pass, source archive verification pass, archive content verification pass, OpenCode install/doctor pass with live rc.9 environmental/client-run limitation documented, Codex CLI interoperability pass, PI agent interoperability pass, MCP setup/install/doctor pass, hidden/bidi scan no matches, secret scan no real secrets, local path scan no public path leakage, README stable wording correct, CHANGELOG stable entry correct, docs stable wording correct, schemas validate, and product guide updated.
 
 ## Deployment Targets
 

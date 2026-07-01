@@ -46,7 +46,7 @@ Replace `<record_id>` with an ID from `pi list`.
 6. Contest it with `pi contest`.
 7. Resolve the contest with `pi resolve-contest`.
 8. Export it with `pi export`.
-9. Dry-run import into a new store with `pi import --dry-run --json`.
+9. Preview import into a new store with `pi import --json`.
 
 ## Coding-Agent MCP Test
 
@@ -54,7 +54,7 @@ Run this MCP setup preflight before opening the agent client:
 
 ```bash
 pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace interop-test
-pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace interop-test --dry-run
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace interop-test
 pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace interop-test
 ```
 

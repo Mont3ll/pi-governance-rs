@@ -1,6 +1,6 @@
 # Release Notes
 
-`v1.0.2` is the stable public packaging release.
+`v1.0.3` is the stable public packaging release.
 
 ## v1.0.0 portable PI memory workflow parity
 
@@ -46,7 +46,7 @@ License: MIT OR Apache-2.0. See `LICENSE`, `LICENSE-APACHE`, and `LICENSE-MIT`.
 Install from Git:
 
 ```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.2 pi-governance-rs
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.3 pi-governance-rs
 ```
 
 Install from crates.io after explicit publication approval:
@@ -58,7 +58,7 @@ cargo install pi-governance-rs
 The MCP server is local stdio by default; no hosted MCP service is included in v1.0.0.
 
 
-Note: v1.0.0 was the first stable GitHub/source release. v1.0.2 updates crates.io package identity before registry publication. No runtime governance behavior changes.
+Note: v1.0.0 was the first stable GitHub/source release. v1.0.3 updates crates.io package identity before registry publication. No runtime governance behavior changes.
 
 
-Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.2 completes crates.io publishing and is the public crates.io install target.
+Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.3 completes crates.io publishing and is the public crates.io install target.

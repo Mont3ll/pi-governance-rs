@@ -35,7 +35,7 @@ Use the verified `v1.0.0` tag, include release notes that match `CHANGELOG.md`, 
 
 ## Version Bump Strategy
 
-Change only version identifiers and stable wording required for the release unless a blocker requires a targeted fix. The version command must report `pi 1.0.0` for stable.
+Change only version identifiers and stable wording required for the release unless a issue requires a targeted fix. The version command must report `pi 1.0.0` for stable.
 
 ## Changelog Strategy
 

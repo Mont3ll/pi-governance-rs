@@ -28,7 +28,7 @@
 | mcp-config opencode | CLI | JSON config | pass | required |
 | mcp-config codex | CLI | config output | pass | required |
 | mcp-config pi-agent | CLI | JSON config | pass | required |
-| mcp-install temp config | CLI | merge/dry-run safe | pass | required |
+| mcp-install temp config | CLI | merge/preview safe | pass | required |
 | mcp-doctor temp config | CLI | direct stdio ok | pass | required |
 | OpenCode install/doctor + documented live limitation | client test | install/doctor pass | documented exception | accepted for v1.0.0 |
 | Codex full interop | client test | pass | pass | required |

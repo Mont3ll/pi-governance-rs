@@ -6,7 +6,7 @@ PI supports MCP stdio setup for OpenCode, Codex CLI, and PI agent/shared MCP. If
 
 ```bash
 pi mcp-config opencode --command /path/to/pi --store /path/to/.pi --namespace default
-pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --dry-run
+pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default
 pi mcp-install opencode --command /path/to/pi --store /path/to/.pi --namespace default --yes
 pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace default
 ```
