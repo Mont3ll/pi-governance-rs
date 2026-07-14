@@ -1,5 +1,5 @@
 use pi_governance_engine::GovernanceEngine;
-use pi_governance_mcp::McpStdioServer;
+use pi_governance_mcp::{registered_tool_names, McpStdioServer};
 use pi_governance_store::JsonlStore;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -21,6 +21,14 @@ fn stdio_server_can_be_constructed() {
     let root = temp_store_dir("construct");
     let engine = GovernanceEngine::new(JsonlStore::new(root));
     let _server = McpStdioServer::new(engine);
+}
+
+#[test]
+fn registered_tool_names_come_from_the_canonical_registry() {
+    let names = registered_tool_names();
+    assert!(names.iter().any(|name| name == "pi.retrieve_context"));
+    assert!(names.iter().any(|name| name == "pi.recall_xray"));
+    assert!(!names.iter().any(|name| name.trim().is_empty()));
 }
 
 #[test]

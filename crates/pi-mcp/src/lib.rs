@@ -2,4 +2,4 @@
 
 pub mod stdio;
 
-pub use stdio::McpStdioServer;
+pub use stdio::{registered_tool_names, tool_definitions, McpStdioServer};

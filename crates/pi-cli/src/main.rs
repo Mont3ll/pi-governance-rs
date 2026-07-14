@@ -8,7 +8,7 @@ use pi_governance_engine::{
     SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
 use serde_json::json;
-use pi_governance_mcp::McpStdioServer;
+use pi_governance_mcp::{registered_tool_names, McpStdioServer};
 use pi_governance_retrieval::render_markdown;
 use pi_governance_store::JsonlStore;
 use serde::Serialize;
@@ -22,7 +22,7 @@ use std::process::{Command, Stdio};
 #[derive(Debug, Parser)]
 #[command(
     name = "pi",
-    version = "1.0.3",
+    version = env!("CARGO_PKG_VERSION"),
     about = "PI governance runtime for coding agents"
 )]
 struct Cli {
@@ -1867,10 +1867,22 @@ fn main() -> Result<()> {
             audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0") && changelog.contains("v1.0.0-rc.5") && changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
             let readme = include_str!("../README.md");
             audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "inspect-record", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "mcp-install", "mcp-doctor", "smoke-test", "release-audit", "changelog"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
-            audit_check(&mut checks, &mut failures, "mcp-tools-list", true, "MCP tools are statically registered");
+            let registered_tools = registered_tool_names();
+            let required_tools = [
+                "pi.retrieve_context", "pi.propose_record", "pi.supersede_record", "pi.tombstone_record",
+                "pi.reinforce_record", "pi.contest_record", "pi.resolve_contest", "pi.apply_patch",
+                "pi.reject_patch", "pi.defer_patch", "pi.list_patches", "pi.inspect_patch",
+                "pi.export_store", "pi.import_store", "pi.migrate_schema", "pi.doctor",
+                "pi.list_records", "pi.inspect_record", "pi.score_memory_worth", "pi.capture_candidates",
+                "pi.build_context", "pi.session_add", "pi.session_search", "pi.session_decisions",
+                "pi.recall_xray", "pi.list_inbox",
+            ];
+            let missing_tools: Vec<_> = required_tools.iter().filter(|required| !registered_tools.iter().any(|actual| actual == **required)).copied().collect();
+            let mcp_tools_detail = if missing_tools.is_empty() { "actual MCP registry contains every required tool".to_string() } else { format!("actual MCP registry is missing: {}", missing_tools.join(", ")) };
+            audit_check(&mut checks, &mut failures, "mcp-tools-list", missing_tools.is_empty(), &mcp_tools_detail);
             let mcp_config = serde_json::json!({"mcpServers": {"pi-governance": {"command": std::env::current_exe()?.display().to_string(), "args": ["--store", store_path.display().to_string().as_str(), "--namespace", namespace.as_str(), "mcp-stdio"]}}});
             audit_check(&mut checks, &mut failures, "mcp-config", mcp_config.to_string().contains("mcp-stdio"), "mcp config missing mcp-stdio");
-            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: "1.0.3".to_string(), checks, failures };
+            let report = ReleaseAuditReport { result: if failures.is_empty() { "pass".to_string() } else { "fail".to_string() }, version: env!("CARGO_PKG_VERSION").to_string(), checks, failures };
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {

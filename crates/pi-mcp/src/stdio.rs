@@ -150,6 +150,10 @@ impl McpStdioServer {
     }
 
     pub fn tool_definitions(&self) -> Value {
+        Self::canonical_tool_definitions()
+    }
+
+    pub fn canonical_tool_definitions() -> Value {
         json!([
             {
                 "name": "pi.retrieve_context",
@@ -1419,6 +1423,19 @@ impl McpStdioServer {
 
         Ok(tool_result(text, json!({ "records": records, "count": count })))
     }
+}
+
+pub fn tool_definitions() -> Value {
+    McpStdioServer::canonical_tool_definitions()
+}
+
+pub fn registered_tool_names() -> Vec<String> {
+    tool_definitions()
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|tool| tool.get("name").and_then(Value::as_str).map(str::to_owned))
+        .collect()
 }
 
 fn tool_result(text: String, structured_content: Value) -> Value {
