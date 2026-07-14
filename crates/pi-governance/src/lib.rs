@@ -1,4 +1,6 @@
 pub mod engine;
+pub mod graph;
+pub mod quality;
 pub mod workflow;
 
 pub use engine::{
@@ -7,4 +9,6 @@ pub use engine::{
     PatchSummary, ProposalInput, ProposalResult, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput,
 };
+pub use graph::*;
+pub use quality::*;
 pub use workflow::*;
