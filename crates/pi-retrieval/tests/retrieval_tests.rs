@@ -85,3 +85,31 @@ fn json_explain_output_includes_score_breakdown() {
     let json = serde_json::to_value(&bundle).unwrap();
     assert!(json["records"][0]["score_breakdown"].is_object() || json["records"][0]["breakdown"].is_object());
 }
+
+#[test]
+fn retrieval_reports_records_omitted_by_budget() {
+    let records = vec![
+        rec(RecordClass::Requirement, "belief revision first record with enough text to consume a meaningful budget", Some("pi-governance-rs"), vec!["belief"], 0.9, RecordStatus::Active),
+        rec(RecordClass::Requirement, "belief revision second record with enough text to exceed the remaining budget", Some("pi-governance-rs"), vec!["belief"], 0.8, RecordStatus::Active),
+        rec(RecordClass::Requirement, "belief revision third record that is also omitted after the budget is reached", Some("pi-governance-rs"), vec!["belief"], 0.7, RecordStatus::Active),
+    ];
+    let mut options = opts("belief revision");
+    options.budget = 50;
+
+    let bundle = retrieve_with_options(&records, options);
+
+    assert_eq!(bundle.records.len(), 1);
+    assert_eq!(bundle.omitted_count, 2);
+}
+
+#[test]
+fn retrieval_reports_zero_omissions_when_budget_fits() {
+    let records = vec![
+        rec(RecordClass::Requirement, "belief revision first", Some("pi-governance-rs"), vec!["belief"], 0.9, RecordStatus::Active),
+        rec(RecordClass::Requirement, "belief revision second", Some("pi-governance-rs"), vec!["belief"], 0.8, RecordStatus::Active),
+    ];
+
+    let bundle = retrieve_with_options(&records, opts("belief revision"));
+
+    assert_eq!(bundle.omitted_count, 0);
+}

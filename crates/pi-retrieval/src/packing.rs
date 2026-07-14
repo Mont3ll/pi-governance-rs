@@ -4,7 +4,8 @@ pub fn estimate_tokens(input: &str) -> usize {
     ((input.chars().count() + 3) / 4).max(1) + 24
 }
 
-pub fn pack_ranked(mut ranked: Vec<RankedRecord>, budget: usize) -> (Vec<RankedRecord>, usize, Vec<String>) {
+pub fn pack_ranked(mut ranked: Vec<RankedRecord>, budget: usize) -> (Vec<RankedRecord>, usize, usize, Vec<String>) {
+    let ranked_count = ranked.len();
     let mut packed = Vec::new();
     let mut used = 0usize;
     let mut warnings = Vec::new();
@@ -21,5 +22,6 @@ pub fn pack_ranked(mut ranked: Vec<RankedRecord>, budget: usize) -> (Vec<RankedR
         packed.push(item);
     }
 
-    (packed, used, warnings)
+    let omitted_count = ranked_count.saturating_sub(packed.len());
+    (packed, used, omitted_count, warnings)
 }

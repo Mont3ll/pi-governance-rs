@@ -831,6 +831,8 @@ pub struct ContextBundle {
     pub project: Option<String>,
     pub budget: RetrievalBudget,
     pub used_estimated_tokens: usize,
+    #[serde(default)]
+    pub omitted_count: usize,
     pub explain: bool,
     pub blocks: Vec<ContextBlock>,
     pub records: Vec<RankedRecord>,

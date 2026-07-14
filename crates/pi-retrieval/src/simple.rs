@@ -65,7 +65,7 @@ pub fn retrieve_with_options(records: &[Record], options: RetrievalOptions) -> C
         else { Some("no active records matched query after project/status/confidence filters".to_string()) }
     } else { None };
     let suggestions = if empty_reason.is_some() { vec!["try include-global".to_string(), "try include-contested".to_string(), "try lower min-confidence".to_string()] } else { Vec::new() };
-    let (packed, used_estimated_tokens, pack_warnings) = pack_ranked(ranked, options.budget);
+    let (packed, used_estimated_tokens, omitted_count, pack_warnings) = pack_ranked(ranked, options.budget);
     warnings.extend(pack_warnings);
 
     let blocks = packed.iter().map(|ranked| ContextBlock {
@@ -83,6 +83,7 @@ pub fn retrieve_with_options(records: &[Record], options: RetrievalOptions) -> C
         project: options.project,
         budget: RetrievalBudget { max_tokens: options.budget },
         used_estimated_tokens,
+        omitted_count,
         explain: options.explain,
         blocks,
         records: packed,

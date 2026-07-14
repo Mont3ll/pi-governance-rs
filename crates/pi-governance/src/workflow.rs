@@ -248,7 +248,7 @@ pub fn recall_xray(store: &JsonlStore, namespace: &str, query: &str, project: Op
         let reason = if r.status == RecordStatus::Tombstoned { "status tombstoned" } else if r.status == RecordStatus::Superseded { "status superseded" } else if r.status == RecordStatus::Contested && !include_contested { "contested excluded" } else if r.layer == MemoryLayer::L3Session && !include_l3 { "L3 excluded by default" } else if project.as_ref().is_some_and(|p| !r.scope.matches_project_filter(Some(p))) { "project mismatch" } else { "no lexical match or budget omitted" };
         RecallExcluded { record_id: r.id, reason: reason.to_string() }
     }).collect::<Vec<_>>();
-    Ok(RecallXrayReport { query: query.to_string(), namespace: namespace.to_string(), project, included, excluded, budget: RecallBudget { requested: budget, used: bundle.used_estimated_tokens, omitted_count: bundle.warnings.len() }, warnings: bundle.warnings })
+    Ok(RecallXrayReport { query: query.to_string(), namespace: namespace.to_string(), project, included, excluded, budget: RecallBudget { requested: budget, used: bundle.used_estimated_tokens, omitted_count: bundle.omitted_count }, warnings: bundle.warnings })
 }
 
 pub fn evidence_for_capture(source_kind: SourceKind, trust_class: TrustClass, durability: Durability) -> EvidenceRef {
