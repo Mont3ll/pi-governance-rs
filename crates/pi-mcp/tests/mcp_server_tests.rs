@@ -34,7 +34,7 @@ fn registered_tool_names_come_from_the_canonical_registry() {
 #[test]
 fn observability_tools_are_registered() {
     let names = registered_tool_names();
-    for expected in ["pi.memory_graph", "pi.memory_quality", "pi.relationship_quality", "pi.recall_effectiveness", "pi.store_quality"] {
+    for expected in ["pi.memory_graph", "pi.memory_quality", "pi.relationship_quality", "pi.recall_effectiveness", "pi.store_quality", "pi.simulate_patch"] {
         assert!(names.iter().any(|name| name == expected), "missing {expected}");
     }
 }

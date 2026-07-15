@@ -11,5 +11,6 @@ Operational inspection tools:
 - `pi.relationship_quality` accepts optional `namespace`, `max_nodes`, and `max_edges`.
 - `pi.recall_effectiveness` accepts optional `namespace`.
 - `pi.store_quality` accepts optional `namespace`.
+- `pi.simulate_patch` requires `patch_id` and returns predicted state and quality deltas with `mutation_performed: false`.
 
 The graph is a bounded computed report. Evidence node identifiers do not contain evidence URIs. Quality metric versions are separate from the persisted store schema version.

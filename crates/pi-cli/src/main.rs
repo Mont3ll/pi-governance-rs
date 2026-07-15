@@ -507,6 +507,9 @@ enum Commands {
         layer: Option<MemoryLayer>,
     },
 
+    /// Preview a proposed patch without mutating the store.
+    SimulatePatch { patch_id: String, #[arg(long)] json: bool },
+
     /// Build a bounded read-only memory graph report.
     Graph {
         #[arg(long, default_value_t = 5000)] max_nodes: usize,
@@ -1428,6 +1431,11 @@ fn main() -> Result<()> {
         }
 
 
+        Commands::SimulatePatch { patch_id, json } => {
+            let report = engine.simulate_patch(&patch_id)?;
+            if json { println!("{}", serde_json::to_string_pretty(&report)?); } else { println!("PI Patch Simulation\nPatch: {}\nMemory quality delta: {:+}\nRelationship quality delta: {:+}\nStore quality delta: {:+}\nNo mutation performed.", report.patch_id, report.memory_quality_delta, report.relationship_quality_delta, report.store_quality_delta); }
+        }
+
         Commands::Graph { max_nodes, max_edges, json } => {
             if max_nodes == 0 || max_edges == 0 { anyhow::bail!("graph limits must be greater than zero"); }
             let report = build_memory_graph(&store.load_records()?, &store.load_patches()?, &store.load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now());
@@ -1937,7 +1945,7 @@ fn main() -> Result<()> {
             let changelog = include_str!("../CHANGELOG.md");
             audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0") && changelog.contains("v1.0.0-rc.5") && changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
             let readme = include_str!("../README.md");
-            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "inspect-record", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "mcp-install", "mcp-doctor", "smoke-test", "release-audit", "changelog", "graph", "quality"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
+            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "inspect-record", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "mcp-install", "mcp-doctor", "smoke-test", "release-audit", "changelog", "graph", "quality", "simulate-patch"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
             let registered_tools = registered_tool_names();
             let required_tools = [
                 "pi.retrieve_context", "pi.propose_record", "pi.supersede_record", "pi.tombstone_record",
@@ -1946,7 +1954,7 @@ fn main() -> Result<()> {
                 "pi.export_store", "pi.import_store", "pi.migrate_schema", "pi.doctor",
                 "pi.list_records", "pi.inspect_record", "pi.score_memory_worth", "pi.capture_candidates",
                 "pi.build_context", "pi.session_add", "pi.session_search", "pi.session_decisions",
-                "pi.recall_xray", "pi.list_inbox", "pi.memory_graph", "pi.memory_quality", "pi.relationship_quality", "pi.recall_effectiveness", "pi.store_quality",
+                "pi.recall_xray", "pi.list_inbox", "pi.memory_graph", "pi.memory_quality", "pi.relationship_quality", "pi.recall_effectiveness", "pi.store_quality", "pi.simulate_patch",
             ];
             let missing_tools: Vec<_> = required_tools.iter().filter(|required| !registered_tools.iter().any(|actual| actual == **required)).copied().collect();
             let mcp_tools_detail = if missing_tools.is_empty() { "actual MCP registry contains every required tool".to_string() } else { format!("actual MCP registry is missing: {}", missing_tools.join(", ")) };

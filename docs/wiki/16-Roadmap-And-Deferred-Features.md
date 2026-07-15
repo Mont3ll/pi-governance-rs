@@ -57,6 +57,7 @@ Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CH
 - CLI and MCP access to graph, memory quality, and relationship quality
 - bounded opt-in recall telemetry
 - recall-effectiveness and aggregate store-quality reports
+- read-only patch simulation with quality deltas
 
 ## Still Deferred After v1.0.0
 

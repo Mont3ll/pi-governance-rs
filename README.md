@@ -91,6 +91,7 @@ quality memory
 quality relationship
 quality recall
 quality store
+simulate-patch
 retrieve
 export
 import

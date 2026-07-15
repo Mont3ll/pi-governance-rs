@@ -20,8 +20,11 @@ Both implementations support scoped records, confidence and evidence metadata, r
 | Relationship quality | `pi quality relationship` | `pi.relationship_quality` |
 | Recall effectiveness | `pi quality recall` | `pi.recall_effectiveness` |
 | Store quality | `pi quality store` | `pi.store_quality` |
+| Patch simulation | `pi simulate-patch <patch-id>` | `pi.simulate_patch` |
 
 Graph and quality outputs are deterministic, report-only views over canonical JSONL state. They do not create a graph database, persist derived edges, or mutate governed memory. Quality scores are versioned review heuristics; inspect their signals and reasons rather than treating scores as objective truth.
+
+Patch simulation uses the same pure record transition as real patch application, but does not write records, patches, events, telemetry, locks, or backups. It returns predicted quality deltas for review.
 
 ## Recall telemetry
 

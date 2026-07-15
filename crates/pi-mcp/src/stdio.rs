@@ -724,7 +724,8 @@ impl McpStdioServer {
             {"name":"pi.memory_quality","description":"Analyze per-record governed memory quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
             {"name":"pi.relationship_quality","description":"Analyze memory graph relationship quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"max_nodes":{"type":"integer","minimum":1,"default":5000},"max_edges":{"type":"integer","minimum":1,"default":10000}}}},
             {"name":"pi.recall_effectiveness","description":"Analyze longitudinal recall selection history.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
-            {"name":"pi.store_quality","description":"Aggregate memory, relationship, recall, inbox, and runtime quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}}
+            {"name":"pi.store_quality","description":"Aggregate memory, relationship, recall, inbox, and runtime quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
+            {"name":"pi.simulate_patch","description":"Preview a proposed patch and quality deltas without mutating the store.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"patch_id":{"type":"string"}},"required":["patch_id"]}}
         ])
     }
 
@@ -774,6 +775,7 @@ impl McpStdioServer {
             "pi.relationship_quality" => self.tool_relationship_quality(arguments),
             "pi.recall_effectiveness" => self.tool_recall_effectiveness(arguments),
             "pi.store_quality" => self.tool_store_quality(arguments),
+            "pi.simulate_patch" => self.tool_simulate_patch(arguments),
             other => bail!("unknown PI MCP tool: {other}"),
         }
     }
@@ -1445,6 +1447,11 @@ impl McpStdioServer {
         if max_nodes == 0 || max_edges == 0 { bail!("graph limits must be greater than zero"); }
         let records = self.engine.store().load_records()?;
         let report = analyze_relationship_quality(&build_memory_graph(&records, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now()), &records, chrono::Utc::now());
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+    }
+
+    fn tool_simulate_patch(&self, args: Value) -> Result<Value> {
+        let report = self.engine.simulate_patch(&required_string(&args, "patch_id")?)?;
         Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
     }
 

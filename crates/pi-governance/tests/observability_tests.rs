@@ -1,9 +1,9 @@
 use chrono::{Duration, TimeZone, Utc};
-use pi_governance_core::{
+use pi_governance_core::{PatchStatus,
     Durability, EvidenceKind, EvidenceRef, Patch, RecallEvent, RecallEventClient, RecallEventOperation, Record, RecordClass, Scope,
     SourceKind, StoreEvent, TrustClass,
 };
-use pi_governance_engine::{
+use pi_governance_engine::{GovernanceEngine,
     analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_memory_graph, build_store_quality, MemoryGraphEdgeType,
 };
 
@@ -72,6 +72,26 @@ fn memory_quality_scores_governance_signals_without_claiming_evidence_liveness()
     assert!(report.items[0].signals.contains(&"missing_evidence".to_string()));
     assert!(!report.items[0].signals.iter().any(|signal| signal.contains("live")));
     assert!(report.summary.average_quality < 100);
+}
+
+#[test]
+fn patch_simulation_reports_quality_delta_without_mutating_store() {
+    let root = std::env::temp_dir().join(format!("pi-simulation-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+    let store = pi_governance_store::JsonlStore::new(&root);
+    store.init().unwrap();
+    store.append_record(&record("rec_existing", "existing workflow")).unwrap();
+    let proposed = Patch::propose_record(record("rec_proposed", "proposed workflow"), "preview");
+    store.append_patch(&proposed).unwrap();
+    let before: Vec<_> = ["records.jsonl", "patches.jsonl", "events.jsonl", "recall-events.jsonl"].iter().map(|name| (name.to_string(), std::fs::read(root.join(name)).unwrap())).collect();
+    let engine = GovernanceEngine::new(store);
+
+    let report = engine.simulate_patch(&proposed.id).unwrap();
+
+    assert_eq!(report.patch_id, proposed.id);
+    assert!(!report.mutation_performed);
+    assert_eq!(report.snapshot_token.len(), 64);
+    assert_eq!(report.predicted_patch_status, PatchStatus::Applied);
+    for (name, bytes) in before { assert_eq!(std::fs::read(root.join(&name)).unwrap(), bytes, "{name} changed"); }
 }
 
 #[test]

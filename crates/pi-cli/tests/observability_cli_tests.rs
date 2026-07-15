@@ -22,6 +22,17 @@ fn graph_and_quality_commands_return_versioned_read_only_json() {
 }
 
 #[test]
+fn simulate_patch_is_read_only() {
+    let root = store();
+    success(&["--store", &root, "demo", "--reset"]);
+    let patches: serde_json::Value = serde_json::from_str(&success(&["--store", &root, "list-patches", "--json"])).unwrap();
+    let patch_id = patches.as_array().unwrap().iter().find(|patch| patch["latest_status"] == "proposed").unwrap()["patch_id"].as_str().unwrap();
+    let value: serde_json::Value = serde_json::from_str(&success(&["--store", &root, "simulate-patch", patch_id, "--json"])).unwrap();
+    assert_eq!(value["mutation_performed"], false);
+    assert_eq!(value["predicted_patch_status"], "applied");
+}
+
+#[test]
 fn enabled_telemetry_records_only_query_hash_and_respects_retention() {
     let root = store();
     success(&["--store", &root, "demo", "--reset"]);

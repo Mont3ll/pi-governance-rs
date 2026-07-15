@@ -1,6 +1,7 @@
 pub mod engine;
 pub mod graph;
 pub mod quality;
+pub mod simulation;
 pub mod workflow;
 
 pub use engine::{
@@ -11,4 +12,5 @@ pub use engine::{
 };
 pub use graph::*;
 pub use quality::*;
+pub use simulation::*;
 pub use workflow::*;
