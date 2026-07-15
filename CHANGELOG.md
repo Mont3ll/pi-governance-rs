@@ -10,6 +10,7 @@ Added:
 - Disabled-by-default, bounded recall telemetry that stores query hashes rather than raw query text.
 - Recall-effectiveness and aggregate store-quality reports through CLI and MCP.
 - Read-only patch simulation with predicted state and quality deltas.
+- Review-only procedure-candidate and failure-analysis reports.
 
 ## v1.0.3
 

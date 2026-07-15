@@ -22,6 +22,17 @@ fn graph_and_quality_commands_return_versioned_read_only_json() {
 }
 
 #[test]
+fn workflow_intelligence_commands_are_report_only() {
+    let root = store();
+    success(&["--store", &root, "demo", "--reset"]);
+    for args in [vec!["--store", &root, "procedure-candidates", "--min-source-records", "2", "--json"], vec!["--store", &root, "failure-analysis", "--json"]] {
+        let value: serde_json::Value = serde_json::from_str(&success(&args)).unwrap();
+        assert_eq!(value["mutation_performed"], false);
+        assert_eq!(value["schema_version"], 1);
+    }
+}
+
+#[test]
 fn simulate_patch_is_read_only() {
     let root = store();
     success(&["--store", &root, "demo", "--reset"]);

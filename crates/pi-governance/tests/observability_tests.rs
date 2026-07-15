@@ -4,7 +4,7 @@ use pi_governance_core::{PatchStatus,
     SourceKind, StoreEvent, TrustClass,
 };
 use pi_governance_engine::{GovernanceEngine,
-    analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_memory_graph, build_store_quality, MemoryGraphEdgeType,
+    analyze_failure_patterns, analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_memory_graph, build_store_quality, generate_procedure_candidates, MemoryGraphEdgeType,
 };
 
 fn record(id: &str, claim: &str) -> Record {
@@ -72,6 +72,28 @@ fn memory_quality_scores_governance_signals_without_claiming_evidence_liveness()
     assert!(report.items[0].signals.contains(&"missing_evidence".to_string()));
     assert!(!report.items[0].signals.iter().any(|signal| signal.contains("live")));
     assert!(report.summary.average_quality < 100);
+}
+
+#[test]
+fn procedure_and_failure_analysis_are_report_only_and_provenance_backed() {
+    let now = Utc.with_ymd_and_hms(2026, 7, 14, 12, 0, 0).unwrap();
+    let records = vec![record("rec_test", "Run cargo test before release"), record("rec_audit", "Run release audit before tagging")];
+    let procedures = generate_procedure_candidates(&records, "default", 2, now);
+    assert!(!procedures.mutation_performed);
+    assert_eq!(procedures.candidates.len(), 1);
+    assert_eq!(procedures.candidates[0].source_record_ids.len(), 2);
+    assert!(procedures.candidates[0].review_required);
+
+    let mut rejected = Patch::propose_record(record("rec_rejected", "rejected workflow"), "unsafe");
+    rejected.status = PatchStatus::Rejected;
+    let mut deferred = Patch::propose_record(record("rec_deferred", "deferred workflow"), "later");
+    deferred.status = PatchStatus::Deferred;
+    deferred.updated_at = now - Duration::days(45);
+    let failures = analyze_failure_patterns(&[rejected, deferred], &[StoreEvent::warning("apply failed repeatedly", None)], "default", 30, now);
+    assert!(!failures.mutation_performed);
+    assert!(failures.summary.rejected_patch_count > 0);
+    assert!(failures.summary.stale_deferred_patch_count > 0);
+    assert!(failures.summary.warning_event_count > 0);
 }
 
 #[test]

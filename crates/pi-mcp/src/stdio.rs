@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use pi_governance_core::{default_namespace, ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, PatchStatus, PolicyProfile, RecallEventClient, RecallEventOperation, RecordClass, RetrievalFormat, RetrievalOptions, Scope, SourceKind, TrustClass};
 use pi_governance_engine::{
-    analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_context, build_memory_graph, build_store_quality, claim_from_capture, evidence_for_capture, recall_xray, record_recall_event, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
+    analyze_failure_patterns, analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_context, build_memory_graph, build_store_quality, generate_procedure_candidates, claim_from_capture, evidence_for_capture, recall_xray, record_recall_event, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
@@ -725,7 +725,9 @@ impl McpStdioServer {
             {"name":"pi.relationship_quality","description":"Analyze memory graph relationship quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"max_nodes":{"type":"integer","minimum":1,"default":5000},"max_edges":{"type":"integer","minimum":1,"default":10000}}}},
             {"name":"pi.recall_effectiveness","description":"Analyze longitudinal recall selection history.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
             {"name":"pi.store_quality","description":"Aggregate memory, relationship, recall, inbox, and runtime quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
-            {"name":"pi.simulate_patch","description":"Preview a proposed patch and quality deltas without mutating the store.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"patch_id":{"type":"string"}},"required":["patch_id"]}}
+            {"name":"pi.simulate_patch","description":"Preview a proposed patch and quality deltas without mutating the store.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"patch_id":{"type":"string"}},"required":["patch_id"]}},
+            {"name":"pi.procedure_candidates","description":"Generate review-only procedure candidates from governed workflows.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"min_source_records":{"type":"integer","minimum":2,"default":2}}}},
+            {"name":"pi.failure_analysis","description":"Analyze rejected patches, stale deferrals, and warning events without mutation.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"stale_days":{"type":"integer","minimum":1,"default":30}}}}
         ])
     }
 
@@ -776,6 +778,8 @@ impl McpStdioServer {
             "pi.recall_effectiveness" => self.tool_recall_effectiveness(arguments),
             "pi.store_quality" => self.tool_store_quality(arguments),
             "pi.simulate_patch" => self.tool_simulate_patch(arguments),
+            "pi.procedure_candidates" => self.tool_procedure_candidates(arguments),
+            "pi.failure_analysis" => self.tool_failure_analysis(arguments),
             other => bail!("unknown PI MCP tool: {other}"),
         }
     }
@@ -1447,6 +1451,19 @@ impl McpStdioServer {
         if max_nodes == 0 || max_edges == 0 { bail!("graph limits must be greater than zero"); }
         let records = self.engine.store().load_records()?;
         let report = analyze_relationship_quality(&build_memory_graph(&records, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now()), &records, chrono::Utc::now());
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+    }
+
+    fn tool_procedure_candidates(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let report = generate_procedure_candidates(&self.engine.store().load_records()?, &namespace, optional_usize(&args, "min_source_records").unwrap_or(2), chrono::Utc::now());
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+    }
+
+    fn tool_failure_analysis(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let stale_days = args.get("stale_days").and_then(Value::as_i64).unwrap_or(30);
+        let report = analyze_failure_patterns(&self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, stale_days, chrono::Utc::now());
         Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
     }
 

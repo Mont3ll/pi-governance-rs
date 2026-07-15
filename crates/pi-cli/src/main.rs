@@ -3,7 +3,7 @@ use chrono::DateTime;
 use clap::{Parser, Subcommand};
 use pi_governance_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, PatchStatus, PolicyProfile, RecallEventClient, RecallEventOperation, RecordClass, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
 use pi_governance_engine::{
-    analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_context, build_memory_graph, build_store_quality, claim_from_capture, evidence_for_capture, read_text_input, recall_xray, record_recall_event, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
+    analyze_failure_patterns, analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_context, build_memory_graph, build_store_quality, generate_procedure_candidates, claim_from_capture, evidence_for_capture, read_text_input, recall_xray, record_recall_event, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection, PatchSummary, ProposalInput, RecordInspection, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
@@ -506,6 +506,12 @@ enum Commands {
         #[arg(long)]
         layer: Option<MemoryLayer>,
     },
+
+    /// Generate review-only procedure candidates from governed workflow records.
+    ProcedureCandidates { #[arg(long, default_value_t = 2)] min_source_records: usize, #[arg(long)] json: bool },
+
+    /// Analyze rejected patches, stale deferrals, and warning events.
+    FailureAnalysis { #[arg(long, default_value_t = 30)] stale_days: i64, #[arg(long)] json: bool },
 
     /// Preview a proposed patch without mutating the store.
     SimulatePatch { patch_id: String, #[arg(long)] json: bool },
@@ -1431,6 +1437,16 @@ fn main() -> Result<()> {
         }
 
 
+        Commands::ProcedureCandidates { min_source_records, json } => {
+            let report = generate_procedure_candidates(&store.load_records()?, &namespace, min_source_records, chrono::Utc::now());
+            if json { println!("{}", serde_json::to_string_pretty(&report)?); } else { println!("PI Procedure Candidates\nCandidates: {}\nReview required. No mutation performed.", report.candidates.len()); }
+        }
+
+        Commands::FailureAnalysis { stale_days, json } => {
+            let report = analyze_failure_patterns(&store.load_patches()?, &store.load_events()?, &namespace, stale_days, chrono::Utc::now());
+            if json { println!("{}", serde_json::to_string_pretty(&report)?); } else { println!("PI Failure Analysis\nPatterns: {}\nReview required. No mutation performed.", report.patterns.len()); }
+        }
+
         Commands::SimulatePatch { patch_id, json } => {
             let report = engine.simulate_patch(&patch_id)?;
             if json { println!("{}", serde_json::to_string_pretty(&report)?); } else { println!("PI Patch Simulation\nPatch: {}\nMemory quality delta: {:+}\nRelationship quality delta: {:+}\nStore quality delta: {:+}\nNo mutation performed.", report.patch_id, report.memory_quality_delta, report.relationship_quality_delta, report.store_quality_delta); }
@@ -1945,7 +1961,7 @@ fn main() -> Result<()> {
             let changelog = include_str!("../CHANGELOG.md");
             audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0") && changelog.contains("v1.0.0-rc.5") && changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
             let readme = include_str!("../README.md");
-            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "inspect-record", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "mcp-install", "mcp-doctor", "smoke-test", "release-audit", "changelog", "graph", "quality", "simulate-patch"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
+            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "inspect-record", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "mcp-install", "mcp-doctor", "smoke-test", "release-audit", "changelog", "graph", "quality", "simulate-patch", "procedure-candidates", "failure-analysis"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
             let registered_tools = registered_tool_names();
             let required_tools = [
                 "pi.retrieve_context", "pi.propose_record", "pi.supersede_record", "pi.tombstone_record",
@@ -1954,7 +1970,7 @@ fn main() -> Result<()> {
                 "pi.export_store", "pi.import_store", "pi.migrate_schema", "pi.doctor",
                 "pi.list_records", "pi.inspect_record", "pi.score_memory_worth", "pi.capture_candidates",
                 "pi.build_context", "pi.session_add", "pi.session_search", "pi.session_decisions",
-                "pi.recall_xray", "pi.list_inbox", "pi.memory_graph", "pi.memory_quality", "pi.relationship_quality", "pi.recall_effectiveness", "pi.store_quality", "pi.simulate_patch",
+                "pi.recall_xray", "pi.list_inbox", "pi.memory_graph", "pi.memory_quality", "pi.relationship_quality", "pi.recall_effectiveness", "pi.store_quality", "pi.simulate_patch", "pi.procedure_candidates", "pi.failure_analysis",
             ];
             let missing_tools: Vec<_> = required_tools.iter().filter(|required| !registered_tools.iter().any(|actual| actual == **required)).copied().collect();
             let mcp_tools_detail = if missing_tools.is_empty() { "actual MCP registry contains every required tool".to_string() } else { format!("actual MCP registry is missing: {}", missing_tools.join(", ")) };

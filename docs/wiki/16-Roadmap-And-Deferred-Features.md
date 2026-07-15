@@ -58,6 +58,7 @@ Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CH
 - bounded opt-in recall telemetry
 - recall-effectiveness and aggregate store-quality reports
 - read-only patch simulation with quality deltas
+- review-only procedure-candidate and failure-analysis reports
 
 ## Still Deferred After v1.0.0
 
@@ -67,7 +68,6 @@ Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CH
 - vault integration
 - background job queue
 - memory timeline
-- procedure candidates
 - skill draft artifacts
 - meta-consolidation automation
 - dashboard/TUI

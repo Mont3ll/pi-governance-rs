@@ -92,6 +92,8 @@ quality relationship
 quality recall
 quality store
 simulate-patch
+procedure-candidates
+failure-analysis
 retrieve
 export
 import

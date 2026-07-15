@@ -451,6 +451,8 @@ pi --store .pi quality recall --json
 pi --store .pi quality store --json
 pi --store .pi config set-recall-telemetry on --max-events 10000
 pi --store .pi simulate-patch <patch-id> --json
+pi --store .pi procedure-candidates --min-source-records 2 --json
+pi --store .pi failure-analysis --stale-days 30 --json
 ```
 
 These commands compute read-only, namespace-scoped reports from canonical JSONL data. `graph` accepts `--max-nodes` and `--max-edges`. Quality scores are versioned heuristics accompanied by concrete signals; they do not mutate records or persist derived graph state.

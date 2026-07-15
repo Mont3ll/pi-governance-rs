@@ -12,5 +12,7 @@ Operational inspection tools:
 - `pi.recall_effectiveness` accepts optional `namespace`.
 - `pi.store_quality` accepts optional `namespace`.
 - `pi.simulate_patch` requires `patch_id` and returns predicted state and quality deltas with `mutation_performed: false`.
+- `pi.procedure_candidates` accepts optional `namespace` and `min_source_records`.
+- `pi.failure_analysis` accepts optional `namespace` and `stale_days`.
 
 The graph is a bounded computed report. Evidence node identifiers do not contain evidence URIs. Quality metric versions are separate from the persisted store schema version.
