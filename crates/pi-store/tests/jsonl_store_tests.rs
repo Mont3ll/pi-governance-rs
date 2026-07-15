@@ -1,8 +1,33 @@
-use pi_governance_core::CURRENT_SCHEMA_VERSION;
+use pi_governance_core::{RecallEvent, RecallEventClient, RecallEventOperation, CURRENT_SCHEMA_VERSION};
 use pi_governance_store::{JsonlStore, SchemaMigrationOptions};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+#[test]
+fn recall_telemetry_is_disabled_by_default_and_uses_a_separate_jsonl_stream() {
+    let root = temp_store_dir("recall-telemetry");
+    let store = JsonlStore::new(&root);
+    store.init().unwrap();
+    assert!(!store.load_config().unwrap().recall_telemetry.enabled);
+    assert!(store.load_recall_events().unwrap().is_empty());
+
+    let event = RecallEvent::new("default", RecallEventClient::Cli, RecallEventOperation::Retrieve, "query-hash", vec!["rec_1".into()], 1200, 80);
+    assert!(!store.record_recall_event(&event).unwrap());
+    assert!(store.load_recall_events().unwrap().is_empty());
+
+    let mut config = store.load_config().unwrap();
+    config.recall_telemetry.enabled = true;
+    config.recall_telemetry.max_events = 1;
+    store.save_config(&config).unwrap();
+    assert!(store.record_recall_event(&event).unwrap());
+    let second = RecallEvent::new("default", RecallEventClient::Cli, RecallEventOperation::RecallXray, "second-hash", vec!["rec_2".into()], 1200, 90);
+    assert!(store.record_recall_event(&second).unwrap());
+    let events = store.load_recall_events().unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].query_hash, "second-hash");
+    assert!(root.join("recall-events.jsonl").exists());
+}
 
 fn temp_store_dir(test_name: &str) -> PathBuf {
     let nonce = SystemTime::now()

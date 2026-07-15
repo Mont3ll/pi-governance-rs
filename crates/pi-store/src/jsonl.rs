@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use pi_governance_core::{Patch, Record, SchemaFileAudit, StoreEvent};
+use pi_governance_core::{Patch, RecallEvent, Record, SchemaFileAudit, StoreEvent};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;
@@ -15,6 +15,7 @@ pub struct JsonlStore {
     pub(crate) records_path: PathBuf,
     pub(crate) patches_path: PathBuf,
     pub(crate) events_path: PathBuf,
+    pub(crate) recall_events_path: PathBuf,
     pub(crate) lock_path: PathBuf,
 }
 
@@ -32,6 +33,7 @@ impl JsonlStore {
             records_path: root.join("records.jsonl"),
             patches_path: root.join("patches.jsonl"),
             events_path: root.join("events.jsonl"),
+            recall_events_path: root.join("recall-events.jsonl"),
             lock_path: root.join("store.lock"),
             root,
         }
@@ -49,7 +51,7 @@ impl JsonlStore {
         fs::create_dir_all(&self.root)
             .with_context(|| format!("failed to create store dir {:?}", self.root))?;
 
-        for path in [&self.records_path, &self.patches_path, &self.events_path] {
+        for path in [&self.records_path, &self.patches_path, &self.events_path, &self.recall_events_path] {
             if !path.exists() {
                 File::create(path).with_context(|| format!("failed to create {:?}", path))?;
             }
@@ -80,6 +82,10 @@ impl JsonlStore {
         self.read_jsonl(&self.events_path)
     }
 
+    pub fn load_recall_events(&self) -> Result<Vec<RecallEvent>> {
+        self.read_jsonl(&self.recall_events_path)
+    }
+
     pub fn append_record(&self, record: &Record) -> Result<()> {
         let session = self.write_session()?;
         session.append_record(record)
@@ -93,6 +99,23 @@ impl JsonlStore {
     pub fn append_event(&self, event: &StoreEvent) -> Result<()> {
         let session = self.write_session()?;
         session.append_event(event)
+    }
+
+    pub fn append_recall_event(&self, event: &RecallEvent) -> Result<()> {
+        let session = self.write_session()?;
+        session.store.append_jsonl(&session.store.recall_events_path, event)
+    }
+
+    pub fn record_recall_event(&self, event: &RecallEvent) -> Result<bool> {
+        let config = self.load_config()?;
+        if !config.recall_telemetry.enabled { return Ok(false); }
+        let session = self.write_session()?;
+        let mut events: Vec<RecallEvent> = session.store.read_jsonl(&session.store.recall_events_path)?;
+        events.push(event.clone());
+        let max_events = config.recall_telemetry.max_events.max(1);
+        if events.len() > max_events { events.drain(0..events.len() - max_events); }
+        session.store.write_jsonl_atomic(&session.store.recall_events_path, &events)?;
+        Ok(true)
     }
 
     pub fn overwrite_records_atomic(&self, records: &[Record]) -> Result<()> {

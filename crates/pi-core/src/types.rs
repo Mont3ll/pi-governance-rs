@@ -843,6 +843,36 @@ pub struct ContextBundle {
     pub suggestions: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RecallEventClient { Cli, Mcp }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RecallEventOperation { Retrieve, BuildContext, RecallXray }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecallEvent {
+    #[serde(default = "current_schema_version")]
+    pub schema_version: u32,
+    #[serde(default = "default_namespace")]
+    pub namespace: String,
+    pub id: String,
+    pub timestamp: DateTime<Utc>,
+    pub client: RecallEventClient,
+    pub operation: RecallEventOperation,
+    pub query_hash: String,
+    pub selected_record_ids: Vec<String>,
+    pub budget_requested: usize,
+    pub budget_used: usize,
+}
+
+impl RecallEvent {
+    pub fn new(namespace: impl Into<String>, client: RecallEventClient, operation: RecallEventOperation, query_hash: impl Into<String>, selected_record_ids: Vec<String>, budget_requested: usize, budget_used: usize) -> Self {
+        Self { schema_version: current_schema_version(), namespace: namespace.into(), id: format!("recall_{}", Uuid::new_v4()), timestamp: Utc::now(), client, operation, query_hash: query_hash.into(), selected_record_ids, budget_requested, budget_used }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreEvent {
     #[serde(default = "current_schema_version")]
