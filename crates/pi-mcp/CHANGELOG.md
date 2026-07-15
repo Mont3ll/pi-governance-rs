@@ -2,7 +2,7 @@
 
 This crate is part of the PI Governance workspace.
 
-## Unreleased
+## v1.1.0
 
 Added `pi.memory_graph`, `pi.memory_quality`, `pi.relationship_quality`, `pi.recall_effectiveness`, and `pi.store_quality`, and `pi.simulate_patch`, `pi.procedure_candidates`, and `pi.failure_analysis`.
 

@@ -32,7 +32,7 @@ pi --version
 ## cargo install --git
 
 ```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.3 pi-governance-rs
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.1.0 pi-governance-rs
 pi --version
 ```
 

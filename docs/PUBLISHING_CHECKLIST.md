@@ -11,7 +11,7 @@ Do not publish remotely until explicitly approved.
 - [ ] `cargo package` for each package when dependencies are available.
 - [ ] `cargo publish` for each package when dependencies are available.
 - [ ] Local `cargo install --path crates/pi-cli` test.
-- [ ] Git tag `cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.2 pi-governance-rs` test.
+- [ ] Git tag `cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.1.0 pi-governance-rs` test.
 - [ ] Installed-binary MCP config and `tools/list` test.
 - [ ] Fresh clone test.
 - [ ] Archive verification.

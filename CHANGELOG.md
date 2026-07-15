@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.1.0
 
 Added:
 - Bounded read-only memory graph reports through CLI and MCP.

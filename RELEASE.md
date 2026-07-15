@@ -1,8 +1,8 @@
 # Release Notes
 
-## Current release: v1.0.3
+## Release: v1.1.0
 
-`v1.0.3` is the current user-facing crates.io release.
+`v1.1.0` adds operational intelligence to the governed-memory runtime while preserving explicit review and local-first storage.
 
 Install:
 
@@ -27,7 +27,11 @@ It includes:
 - trust, durability, source, evidence, and namespace metadata
 - scoped context output for agent tasks
 - session add/search/decisions
-- recall-xray
+- recall-xray and optional privacy-safe recall telemetry
+- bounded memory graph and quality reports
+- recall-effectiveness and aggregate store-quality reports
+- read-only patch simulation
+- review-only procedure-candidate and failure-analysis reports
 - import/export
 - local stdio MCP tools
 
@@ -50,7 +54,7 @@ cargo install pi-governance-rs
 Install from Git:
 
 ```bash
-cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.0.3 pi-governance-rs
+cargo install --git https://github.com/Mont3ll/pi-governance-rs --tag v1.1.0 pi-governance-rs
 ```
 
 Build from source:

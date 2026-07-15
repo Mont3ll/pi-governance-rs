@@ -2,7 +2,7 @@
 
 This crate provides the `pi` command-line binary for PI Governance.
 
-## Unreleased
+## v1.1.0
 
 Added graph, memory/relationship/recall/store quality CLI reports, bounded opt-in recall telemetry, read-only patch simulation, procedure-candidate and failure-analysis reports, and actual MCP-registry release auditing.
 
