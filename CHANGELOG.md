@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+Added:
+- Bounded read-only memory graph reports through CLI and MCP.
+- Per-record memory quality and relationship quality reports with versioned heuristic signals.
+- Accurate recall budget omission counts.
+- Release-audit validation against the actual MCP tool registry.
+
 ## v1.0.3
 
 The public crates.io package is available as `pi-governance-rs`.

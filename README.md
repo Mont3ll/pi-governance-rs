@@ -85,6 +85,9 @@ review
 context
 session
 recall-xray
+graph
+quality memory
+quality relationship
 retrieve
 export
 import

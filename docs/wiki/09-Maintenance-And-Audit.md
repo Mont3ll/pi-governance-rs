@@ -18,6 +18,12 @@ Maintenance findings include `pending_patches`, `old_pending_patches`, `deferred
 
 Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CHECKLIST.md), [Release strategy](../RELEASE_STRATEGY.md), [Stable v1 gate](../STABLE_V1_GATE.md).
 
+## Operational quality inspection
+
+Use `pi graph`, `pi quality memory`, and `pi quality relationship` to inspect current memory structure and review signals. These reports are bounded and read-only. A low score is a prompt for review, not an automatic mutation or deletion decision.
+
+Equivalent MCP tools are `pi.memory_graph`, `pi.memory_quality`, and `pi.relationship_quality`.
+
 ## Portable Workflow Parity
 
 `v1.0.0` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.

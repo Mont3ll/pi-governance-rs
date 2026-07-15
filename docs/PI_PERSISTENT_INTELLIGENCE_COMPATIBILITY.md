@@ -1,26 +1,30 @@
 # pi-persistent-intelligence Compatibility
 
-`pi-governance-rs` and `pi-persistent-intelligence` are standalone implementations of the shared PI memory model.
+`pi-governance-rs` and `pi-persistent-intelligence` are standalone implementations of the shared PI governed-memory model.
 
-Use `pi-governance-rs` when you want governed memory through CLI or MCP across multiple agents.
+Use `pi-governance-rs` for explicit CLI or MCP memory workflows across agent clients. Use `pi-persistent-intelligence` for native PI-agent hooks and interactive extension commands. Neither project requires the other.
 
-Use `pi-persistent-intelligence` when you want the lightweight native memory extension inside PI agent.
+## Shared model
 
-Neither project requires the other.
+Both implementations support scoped records, confidence and evidence metadata, review before durable changes, lifecycle revision, and portable export/import.
 
-## Shared memory contract
+## Operational inspection mapping
 
-Both projects use the same core ideas:
+| Capability | Rust CLI | Rust MCP |
+|---|---|---|
+| Retrieve context | `pi retrieve` / `pi context` | `pi.retrieve_context` / `pi.build_context` |
+| Review pending memory | `pi review` / `pi inbox` | `pi.list_patches`, `pi.inspect_patch`, `pi.list_inbox` |
+| Explain recall | `pi recall-xray` | `pi.recall_xray` |
+| Computed memory graph | `pi graph` | `pi.memory_graph` |
+| Per-record quality | `pi quality memory` | `pi.memory_quality` |
+| Relationship quality | `pi quality relationship` | `pi.relationship_quality` |
 
-- scoped memory records
-- confidence and evidence metadata
-- review before durable changes
-- import/export formats for moving memory between tools
+Graph and quality outputs are deterministic, report-only views over canonical JSONL state. They do not create a graph database, persist derived edges, or mutate governed memory. Quality scores are versioned review heuristics; inspect their signals and reasons rather than treating scores as objective truth.
 
-## Interoperability
+## Intentional differences
 
-Use export and import workflows to move reviewed memory between stores. Review imported records and patches before relying on them in another environment.
+Rust does not reproduce PI-extension lifecycle hooks, automatic context injection, TUI browsers, or automatic session shutdown behavior. Agent clients call Rust tools explicitly. Rust graph output is bounded and uses non-secret evidence-reference identifiers rather than exposing evidence URIs in graph node IDs.
 
-## Safety model
+## Interoperability and safety
 
-PI memory is designed to be explicit and auditable. Keep high-impact rules, corrections, and identity-level claims under review, and prefer evidence-backed records over unreviewed notes.
+Use export/import to move reviewed memory between stores. Review imported records and patches before relying on them. Keep identity-level claims, corrections, and high-impact rules under explicit review.

@@ -2,6 +2,10 @@
 
 This crate provides the `pi` command-line binary for PI Governance.
 
+## Unreleased
+
+Added graph and memory/relationship quality CLI reports and actual MCP-registry release auditing.
+
 ## v1.0.3
 
 Fixed the crates.io package layout for the `pi-governance-rs` binary package.

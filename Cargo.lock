@@ -380,6 +380,7 @@ name = "pi-governance-mcp"
 version = "1.0.2"
 dependencies = [
  "anyhow",
+ "chrono",
  "pi-governance-core",
  "pi-governance-engine",
  "pi-governance-retrieval",

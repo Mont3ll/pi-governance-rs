@@ -11,6 +11,7 @@ categories.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+chrono.workspace = true
 serde_json.workspace = true
 pi-governance-core.workspace = true
 pi-governance-engine.workspace = true

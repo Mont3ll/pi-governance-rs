@@ -3,7 +3,7 @@ use chrono::DateTime;
 use clap::{Parser, Subcommand};
 use pi_governance_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, PatchStatus, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
 use pi_governance_engine::{
-    build_context, claim_from_capture, evidence_for_capture, read_text_input, recall_xray, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
+    analyze_memory_quality, analyze_relationship_quality, build_context, build_memory_graph, claim_from_capture, evidence_for_capture, read_text_input, recall_xray, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection, PatchSummary, ProposalInput, RecordInspection, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
@@ -507,6 +507,16 @@ enum Commands {
         layer: Option<MemoryLayer>,
     },
 
+    /// Build a bounded read-only memory graph report.
+    Graph {
+        #[arg(long, default_value_t = 5000)] max_nodes: usize,
+        #[arg(long, default_value_t = 10000)] max_edges: usize,
+        #[arg(long)] json: bool,
+    },
+
+    /// Analyze governed memory quality.
+    Quality { #[command(subcommand)] command: QualityCommands },
+
     /// Generate MCP client configuration.
     McpConfig {
         client: String,
@@ -581,6 +591,14 @@ enum PolicyCommands {
 enum MaintenanceCommands {
     /// Run a read-only governance maintenance scan.
     Scan { #[arg(long)] json: bool, #[arg(long)] layer: Option<MemoryLayer> },
+}
+
+#[derive(Debug, Subcommand)]
+enum QualityCommands {
+    /// Analyze per-record memory quality.
+    Memory { #[arg(long)] json: bool },
+    /// Analyze graph relationship quality.
+    Relationship { #[arg(long)] json: bool },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1402,6 +1420,24 @@ fn main() -> Result<()> {
         }
 
 
+        Commands::Graph { max_nodes, max_edges, json } => {
+            if max_nodes == 0 || max_edges == 0 { anyhow::bail!("graph limits must be greater than zero"); }
+            let report = build_memory_graph(&store.load_records()?, &store.load_patches()?, &store.load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now());
+            if json { println!("{}", serde_json::to_string_pretty(&report)?); } else { println!("PI Memory Graph\nNodes: {}\nEdges: {}\nTruncated: {}", report.nodes.len(), report.edges.len(), report.truncated); }
+        }
+        Commands::Quality { command } => match command {
+            QualityCommands::Memory { json } => {
+                let report = analyze_memory_quality(&store.load_records()?, &namespace, chrono::Utc::now());
+                if json { println!("{}", serde_json::to_string_pretty(&report)?); } else { println!("PI Memory Quality\nAverage: {}/100\nLow quality: {}", report.summary.average_quality, report.summary.low_quality_count); }
+            }
+            QualityCommands::Relationship { json } => {
+                let records = store.load_records()?;
+                let graph = build_memory_graph(&records, &store.load_patches()?, &store.load_events()?, &namespace, 5000, 10000, chrono::Utc::now());
+                let report = analyze_relationship_quality(&graph, &records, chrono::Utc::now());
+                if json { println!("{}", serde_json::to_string_pretty(&report)?); } else { println!("PI Relationship Quality\nAverage: {}/100\nDangling: {}", report.summary.average_relationship_quality, report.summary.dangling_edge_count); }
+            }
+        },
+
         Commands::Config { command } => match command {
             ConfigCommands::Show => {
                 println!("{}", serde_json::to_string_pretty(&engine.config()?)?);
@@ -1866,7 +1902,7 @@ fn main() -> Result<()> {
             let changelog = include_str!("../CHANGELOG.md");
             audit_check(&mut checks, &mut failures, "changelog", changelog.contains("v1.0.0") && changelog.contains("v1.0.0-rc.5") && changelog.contains("v1.0.0-rc.2") && changelog.contains("v1.0.0-rc.1") && changelog.contains("v0.10.1") && changelog.contains("v0.1.0"), "changelog missing expected versions");
             let readme = include_str!("../README.md");
-            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "inspect-record", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "mcp-install", "mcp-doctor", "smoke-test", "release-audit", "changelog"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
+            audit_check(&mut checks, &mut failures, "readme-command-matrix", ["init", "doctor", "migrate", "config", "policy", "namespace", "propose", "review", "demo", "agent-instructions", "apply", "reinforce", "supersede", "tombstone", "contest", "resolve-contest", "retrieve", "export", "import", "list", "inspect-record", "list-patches", "inspect-patch", "mcp-stdio", "mcp-config", "mcp-install", "mcp-doctor", "smoke-test", "release-audit", "changelog", "graph", "quality"].iter().all(|cmd| readme.contains(cmd)), "README command matrix incomplete");
             let registered_tools = registered_tool_names();
             let required_tools = [
                 "pi.retrieve_context", "pi.propose_record", "pi.supersede_record", "pi.tombstone_record",
@@ -1875,7 +1911,7 @@ fn main() -> Result<()> {
                 "pi.export_store", "pi.import_store", "pi.migrate_schema", "pi.doctor",
                 "pi.list_records", "pi.inspect_record", "pi.score_memory_worth", "pi.capture_candidates",
                 "pi.build_context", "pi.session_add", "pi.session_search", "pi.session_decisions",
-                "pi.recall_xray", "pi.list_inbox",
+                "pi.recall_xray", "pi.list_inbox", "pi.memory_graph", "pi.memory_quality", "pi.relationship_quality",
             ];
             let missing_tools: Vec<_> = required_tools.iter().filter(|required| !registered_tools.iter().any(|actual| actual == **required)).copied().collect();
             let mcp_tools_detail = if missing_tools.is_empty() { "actual MCP registry contains every required tool".to_string() } else { format!("actual MCP registry is missing: {}", missing_tools.join(", ")) };

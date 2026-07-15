@@ -49,6 +49,13 @@ Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CH
 - explicit L1/L2/L3 layers
 - minimal reinforcement event compatibility
 
+## Shipped operational inspection
+
+- bounded computed memory graph report
+- per-record memory quality report
+- relationship quality report
+- CLI and MCP access to all three reports
+
 ## Still Deferred After v1.0.0
 
 - deep reinforcement maintenance weighting
@@ -56,7 +63,6 @@ Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CH
 - qmd semantic search
 - vault integration
 - background job queue
-- memory graph
 - memory timeline
 - procedure candidates
 - skill draft artifacts

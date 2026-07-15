@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use pi_governance_core::{default_namespace, ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope, SourceKind, TrustClass};
 use pi_governance_engine::{
-    build_context, claim_from_capture, evidence_for_capture, recall_xray, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
+    analyze_memory_quality, analyze_relationship_quality, build_context, build_memory_graph, claim_from_capture, evidence_for_capture, recall_xray, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
@@ -12,7 +12,7 @@ use std::str::FromStr;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "pi-governance";
-const SERVER_VERSION: &str = "1.0.2";
+const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Clone)]
 pub struct McpStdioServer {
@@ -719,7 +719,10 @@ impl McpStdioServer {
             {"name":"pi.session_search","description":"Search L3 session evidence lexically.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"query":{"type":"string"},"project":{"type":"string"}},"required":["query"]}},
             {"name":"pi.session_decisions","description":"List extracted session decision markers.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"project":{"type":"string"},"days":{"type":"integer"}}}},
             {"name":"pi.recall_xray","description":"Explain recall inclusion and exclusion.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"query":{"type":"string"},"project":{"type":"string"},"budget":{"type":"integer","default":1200},"include_l3":{"type":"boolean"},"include_contested":{"type":"boolean"}},"required":["query"]}},
-            {"name":"pi.list_inbox","description":"List proposed/deferred candidate patches.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"all":{"type":"boolean"}}}}
+            {"name":"pi.list_inbox","description":"List proposed/deferred candidate patches.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"all":{"type":"boolean"}}}},
+            {"name":"pi.memory_graph","description":"Build a bounded read-only memory graph.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"max_nodes":{"type":"integer","minimum":1,"default":5000},"max_edges":{"type":"integer","minimum":1,"default":10000}}}},
+            {"name":"pi.memory_quality","description":"Analyze per-record governed memory quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
+            {"name":"pi.relationship_quality","description":"Analyze memory graph relationship quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"max_nodes":{"type":"integer","minimum":1,"default":5000},"max_edges":{"type":"integer","minimum":1,"default":10000}}}}
         ])
     }
 
@@ -764,6 +767,9 @@ impl McpStdioServer {
             "pi.session_decisions" => self.tool_session_decisions(arguments),
             "pi.recall_xray" => self.tool_recall_xray(arguments),
             "pi.list_inbox" => self.tool_list_inbox(arguments),
+            "pi.memory_graph" => self.tool_memory_graph(arguments),
+            "pi.memory_quality" => self.tool_memory_quality(arguments),
+            "pi.relationship_quality" => self.tool_relationship_quality(arguments),
             other => bail!("unknown PI MCP tool: {other}"),
         }
     }
@@ -1404,6 +1410,31 @@ impl McpStdioServer {
     fn tool_maintenance_scan(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
         let report = self.engine.maintenance_scan(&namespace)?;
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+    }
+
+    fn tool_memory_graph(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let max_nodes = optional_usize(&args, "max_nodes").unwrap_or(5000);
+        let max_edges = optional_usize(&args, "max_edges").unwrap_or(10000);
+        if max_nodes == 0 || max_edges == 0 { bail!("graph limits must be greater than zero"); }
+        let report = build_memory_graph(&self.engine.store().load_records()?, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now());
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+    }
+
+    fn tool_memory_quality(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let report = analyze_memory_quality(&self.engine.store().load_records()?, &namespace, chrono::Utc::now());
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+    }
+
+    fn tool_relationship_quality(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let max_nodes = optional_usize(&args, "max_nodes").unwrap_or(5000);
+        let max_edges = optional_usize(&args, "max_edges").unwrap_or(10000);
+        if max_nodes == 0 || max_edges == 0 { bail!("graph limits must be greater than zero"); }
+        let records = self.engine.store().load_records()?;
+        let report = analyze_relationship_quality(&build_memory_graph(&records, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now()), &records, chrono::Utc::now());
         Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
     }
 

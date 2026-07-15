@@ -109,7 +109,7 @@ fn mcp_lists_and_calls_rc9_tools_with_object_content() {
     let out = child.wait_with_output().unwrap();
     assert!(out.status.success());
     let text = String::from_utf8(out.stdout).unwrap();
-    for tool in ["pi.score_memory_worth", "pi.capture_candidates", "pi.build_context", "pi.session_add", "pi.session_search", "pi.session_decisions", "pi.recall_xray"] {
+    for tool in ["pi.score_memory_worth", "pi.capture_candidates", "pi.build_context", "pi.session_add", "pi.session_search", "pi.session_decisions", "pi.recall_xray", "pi.memory_graph", "pi.memory_quality", "pi.relationship_quality"] {
         assert!(text.contains(tool), "missing {tool} in {text}");
     }
 
@@ -121,4 +121,13 @@ fn mcp_lists_and_calls_rc9_tools_with_object_content() {
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert!(json["result"]["structuredContent"].is_object());
     assert_eq!(json["result"]["structuredContent"]["decision"], "candidate");
+
+    let call = "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"pi.memory_graph\",\"arguments\":{}}}\n";
+    let mut child = Command::new(bin()).args(["--store", &s, "mcp-stdio"]).stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).spawn().unwrap();
+    child.stdin.as_mut().unwrap().write_all(call.as_bytes()).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["result"]["structuredContent"]["mutation_performed"], false);
+    assert_eq!(json["result"]["structuredContent"]["schema_version"], 1);
 }

@@ -1,7 +1,13 @@
-# MCP Response Schema
+# MCP schema
 
-Schema is release-candidate level and intended to stabilize at v1.0.0.
+PI MCP uses JSON-RPC over stdio. `tools/list` is the canonical tool registry; release audit validates required tools against that registry.
 
-MCP tool responses include text `content`, object-shaped `structured content`, and `isError`. List-style tools return objects with named arrays and `count`, for example `{ "records": [], "count": 0 }`.
+Tool results include text content and machine-readable `structuredContent`. Graph and quality reports include `schema_version`, `generated_at`, namespace scope, recommendations or warnings where applicable, and `mutation_performed: false`.
 
-The MCP server default namespace comes from `pi --namespace <name> mcp-stdio`; tool arguments may override namespace where supported.
+Operational inspection tools:
+
+- `pi.memory_graph` accepts optional `namespace`, `max_nodes`, and `max_edges`.
+- `pi.memory_quality` accepts optional `namespace`.
+- `pi.relationship_quality` accepts optional `namespace`, `max_nodes`, and `max_edges`.
+
+The graph is a bounded computed report. Evidence node identifiers do not contain evidence URIs. Quality metric versions are separate from the persisted store schema version.

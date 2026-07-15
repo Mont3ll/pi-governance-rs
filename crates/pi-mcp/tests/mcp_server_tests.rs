@@ -32,6 +32,14 @@ fn registered_tool_names_come_from_the_canonical_registry() {
 }
 
 #[test]
+fn observability_tools_are_registered() {
+    let names = registered_tool_names();
+    for expected in ["pi.memory_graph", "pi.memory_quality", "pi.relationship_quality"] {
+        assert!(names.iter().any(|name| name == expected), "missing {expected}");
+    }
+}
+
+#[test]
 fn retrieve_context_schema_includes_deterministic_retrieval_fields() {
     let root = temp_store_dir("schema");
     let engine = GovernanceEngine::new(JsonlStore::new(root));

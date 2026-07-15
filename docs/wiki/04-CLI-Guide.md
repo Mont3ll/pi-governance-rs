@@ -441,6 +441,16 @@ Notes/cautions: review output before applying durable changes; use namespaces in
 
 Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CHECKLIST.md), [Release strategy](../RELEASE_STRATEGY.md), [Stable v1 gate](../STABLE_V1_GATE.md).
 
+## Graph and quality reports
+
+```console
+pi --store .pi graph --json
+pi --store .pi quality memory --json
+pi --store .pi quality relationship --json
+```
+
+These commands compute read-only, namespace-scoped reports from canonical JSONL data. `graph` accepts `--max-nodes` and `--max-edges`. Quality scores are versioned heuristics accompanied by concrete signals; they do not mutate records or persist derived graph state.
+
 ## Portable Workflow Parity
 
 `v1.0.0` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.

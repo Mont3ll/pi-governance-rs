@@ -75,6 +75,19 @@ fn memory_quality_scores_governance_signals_without_claiming_evidence_liveness()
 }
 
 #[test]
+fn reports_remain_bounded_for_one_thousand_records() {
+    let now = Utc.with_ymd_and_hms(2026, 7, 14, 12, 0, 0).unwrap();
+    let records: Vec<_> = (0..1000).map(|index| record(&format!("rec_{index:04}"), &format!("workflow record {index}"))).collect();
+    let graph = build_memory_graph(&records, &[], &[], "default", 250, 500, now);
+    assert!(graph.truncated);
+    assert!(graph.nodes.len() <= 250);
+    assert!(graph.edges.len() <= 500);
+    assert!(!serde_json::to_string(&graph).unwrap().contains("/private/secret.txt"));
+    let memory = analyze_memory_quality(&records, "default", now);
+    assert_eq!(memory.summary.total_records, 1000);
+}
+
+#[test]
 fn relationship_quality_reports_dangling_and_orphan_relationships() {
     let now = Utc.with_ymd_and_hms(2026, 7, 14, 12, 0, 0).unwrap();
     let mut dangling = record("rec_dangling", "superseding workflow");
