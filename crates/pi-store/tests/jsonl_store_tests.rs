@@ -27,6 +27,8 @@ fn recall_telemetry_is_disabled_by_default_and_uses_a_separate_jsonl_stream() {
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].query_hash, "second-hash");
     assert!(root.join("recall-events.jsonl").exists());
+    let export = store.export_bundle(pi_governance_store::StoreExportOptions { namespace: Some("default".into()), all_namespaces: false, project: None, redacted: false }).unwrap();
+    assert!(!serde_json::to_string(&export).unwrap().contains("second-hash"));
 }
 
 fn temp_store_dir(test_name: &str) -> PathBuf {

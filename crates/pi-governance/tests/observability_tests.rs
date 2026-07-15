@@ -1,10 +1,10 @@
 use chrono::{Duration, TimeZone, Utc};
 use pi_governance_core::{
-    Durability, EvidenceKind, EvidenceRef, Patch, Record, RecordClass, Scope,
+    Durability, EvidenceKind, EvidenceRef, Patch, RecallEvent, RecallEventClient, RecallEventOperation, Record, RecordClass, Scope,
     SourceKind, StoreEvent, TrustClass,
 };
 use pi_governance_engine::{
-    analyze_memory_quality, analyze_relationship_quality, build_memory_graph, MemoryGraphEdgeType,
+    analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_memory_graph, build_store_quality, MemoryGraphEdgeType,
 };
 
 fn record(id: &str, claim: &str) -> Record {
@@ -72,6 +72,22 @@ fn memory_quality_scores_governance_signals_without_claiming_evidence_liveness()
     assert!(report.items[0].signals.contains(&"missing_evidence".to_string()));
     assert!(!report.items[0].signals.iter().any(|signal| signal.contains("live")));
     assert!(report.summary.average_quality < 100);
+}
+
+#[test]
+fn recall_effectiveness_and_store_quality_use_recorded_selection_history() {
+    let now = Utc.with_ymd_and_hms(2026, 7, 14, 12, 0, 0).unwrap();
+    let records = vec![record("rec_used", "used workflow"), record("rec_never", "never used workflow")];
+    let events = vec![RecallEvent::new("default", RecallEventClient::Cli, RecallEventOperation::Retrieve, "hash", vec!["rec_used".into()], 1200, 80)];
+    let recall = analyze_recall_effectiveness(&records, &events, "default", now);
+    assert_eq!(recall.summary.total_events, 1);
+    assert_eq!(recall.summary.never_recalled_count, 1);
+    let memory = analyze_memory_quality(&records, "default", now);
+    let graph = build_memory_graph(&records, &[], &[], "default", 100, 100, now);
+    let relationships = analyze_relationship_quality(&graph, &records, now);
+    let store = build_store_quality(&memory, &relationships, Some(&recall), 0, 0, now);
+    assert!(!store.mutation_performed);
+    assert!(store.metrics.iter().any(|metric| metric.id == "recall_effectiveness"));
 }
 
 #[test]

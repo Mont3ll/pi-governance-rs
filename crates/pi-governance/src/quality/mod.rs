@@ -1,8 +1,12 @@
 mod memory;
+mod recall;
 mod relationship;
+mod store;
 
 pub use memory::*;
+pub use recall::*;
 pub use relationship::*;
+pub use store::*;
 
 use serde::{Deserialize, Serialize};
 

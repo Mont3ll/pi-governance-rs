@@ -22,7 +22,7 @@ Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CH
 
 Use `pi graph`, `pi quality memory`, and `pi quality relationship` to inspect current memory structure and review signals. These reports are bounded and read-only. A low score is a prompt for review, not an automatic mutation or deletion decision.
 
-Equivalent MCP tools are `pi.memory_graph`, `pi.memory_quality`, and `pi.relationship_quality`.
+Equivalent MCP tools are `pi.memory_graph`, `pi.memory_quality`, `pi.relationship_quality`, `pi.recall_effectiveness`, and `pi.store_quality`. Recall telemetry is disabled by default, bounded when enabled, and excluded from ordinary exports.
 
 ## Portable Workflow Parity
 

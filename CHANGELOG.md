@@ -7,6 +7,8 @@ Added:
 - Per-record memory quality and relationship quality reports with versioned heuristic signals.
 - Accurate recall budget omission counts.
 - Release-audit validation against the actual MCP tool registry.
+- Disabled-by-default, bounded recall telemetry that stores query hashes rather than raw query text.
+- Recall-effectiveness and aggregate store-quality reports through CLI and MCP.
 
 ## v1.0.3
 

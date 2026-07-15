@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
-use pi_governance_core::{default_namespace, ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, Scope, SourceKind, TrustClass};
+use pi_governance_core::{default_namespace, ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, PatchStatus, PolicyProfile, RecallEventClient, RecallEventOperation, RecordClass, RetrievalFormat, RetrievalOptions, Scope, SourceKind, TrustClass};
 use pi_governance_engine::{
-    analyze_memory_quality, analyze_relationship_quality, build_context, build_memory_graph, claim_from_capture, evidence_for_capture, recall_xray, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
+    analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_context, build_memory_graph, build_store_quality, claim_from_capture, evidence_for_capture, recall_xray, record_recall_event, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
@@ -722,7 +722,9 @@ impl McpStdioServer {
             {"name":"pi.list_inbox","description":"List proposed/deferred candidate patches.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"all":{"type":"boolean"}}}},
             {"name":"pi.memory_graph","description":"Build a bounded read-only memory graph.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"max_nodes":{"type":"integer","minimum":1,"default":5000},"max_edges":{"type":"integer","minimum":1,"default":10000}}}},
             {"name":"pi.memory_quality","description":"Analyze per-record governed memory quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
-            {"name":"pi.relationship_quality","description":"Analyze memory graph relationship quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"max_nodes":{"type":"integer","minimum":1,"default":5000},"max_edges":{"type":"integer","minimum":1,"default":10000}}}}
+            {"name":"pi.relationship_quality","description":"Analyze memory graph relationship quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"max_nodes":{"type":"integer","minimum":1,"default":5000},"max_edges":{"type":"integer","minimum":1,"default":10000}}}},
+            {"name":"pi.recall_effectiveness","description":"Analyze longitudinal recall selection history.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
+            {"name":"pi.store_quality","description":"Aggregate memory, relationship, recall, inbox, and runtime quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}}
         ])
     }
 
@@ -770,6 +772,8 @@ impl McpStdioServer {
             "pi.memory_graph" => self.tool_memory_graph(arguments),
             "pi.memory_quality" => self.tool_memory_quality(arguments),
             "pi.relationship_quality" => self.tool_relationship_quality(arguments),
+            "pi.recall_effectiveness" => self.tool_recall_effectiveness(arguments),
+            "pi.store_quality" => self.tool_store_quality(arguments),
             other => bail!("unknown PI MCP tool: {other}"),
         }
     }
@@ -813,6 +817,9 @@ impl McpStdioServer {
         let include_contested = optional_bool(&args, "include_contested").unwrap_or(false);
         let format = optional_string(&args, "format").unwrap_or_else(|| "markdown".to_string());
         let (markdown, value) = build_context(self.engine.store(), &self.default_namespace, &query, project, budget, include_l3, include_contested)?;
+        let selected = value["selected_record_ids"].as_array().map(|ids| ids.iter().filter_map(|id| id.as_str().map(str::to_owned)).collect()).unwrap_or_default();
+        let used = value["retrieval_notes"]["used_estimated_tokens"].as_u64().unwrap_or(0) as usize;
+        record_recall_event(self.engine.store(), &self.default_namespace, RecallEventClient::Mcp, RecallEventOperation::BuildContext, &query, selected, budget, used)?;
         let text = if format == "json" { serde_json::to_string_pretty(&value)? } else { markdown };
         Ok(tool_result(text, value))
     }
@@ -852,6 +859,7 @@ impl McpStdioServer {
         let include_l3 = optional_bool(&args, "include_l3").unwrap_or(false);
         let include_contested = optional_bool(&args, "include_contested").unwrap_or(false);
         let report = recall_xray(self.engine.store(), &namespace, &query, project, budget, include_l3, include_contested)?;
+        record_recall_event(self.engine.store(), &namespace, RecallEventClient::Mcp, RecallEventOperation::RecallXray, &query, report.included.iter().map(|item| item.record_id.clone()).collect(), budget, report.budget.used)?;
         Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
     }
 
@@ -963,6 +971,8 @@ impl McpStdioServer {
                 min_confidence,
             })
             .context("failed to retrieve PI context")?;
+
+        record_recall_event(self.engine.store(), &bundle.namespace, RecallEventClient::Mcp, RecallEventOperation::Retrieve, &bundle.query, bundle.records.iter().map(|ranked| ranked.record.id.clone()).collect(), bundle.budget.max_tokens, bundle.used_estimated_tokens)?;
 
         let text = match retrieval_format {
             RetrievalFormat::Json => serde_json::to_string_pretty(&bundle)?,
@@ -1435,6 +1445,24 @@ impl McpStdioServer {
         if max_nodes == 0 || max_edges == 0 { bail!("graph limits must be greater than zero"); }
         let records = self.engine.store().load_records()?;
         let report = analyze_relationship_quality(&build_memory_graph(&records, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now()), &records, chrono::Utc::now());
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+    }
+
+    fn tool_recall_effectiveness(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args);
+        let report = analyze_recall_effectiveness(&self.engine.store().load_records()?, &self.engine.store().load_recall_events()?, &namespace, chrono::Utc::now());
+        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+    }
+
+    fn tool_store_quality(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args); let now = chrono::Utc::now(); let records = self.engine.store().load_records()?;
+        let memory = analyze_memory_quality(&records, &namespace, now);
+        let graph = build_memory_graph(&records, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, 5000, 10000, now);
+        let relationships = analyze_relationship_quality(&graph, &records, now);
+        let recall = analyze_recall_effectiveness(&records, &self.engine.store().load_recall_events()?, &namespace, now);
+        let pending = self.engine.list_patches(10000)?.iter().filter(|patch| matches!(patch.latest_status, PatchStatus::Proposed | PatchStatus::Deferred)).count();
+        let warnings = self.engine.store().load_events()?.iter().filter(|event| event.namespace == namespace && event.severity != "info").count();
+        let report = build_store_quality(&memory, &relationships, Some(&recall), pending, warnings, now);
         Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
     }
 

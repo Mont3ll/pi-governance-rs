@@ -1,9 +1,9 @@
 use anyhow::Result;
 use chrono::DateTime;
 use clap::{Parser, Subcommand};
-use pi_governance_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, PatchStatus, PolicyProfile, RecordClass, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
+use pi_governance_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, PatchStatus, PolicyProfile, RecallEventClient, RecallEventOperation, RecordClass, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
 use pi_governance_engine::{
-    analyze_memory_quality, analyze_relationship_quality, build_context, build_memory_graph, claim_from_capture, evidence_for_capture, read_text_input, recall_xray, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
+    analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_context, build_memory_graph, build_store_quality, claim_from_capture, evidence_for_capture, read_text_input, recall_xray, record_recall_event, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection, PatchSummary, ProposalInput, RecordInspection, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
@@ -577,6 +577,8 @@ enum ConfigCommands {
     Show,
     /// Set a namespace policy profile.
     SetPolicy { namespace: String, profile: PolicyProfile },
+    /// Enable or disable bounded local recall telemetry.
+    SetRecallTelemetry { enabled: String, #[arg(long, default_value_t = 10000)] max_events: usize },
 }
 
 #[derive(Debug, Subcommand)]
@@ -599,6 +601,10 @@ enum QualityCommands {
     Memory { #[arg(long)] json: bool },
     /// Analyze graph relationship quality.
     Relationship { #[arg(long)] json: bool },
+    /// Analyze longitudinal recall effectiveness.
+    Recall { #[arg(long)] json: bool },
+    /// Aggregate memory, relationship, recall, inbox, and runtime quality.
+    Store { #[arg(long)] json: bool },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1191,6 +1197,8 @@ fn main() -> Result<()> {
                 min_confidence,
             })?;
 
+            record_recall_event(&store, &namespace, RecallEventClient::Cli, RecallEventOperation::Retrieve, &bundle.query, bundle.records.iter().map(|ranked| ranked.record.id.clone()).collect(), bundle.budget.max_tokens, bundle.used_estimated_tokens)?;
+
             match retrieval_format {
                 RetrievalFormat::Json => println!("{}", serde_json::to_string_pretty(&bundle)?),
                 RetrievalFormat::Markdown => println!("{}", render_markdown(&bundle)),
@@ -1436,6 +1444,21 @@ fn main() -> Result<()> {
                 let report = analyze_relationship_quality(&graph, &records, chrono::Utc::now());
                 if json { println!("{}", serde_json::to_string_pretty(&report)?); } else { println!("PI Relationship Quality\nAverage: {}/100\nDangling: {}", report.summary.average_relationship_quality, report.summary.dangling_edge_count); }
             }
+            QualityCommands::Recall { json } => {
+                let report = analyze_recall_effectiveness(&store.load_records()?, &store.load_recall_events()?, &namespace, chrono::Utc::now());
+                if json { println!("{}", serde_json::to_string_pretty(&report)?); } else { println!("PI Recall Effectiveness\nAverage: {}/100\nEvents: {}", report.summary.average_effectiveness, report.summary.total_events); }
+            }
+            QualityCommands::Store { json } => {
+                let now = chrono::Utc::now(); let records = store.load_records()?;
+                let memory = analyze_memory_quality(&records, &namespace, now);
+                let graph = build_memory_graph(&records, &store.load_patches()?, &store.load_events()?, &namespace, 5000, 10000, now);
+                let relationships = analyze_relationship_quality(&graph, &records, now);
+                let recall = analyze_recall_effectiveness(&records, &store.load_recall_events()?, &namespace, now);
+                let pending = engine.list_patches(10000)?.iter().filter(|patch| matches!(patch.latest_status, PatchStatus::Proposed | PatchStatus::Deferred)).count();
+                let warnings = store.load_events()?.iter().filter(|event| event.namespace == namespace && event.severity != "info").count();
+                let report = build_store_quality(&memory, &relationships, Some(&recall), pending, warnings, now);
+                if json { println!("{}", serde_json::to_string_pretty(&report)?); } else { println!("PI Store Quality\nOverall: {}/100", report.overall_score); }
+            }
         },
 
         Commands::Config { command } => match command {
@@ -1445,6 +1468,14 @@ fn main() -> Result<()> {
             ConfigCommands::SetPolicy { namespace, profile } => {
                 let config = engine.set_policy(&namespace, profile)?;
                 println!("{}", serde_json::to_string_pretty(&config)?);
+            }
+            ConfigCommands::SetRecallTelemetry { enabled, max_events } => {
+                if max_events == 0 { anyhow::bail!("max-events must be greater than zero"); }
+                let mut config = store.load_config()?;
+                config.recall_telemetry.enabled = match enabled.as_str() { "true" | "on" | "enabled" => true, "false" | "off" | "disabled" => false, _ => anyhow::bail!("enabled must be true/on or false/off") };
+                config.recall_telemetry.max_events = max_events;
+                store.save_config(&config)?;
+                println!("{}", serde_json::to_string_pretty(&config.recall_telemetry)?);
             }
         },
 
@@ -1772,6 +1803,9 @@ fn main() -> Result<()> {
 
         Commands::Context { query, project, budget, format, include_l3, include_contested, layer: _ } => {
             let (markdown, value) = build_context(&store, &namespace, &query, project, budget, include_l3, include_contested)?;
+            let selected = value["selected_record_ids"].as_array().map(|ids| ids.iter().filter_map(|id| id.as_str().map(str::to_owned)).collect()).unwrap_or_default();
+            let used = value["retrieval_notes"]["used_estimated_tokens"].as_u64().unwrap_or(0) as usize;
+            record_recall_event(&store, &namespace, RecallEventClient::Cli, RecallEventOperation::BuildContext, &query, selected, budget, used)?;
             match format.as_str() {
                 "json" => println!("{}", serde_json::to_string_pretty(&value)?),
                 "markdown" | "md" => println!("{}", markdown),
@@ -1799,6 +1833,7 @@ fn main() -> Result<()> {
 
         Commands::RecallXray { query, project, budget, json, include_l3, include_contested, layer: _ } => {
             let report = recall_xray(&store, &namespace, &query, project, budget, include_l3, include_contested)?;
+            record_recall_event(&store, &namespace, RecallEventClient::Cli, RecallEventOperation::RecallXray, &query, report.included.iter().map(|item| item.record_id.clone()).collect(), budget, report.budget.used)?;
             if json { println!("{}", serde_json::to_string_pretty(&report)?); }
             else { println!("Recall X-ray: {}", report.query); for r in report.included { println!("included {} layer={} score={:.3}", r.record_id, r.layer, r.score); } for r in report.excluded { println!("excluded {} reason={}", r.record_id, r.reason); } }
         }
@@ -1911,7 +1946,7 @@ fn main() -> Result<()> {
                 "pi.export_store", "pi.import_store", "pi.migrate_schema", "pi.doctor",
                 "pi.list_records", "pi.inspect_record", "pi.score_memory_worth", "pi.capture_candidates",
                 "pi.build_context", "pi.session_add", "pi.session_search", "pi.session_decisions",
-                "pi.recall_xray", "pi.list_inbox", "pi.memory_graph", "pi.memory_quality", "pi.relationship_quality",
+                "pi.recall_xray", "pi.list_inbox", "pi.memory_graph", "pi.memory_quality", "pi.relationship_quality", "pi.recall_effectiveness", "pi.store_quality",
             ];
             let missing_tools: Vec<_> = required_tools.iter().filter(|required| !registered_tools.iter().any(|actual| actual == **required)).copied().collect();
             let mcp_tools_detail = if missing_tools.is_empty() { "actual MCP registry contains every required tool".to_string() } else { format!("actual MCP registry is missing: {}", missing_tools.join(", ")) };

@@ -18,8 +18,14 @@ Both implementations support scoped records, confidence and evidence metadata, r
 | Computed memory graph | `pi graph` | `pi.memory_graph` |
 | Per-record quality | `pi quality memory` | `pi.memory_quality` |
 | Relationship quality | `pi quality relationship` | `pi.relationship_quality` |
+| Recall effectiveness | `pi quality recall` | `pi.recall_effectiveness` |
+| Store quality | `pi quality store` | `pi.store_quality` |
 
 Graph and quality outputs are deterministic, report-only views over canonical JSONL state. They do not create a graph database, persist derived edges, or mutate governed memory. Quality scores are versioned review heuristics; inspect their signals and reasons rather than treating scores as objective truth.
+
+## Recall telemetry
+
+Recall telemetry is disabled by default. When enabled, it is local, bounded by `max_events`, stores a SHA-256 query hash rather than raw query text, and is excluded from ordinary store export. Use `pi config set-recall-telemetry on --max-events 10000` to enable it.
 
 ## Intentional differences
 

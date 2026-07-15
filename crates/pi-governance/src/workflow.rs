@@ -1,10 +1,11 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
-use pi_governance_core::{Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, RecordClass, RecordStatus, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
+use pi_governance_core::{RecallEvent, RecallEventClient, RecallEventOperation,Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, RecordClass, RecordStatus, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
 use pi_governance_retrieval::retrieve_with_options;
 use pi_governance_store::JsonlStore;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -232,7 +233,7 @@ pub fn build_context(store: &JsonlStore, namespace: &str, query: &str, project: 
     md.push_str(&l3_text);
     md.push_str("\n### Contested / Review Before Relying\n"); md.push_str(&format_items(&contested));
     md.push_str("\n### Open Questions\n- none detected\n\n### Retrieval Notes\n"); md.push_str(&format!("- retriever: hybrid\n- namespace: {namespace}\n- used estimated tokens: {}\n", bundle.used_estimated_tokens));
-    let json = json!({"query":query,"namespace":namespace,"project":project,"l1":l1,"l2":l2,"l3":l3,"contested":contested,"retrieval_notes":{"retriever":"hybrid","used_estimated_tokens":bundle.used_estimated_tokens,"warnings":bundle.warnings}});
+    let json = json!({"query":query,"namespace":namespace,"project":project,"l1":l1,"l2":l2,"l3":l3,"contested":contested,"selected_record_ids":bundle.records.iter().map(|ranked| ranked.record.id.clone()).collect::<Vec<_>>(),"retrieval_notes":{"retriever":"hybrid","used_estimated_tokens":bundle.used_estimated_tokens,"warnings":bundle.warnings}});
     Ok((md, json))
 }
 
@@ -249,6 +250,14 @@ pub fn recall_xray(store: &JsonlStore, namespace: &str, query: &str, project: Op
         RecallExcluded { record_id: r.id, reason: reason.to_string() }
     }).collect::<Vec<_>>();
     Ok(RecallXrayReport { query: query.to_string(), namespace: namespace.to_string(), project, included, excluded, budget: RecallBudget { requested: budget, used: bundle.used_estimated_tokens, omitted_count: bundle.omitted_count }, warnings: bundle.warnings })
+}
+
+pub fn hash_recall_query(query: &str) -> String {
+    format!("{:x}", Sha256::digest(query.as_bytes()))
+}
+
+pub fn record_recall_event(store: &JsonlStore, namespace: &str, client: RecallEventClient, operation: RecallEventOperation, query: &str, selected_record_ids: Vec<String>, budget_requested: usize, budget_used: usize) -> Result<bool> {
+    store.record_recall_event(&RecallEvent::new(namespace, client, operation, hash_recall_query(query), selected_record_ids, budget_requested, budget_used))
 }
 
 pub fn evidence_for_capture(source_kind: SourceKind, trust_class: TrustClass, durability: Durability) -> EvidenceRef {

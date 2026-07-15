@@ -54,7 +54,9 @@ Related: [Wiki index](../WIKI_INDEX.md), [Deployment checklist](../DEPLOYMENT_CH
 - bounded computed memory graph report
 - per-record memory quality report
 - relationship quality report
-- CLI and MCP access to all three reports
+- CLI and MCP access to graph, memory quality, and relationship quality
+- bounded opt-in recall telemetry
+- recall-effectiveness and aggregate store-quality reports
 
 ## Still Deferred After v1.0.0
 

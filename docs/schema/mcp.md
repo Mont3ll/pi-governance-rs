@@ -9,5 +9,7 @@ Operational inspection tools:
 - `pi.memory_graph` accepts optional `namespace`, `max_nodes`, and `max_edges`.
 - `pi.memory_quality` accepts optional `namespace`.
 - `pi.relationship_quality` accepts optional `namespace`, `max_nodes`, and `max_edges`.
+- `pi.recall_effectiveness` accepts optional `namespace`.
+- `pi.store_quality` accepts optional `namespace`.
 
 The graph is a bounded computed report. Evidence node identifiers do not contain evidence URIs. Quality metric versions are separate from the persisted store schema version.

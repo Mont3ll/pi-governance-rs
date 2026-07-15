@@ -109,7 +109,7 @@ fn mcp_lists_and_calls_rc9_tools_with_object_content() {
     let out = child.wait_with_output().unwrap();
     assert!(out.status.success());
     let text = String::from_utf8(out.stdout).unwrap();
-    for tool in ["pi.score_memory_worth", "pi.capture_candidates", "pi.build_context", "pi.session_add", "pi.session_search", "pi.session_decisions", "pi.recall_xray", "pi.memory_graph", "pi.memory_quality", "pi.relationship_quality"] {
+    for tool in ["pi.score_memory_worth", "pi.capture_candidates", "pi.build_context", "pi.session_add", "pi.session_search", "pi.session_decisions", "pi.recall_xray", "pi.memory_graph", "pi.memory_quality", "pi.relationship_quality", "pi.recall_effectiveness", "pi.store_quality"] {
         assert!(text.contains(tool), "missing {tool} in {text}");
     }
 
