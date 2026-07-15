@@ -41,4 +41,6 @@ Rust does not reproduce PI-extension lifecycle hooks, automatic context injectio
 
 ## Interoperability and safety
 
-Use export/import to move reviewed memory between stores. Review imported records and patches before relying on them. Keep identity-level claims, corrections, and high-impact rules under explicit review.
+Use export/import to move reviewed memory between stores. Version 1 bundles preserve records, patch history, evidence, inquiries, sessions, reinforcement events, tombstones, redaction metadata, and namespaces. The importer accepts RFC 3339 and date-only timestamps, normalizing date-only values to midnight UTC.
+
+Rust keeps records, patches, and events as canonical JSONL. Portable auxiliary artifacts are stored as categorized canonical events and reconstructed into their original bundle sections on export. Imports remain merge-only, skip stable-ID duplicates, and never auto-apply proposed or deferred patches. Review imported records and patches before relying on them. Keep identity-level claims, corrections, and high-impact rules under explicit review.

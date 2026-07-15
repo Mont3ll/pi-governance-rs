@@ -95,6 +95,57 @@ fn migrates_legacy_jsonl_schema_versions_with_backup() -> anyhow::Result<()> {
 }
 
 #[test]
+fn imports_javascript_bundle_and_preserves_auxiliary_sections() -> anyhow::Result<()> {
+    use pi_governance_store::{StoreExportOptions, StoreImportOptions};
+    let root = temp_store_dir("js-portable");
+    let store = JsonlStore::new(&root);
+    store.init()?;
+    let path = root.join("js-bundle.json");
+    let bundle = serde_json::json!({
+        "schema_version": 1, "format": "pi-governance",
+        "producer": {"name":"pi-persistent-intelligence","version":"0.13.0"},
+        "exported_at":"2026-07-15T00:00:00Z", "redacted":false,
+        "redaction":{"enabled":false,"fields_checked":[],"fields_redacted":[],"notes":[]},
+        "namespace":"interop-test", "all_namespaces":false, "project":null,
+        "records":[
+            {"id":"mem_js","namespace":"interop-test","class":"workflow","layer":"l2_playbook","claim":"Preserve portable memory.","status":"active","memory_kind":"instruction","rule_type":"workflow","trust_class":"direct_user_instruction","durability":"project","source_kind":"manual_cli","confidence":0.9,"evidence_ids":["ev_js"],"evidence":[{"kind":"conversation","uri":"daily/2026-07-15.md"}],"scope":{"level":"project","key":"demo"},"tags":["interop"],"supersedes":[],"created_at":"2026-07-15","updated_at":"2026-07-15"},
+            {"id":"mem_domain","namespace":"interop-test","class":"workflow","layer":"l2_playbook","claim":"Preserve domain scope metadata.","status":"active","memory_kind":"instruction","confidence":0.8,"evidence":[],"scope":{"level":"domain","key":"release"},"tags":["interop"],"supersedes":[],"created_at":"2026-07-15","updated_at":"2026-07-15"}
+        ],
+        "patches":[
+            {"id":"cap_js","status":"proposed","operation":"propose_record","claim":"Review imported candidate.","layer":"l2_playbook","memory_kind":"instruction","rule_type":"workflow","tags":["interop"]},
+            {"schema_version":1,"namespace":"interop-test","id":"patch_reinforce","operation":"reinforce_record","status":"applied","target_id":"mem_js","proposed_record":null,"contest_resolution":null,"evidence":[],"reason":"Historical reinforcement","created_at":"2026-07-15T00:00:00Z","updated_at":"2026-07-15T00:00:00Z"}
+        ],
+        "evidence":[{"id":"ev_js","created_at":"2026-07-15T00:00:00Z","source_summary":"Portable evidence"}],
+        "sessions":[{"id":"session_js","namespace":"interop-test","layer":"l3_session","text":"#decision preserve sessions","created_at":"2026-07-15T00:00:00Z","source_kind":"session_entry"}],
+        "inquiries":[{"id":"inq_js","created_at":"2026-07-15T00:00:00Z","question":"Preserve inquiry?","status":"open"}],
+        "reinforcement":[{"id":"rein_js","memory_id":"mem_js","timestamp":"2026-07-15T00:00:00Z","outcome":"explicit_reinforcement"}],
+        "tombstones":[{"id":"tomb_js","deleted_record_id":"mem_deleted","deleted_at":"2026-07-15T00:00:00Z","deletion_mode":"audit_preserving","deletion_reason":"user_requested","content_removed":true}],
+        "events":[]
+    });
+    fs::write(&path, serde_json::to_vec_pretty(&bundle)?)?;
+    let report = store.import_bundle_from_path(&path, StoreImportOptions { namespace:"interop-test".into(), preserve_namespaces:true, dry_run:false, backup:true })?;
+    assert_eq!(report.imported_records, 2);
+    assert!(store.load_records()?.iter().any(|record| record.id == "mem_domain" && record.tags.iter().any(|tag| tag == "domain:release")));
+    assert_eq!(report.imported_patches, 2);
+    assert_eq!(report.imported_events, 5);
+    let exported = store.export_bundle(StoreExportOptions { namespace:Some("interop-test".into()), all_namespaces:false, project:None, redacted:false })?;
+    assert_eq!(exported.evidence.len(), 1);
+    assert_eq!(exported.sessions.len(), 1);
+    assert_eq!(exported.inquiries.len(), 1);
+    assert_eq!(exported.reinforcement.len(), 1);
+    assert_eq!(exported.tombstones.len(), 1);
+    let redacted = store.export_bundle(StoreExportOptions { namespace:Some("interop-test".into()), all_namespaces:false, project:None, redacted:true })?;
+    assert!(redacted.sessions.is_empty());
+    assert_eq!(redacted.evidence[0].get("source_summary").and_then(serde_json::Value::as_str), Some("redacted"));
+    let duplicate = store.import_bundle_from_path(&path, StoreImportOptions { namespace:"interop-test".into(), preserve_namespaces:true, dry_run:false, backup:true })?;
+    assert_eq!(duplicate.imported_records, 0);
+    assert_eq!(duplicate.imported_patches, 0);
+    assert_eq!(duplicate.imported_events, 0);
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
 fn exports_and_imports_portable_bundle_without_overwriting_duplicates() -> anyhow::Result<()> {
     use pi_governance_core::{EvidenceKind, EvidenceRef, Record, RecordClass, Scope};
     use pi_governance_store::{StoreExportOptions, StoreImportOptions};

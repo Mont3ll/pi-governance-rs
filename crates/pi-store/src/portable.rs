@@ -1,7 +1,8 @@
 use anyhow::{bail, Context, Result};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use pi_governance_core::{Patch, Record, StoreEvent, CURRENT_SCHEMA_VERSION};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
@@ -34,8 +35,13 @@ pub struct RedactionMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BundleProducer { pub name: String, pub version: String }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreExportBundle {
     pub schema_version: u32,
+    #[serde(default)] pub format: Option<String>,
+    #[serde(default)] pub producer: Option<BundleProducer>,
     pub exported_at: DateTime<Utc>,
     pub redacted: bool,
     pub redaction: RedactionMetadata,
@@ -45,6 +51,11 @@ pub struct StoreExportBundle {
     pub records: Vec<Record>,
     pub patches: Vec<Patch>,
     pub events: Vec<StoreEvent>,
+    #[serde(default)] pub evidence: Vec<Value>,
+    #[serde(default)] pub inquiries: Vec<Value>,
+    #[serde(default)] pub sessions: Vec<Value>,
+    #[serde(default)] pub reinforcement: Vec<Value>,
+    #[serde(default)] pub tombstones: Vec<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -128,14 +139,25 @@ impl JsonlStore {
             })
             .collect();
 
+        let mut evidence = take_compatibility_events(&mut selected_events, "evidence");
+        let mut inquiries = take_compatibility_events(&mut selected_events, "inquiry");
+        let mut sessions = take_compatibility_events(&mut selected_events, "session");
+        let reinforcement = take_compatibility_events(&mut selected_events, "reinforcement");
+        let mut tombstones = take_compatibility_events(&mut selected_events, "tombstone");
         if options.redacted {
             redact_records(&mut selected_records);
             redact_patches(&mut selected_patches);
             redact_events(&mut selected_events);
+            redact_portable_values(&mut evidence, &["source_summary", "source_excerpt"]);
+            redact_portable_values(&mut inquiries, &["question", "context"]);
+            redact_portable_values(&mut tombstones, &["content", "content_hash"]);
+            sessions.clear();
         }
 
         Ok(StoreExportBundle {
             schema_version: CURRENT_SCHEMA_VERSION,
+            format: Some("pi-governance".to_string()),
+            producer: Some(BundleProducer { name: "pi-governance-rs".to_string(), version: env!("CARGO_PKG_VERSION").to_string() }),
             exported_at: Utc::now(),
             redacted: options.redacted,
             redaction: RedactionMetadata {
@@ -150,6 +172,11 @@ impl JsonlStore {
             records: selected_records,
             patches: selected_patches,
             events: selected_events,
+            evidence,
+            inquiries,
+            sessions,
+            reinforcement,
+            tombstones,
         })
     }
 
@@ -178,9 +205,10 @@ impl JsonlStore {
     ) -> Result<StoreImportReport> {
         let contents = fs::read_to_string(path)
             .with_context(|| format!("failed to read import bundle {:?}", path))?;
-        let bundle: StoreExportBundle = serde_json::from_str(&contents)
-            .with_context(|| format!("failed to parse import bundle {:?}", path))?;
-
+        let value: Value = serde_json::from_str(&contents)
+            .with_context(|| format!("failed to parse import bundle JSON {:?}", path))?;
+        let bundle = normalize_portable_bundle(value)
+            .with_context(|| format!("failed to normalize import bundle {:?}", path))?;
         self.import_bundle(bundle, options)
     }
 
@@ -189,6 +217,7 @@ impl JsonlStore {
         bundle: StoreExportBundle,
         options: StoreImportOptions,
     ) -> Result<StoreImportReport> {
+        let bundle = materialize_auxiliary_events(bundle)?;
         self.init()?;
         let session = self.write_session()?;
 
@@ -307,6 +336,141 @@ impl JsonlStore {
             warnings,
         })
     }
+}
+
+fn normalize_timestamp(value: Option<&str>, fallback: DateTime<Utc>) -> Result<DateTime<Utc>> {
+    match value {
+        None => Ok(fallback),
+        Some(raw) if raw.len() == 10 => {
+            let date = NaiveDate::parse_from_str(raw, "%Y-%m-%d")?;
+            Ok(Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).expect("midnight is valid")))
+        }
+        Some(raw) => Ok(DateTime::parse_from_rfc3339(raw)?.with_timezone(&Utc)),
+    }
+}
+
+fn set_timestamp(object: &mut serde_json::Map<String, Value>, key: &str, fallback: DateTime<Utc>) -> Result<()> {
+    let parsed = normalize_timestamp(object.get(key).and_then(Value::as_str), fallback)?;
+    object.insert(key.to_string(), Value::String(parsed.to_rfc3339()));
+    Ok(())
+}
+
+fn normalize_evidence_value(value: &mut Value) {
+    let Some(object) = value.as_object_mut() else { return; };
+    object.entry("schema_version").or_insert(json!(1));
+    object.entry("kind").or_insert(json!("conversation"));
+    object.entry("uri").or_insert(json!("imported:portable-evidence"));
+    object.entry("note").or_insert(Value::Null);
+    for (key, allowed) in [
+        ("trust_class", &["direct_user_instruction","user_correction","agent_inference","repository_text","generated_content","third_party_documentation","codebase_analysis","human_review","unknown"][..]),
+        ("durability", &["temporary","task","project","long_term","unknown"][..]),
+        ("source_kind", &["manual_cli","manual_mcp","session_text","transcript_file","stdin","agent_observation","codebase_analysis","imported_bundle","unknown"][..]),
+    ] {
+        let valid = object.get(key).and_then(Value::as_str).map(|item| allowed.contains(&item)).unwrap_or(false);
+        if !valid { object.insert(key.to_string(), json!("unknown")); }
+    }
+}
+
+fn normalize_record_value(value: &mut Value, fallback_namespace: &str, fallback_time: DateTime<Utc>) -> Result<()> {
+    let object = value.as_object_mut().context("portable record must be an object")?;
+    object.entry("schema_version").or_insert(json!(1));
+    object.entry("namespace").or_insert(json!(fallback_namespace));
+    object.entry("class").or_insert(json!("workflow"));
+    object.entry("evidence").or_insert(json!([]));
+    object.entry("layer").or_insert(json!("l2_playbook"));
+    object.entry("trust_class").or_insert(json!("unknown"));
+    object.entry("durability").or_insert(json!("unknown"));
+    object.entry("source_kind").or_insert(json!("imported_bundle"));
+    object.entry("scope").or_insert(json!({"level":"global","key":null}));
+    object.entry("tags").or_insert(json!([]));
+    object.entry("supersedes").or_insert(json!([]));
+    if object.get("status").and_then(Value::as_str) == Some("deleted") { object.insert("status".into(), json!("tombstoned")); }
+    let domain_key = object.get("scope").and_then(Value::as_object).filter(|scope| scope.get("level").and_then(Value::as_str) == Some("domain")).and_then(|scope| scope.get("key")).and_then(Value::as_str).map(str::to_string);
+    if let Some(key) = domain_key {
+        if let Some(tags) = object.get_mut("tags").and_then(Value::as_array_mut) { tags.push(json!(format!("domain:{key}"))); }
+        if let Some(scope) = object.get_mut("scope").and_then(Value::as_object_mut) { scope.insert("level".into(), json!("global")); scope.insert("key".into(), Value::Null); }
+    }
+    if let Some(evidence) = object.get_mut("evidence").and_then(Value::as_array_mut) { for item in evidence { normalize_evidence_value(item); } }
+    set_timestamp(object, "created_at", fallback_time)?;
+    set_timestamp(object, "updated_at", fallback_time)?;
+    Ok(())
+}
+
+fn normalize_patch_value(value: &mut Value, fallback_namespace: &str, project: Option<&str>, fallback_time: DateTime<Utc>) -> Result<()> {
+    let object = value.as_object_mut().context("portable patch must be an object")?;
+    let patch_id = object.get("id").and_then(Value::as_str).context("portable patch is missing id")?.to_string();
+    object.entry("schema_version").or_insert(json!(1));
+    object.entry("namespace").or_insert(json!(fallback_namespace));
+    object.entry("operation").or_insert(json!("propose_record"));
+    object.entry("target_id").or_insert(Value::Null);
+    object.entry("contest_resolution").or_insert(Value::Null);
+    object.entry("evidence").or_insert(json!([]));
+    object.entry("reason").or_insert(json!("Imported portable patch; review required before application."));
+    set_timestamp(object, "created_at", fallback_time)?;
+    set_timestamp(object, "updated_at", fallback_time)?;
+    let is_propose = object.get("operation").and_then(Value::as_str) == Some("propose_record");
+    let has_proposed_record = object.get("proposed_record").map(Value::is_object).unwrap_or(false);
+    if is_propose && !has_proposed_record {
+        let claim = object.get("claim").and_then(Value::as_str).unwrap_or("Imported portable candidate").to_string();
+        let class = match object.get("rule_type").and_then(Value::as_str) { Some("correction" | "avoid_pattern") => "correction", Some("preference" | "prefer_pattern") => "preference", Some("convention" | "architecture") => "requirement", _ => "workflow" };
+        let mut record = json!({
+            "schema_version":1,"namespace":fallback_namespace,"id":format!("imported_{patch_id}"),"class":class,"claim":claim,
+            "evidence":[],"confidence":0.7,"status":"active","layer":object.get("layer").cloned().unwrap_or(json!("l2_playbook")),
+            "memory_kind":object.get("memory_kind").cloned().unwrap_or(json!("instruction")),"rule_type":object.get("rule_type").cloned().unwrap_or(Value::Null),
+            "trust_class":"agent_inference","durability":"project","source_kind":"imported_bundle",
+            "scope":project.map(|key| json!({"level":"project","key":key})).unwrap_or(json!({"level":"global","key":null})),
+            "tags":object.get("tags").cloned().unwrap_or(json!([])),"supersedes":[],"created_at":fallback_time.to_rfc3339(),"updated_at":fallback_time.to_rfc3339()
+        });
+        normalize_record_value(&mut record, fallback_namespace, fallback_time)?;
+        object.insert("proposed_record".into(), record);
+    } else if has_proposed_record { if let Some(record) = object.get_mut("proposed_record") { normalize_record_value(record, fallback_namespace, fallback_time)?; } }
+    Ok(())
+}
+
+fn normalize_portable_bundle(mut value: Value) -> Result<StoreExportBundle> {
+    let object = value.as_object_mut().context("portable bundle must be an object")?;
+    let schema = object.get("schema_version").and_then(Value::as_u64).unwrap_or(1);
+    if schema > CURRENT_SCHEMA_VERSION as u64 { bail!("unsupported_export_schema: bundle schema_version {schema} is newer than current schema_version {CURRENT_SCHEMA_VERSION}"); }
+    let fallback_time = normalize_timestamp(object.get("exported_at").and_then(Value::as_str), Utc::now())?;
+    object.insert("exported_at".into(), json!(fallback_time.to_rfc3339()));
+    object.entry("redacted").or_insert(json!(false));
+    object.entry("redaction").or_insert(json!({"enabled":false,"fields_checked":[],"fields_redacted":[],"notes":[]}));
+    object.entry("all_namespaces").or_insert(json!(false));
+    object.entry("project").or_insert(Value::Null);
+    object.entry("events").or_insert(json!([]));
+    for key in ["evidence","inquiries","sessions","reinforcement","tombstones"] { object.entry(key).or_insert(json!([])); }
+    let namespace = object.get("namespace").and_then(Value::as_str).unwrap_or("default").to_string();
+    let project = object.get("project").and_then(Value::as_str).map(str::to_string);
+    for record in object.entry("records").or_insert(json!([])).as_array_mut().context("records must be an array")? { normalize_record_value(record, &namespace, fallback_time)?; }
+    for patch in object.entry("patches").or_insert(json!([])).as_array_mut().context("patches must be an array")? { normalize_patch_value(patch, &namespace, project.as_deref(), fallback_time)?; }
+    let bundle: StoreExportBundle = serde_json::from_value(value).context("normalized bundle does not satisfy the pi-governance v1 contract")?;
+    materialize_auxiliary_events(bundle)
+}
+
+fn artifact_event(category: &str, value: &Value, namespace: &str) -> Result<StoreEvent> {
+    let object = value.as_object().context("portable auxiliary artifact must be an object")?;
+    let artifact_id = object.get("id").and_then(Value::as_str).context("portable auxiliary artifact is missing id")?;
+    let created = object.get("created_at").or_else(|| object.get("timestamp")).or_else(|| object.get("deleted_at")).and_then(Value::as_str);
+    Ok(StoreEvent { schema_version: CURRENT_SCHEMA_VERSION, namespace: namespace.to_string(), id: format!("interop_{category}_{artifact_id}"), severity:"info".into(), category:format!("interop_{category}"), message:serde_json::to_string(value)?, object_id:Some(artifact_id.to_string()), created_at:normalize_timestamp(created, Utc::now())? })
+}
+
+fn materialize_auxiliary_events(mut bundle: StoreExportBundle) -> Result<StoreExportBundle> {
+    let namespace = bundle.namespace.as_deref().unwrap_or("default").to_string();
+    for (category, values) in [("evidence", &bundle.evidence), ("inquiry", &bundle.inquiries), ("session", &bundle.sessions), ("reinforcement", &bundle.reinforcement), ("tombstone", &bundle.tombstones)] {
+        for value in values { bundle.events.push(artifact_event(category, value, &namespace)?); }
+    }
+    bundle.evidence.clear(); bundle.inquiries.clear(); bundle.sessions.clear(); bundle.reinforcement.clear(); bundle.tombstones.clear();
+    Ok(bundle)
+}
+
+fn take_compatibility_events(events: &mut Vec<StoreEvent>, category: &str) -> Vec<Value> {
+    let target = format!("interop_{category}"); let mut values = Vec::new(); let mut retained = Vec::new();
+    for event in events.drain(..) { if event.category == target { if let Ok(value) = serde_json::from_str(&event.message) { values.push(value); } } else { retained.push(event); } }
+    *events = retained; values
+}
+
+fn redact_portable_values(values: &mut [Value], fields: &[&str]) {
+    for value in values { if let Some(object) = value.as_object_mut() { for field in fields { if object.contains_key(*field) { object.insert((*field).to_string(), json!("redacted")); } } } }
 }
 
 fn redact_records(records: &mut [Record]) {

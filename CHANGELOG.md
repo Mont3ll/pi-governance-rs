@@ -14,6 +14,7 @@ Added:
 - Relationship quality bands, dead-end, hub, and cycle signals.
 - Privacy-safe exclusion reason aggregates and explicit recall outcome feedback.
 - Store-wide governance quality metric and richer procedure/failure metadata.
+- Direct import and round-trip preservation of `pi-persistent-intelligence` bundles, including date-only timestamps, candidate patches, evidence, sessions, inquiries, reinforcement, and tombstones.
 
 ## v1.0.3
 
