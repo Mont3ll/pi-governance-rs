@@ -11,6 +11,9 @@ Added:
 - Recall-effectiveness and aggregate store-quality reports through CLI and MCP.
 - Read-only patch simulation with predicted state and quality deltas.
 - Review-only procedure-candidate and failure-analysis reports.
+- Relationship quality bands, dead-end, hub, and cycle signals.
+- Privacy-safe exclusion reason aggregates and explicit recall outcome feedback.
+- Store-wide governance quality metric and richer procedure/failure metadata.
 
 ## v1.0.3
 

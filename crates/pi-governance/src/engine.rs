@@ -740,7 +740,7 @@ impl GovernanceEngine {
         let mut rejected = latest.rejected_copy();
         rejected.reason = reason.to_string();
         session.append_patch(&rejected)?;
-        session.append_event(&StoreEvent::info(format!("patch rejected: {reason}"), Some(patch_id.to_string())))?;
+        session.append_event(&StoreEvent::info(format!("patch rejected: {reason}"), Some(patch_id.to_string())).with_category("patch_rejected"))?;
         Ok(ReviewActionResult { patch_id: patch_id.to_string(), status: "rejected".to_string(), reason: reason.to_string(), namespace: namespace.to_string() })
     }
 
@@ -754,7 +754,7 @@ impl GovernanceEngine {
         let mut deferred = latest.deferred_copy();
         deferred.reason = reason.to_string();
         session.append_patch(&deferred)?;
-        session.append_event(&StoreEvent::info(format!("patch deferred: {reason}"), Some(patch_id.to_string())))?;
+        session.append_event(&StoreEvent::info(format!("patch deferred: {reason}"), Some(patch_id.to_string())).with_category("patch_deferred"))?;
         Ok(ReviewActionResult { patch_id: patch_id.to_string(), status: "deferred".to_string(), reason: reason.to_string(), namespace: namespace.to_string() })
     }
 
@@ -824,7 +824,7 @@ impl GovernanceEngine {
 
         session.overwrite_records_atomic(&records)?;
         session.append_patch(&patch.applied_copy())?;
-        session.append_event(&StoreEvent::info("patch applied", Some(patch.id.clone())))?;
+        session.append_event(&StoreEvent::info("patch applied", Some(patch.id.clone())).with_category("patch_applied"))?;
 
         Ok(())
     }

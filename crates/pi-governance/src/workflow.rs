@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
-use pi_governance_core::{RecallEvent, RecallEventClient, RecallEventOperation,Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, RecordClass, RecordStatus, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
+use pi_governance_core::{RecallEvent, RecallEventClient, RecallEventOperation, RecallEventOutcome,Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, RecordClass, RecordStatus, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
 use pi_governance_retrieval::retrieve_with_options;
 use pi_governance_store::JsonlStore;
 use serde::{Deserialize, Serialize};
@@ -174,7 +174,7 @@ pub fn verify_candidate(claim: &str, layer: MemoryLayer, trust_class: TrustClass
 
 pub fn session_event(namespace: &str, project: Option<&str>, text: &str, source_kind: SourceKind) -> StoreEvent {
     let payload = json!({"kind":"session_entry","project":project,"text":text,"source_kind":source_kind,"decisions":extract_decisions(text)});
-    let mut event = StoreEvent::info(payload.to_string(), None);
+    let mut event = StoreEvent::info(payload.to_string(), None).with_category("session");
     event.namespace = namespace.to_string();
     event
 }
@@ -257,7 +257,16 @@ pub fn hash_recall_query(query: &str) -> String {
 }
 
 pub fn record_recall_event(store: &JsonlStore, namespace: &str, client: RecallEventClient, operation: RecallEventOperation, query: &str, selected_record_ids: Vec<String>, budget_requested: usize, budget_used: usize) -> Result<bool> {
-    store.record_recall_event(&RecallEvent::new(namespace, client, operation, hash_recall_query(query), selected_record_ids, budget_requested, budget_used))
+    record_recall_event_with_details(store, namespace, client, operation, query, selected_record_ids, std::collections::BTreeMap::new(), None, budget_requested, budget_used)
+}
+
+pub fn record_recall_event_with_details(store: &JsonlStore, namespace: &str, client: RecallEventClient, operation: RecallEventOperation, query: &str, selected_record_ids: Vec<String>, excluded_reason_counts: std::collections::BTreeMap<String, usize>, outcome: Option<RecallEventOutcome>, budget_requested: usize, budget_used: usize) -> Result<bool> {
+    let mut event = RecallEvent::new(namespace, client, operation, hash_recall_query(query), selected_record_ids, budget_requested, budget_used);
+    event.excluded_reason_counts = excluded_reason_counts; event.outcome = outcome; store.record_recall_event(&event)
+}
+
+pub fn recall_exclusion_counts(report: &RecallXrayReport) -> std::collections::BTreeMap<String, usize> {
+    let mut counts = std::collections::BTreeMap::new(); for item in &report.excluded { *counts.entry(item.reason.clone()).or_insert(0) += 1; } counts
 }
 
 pub fn evidence_for_capture(source_kind: SourceKind, trust_class: TrustClass, durability: Durability) -> EvidenceRef {

@@ -19,6 +19,7 @@ Both implementations support scoped records, confidence and evidence metadata, r
 | Per-record quality | `pi quality memory` | `pi.memory_quality` |
 | Relationship quality | `pi quality relationship` | `pi.relationship_quality` |
 | Recall effectiveness | `pi quality recall` | `pi.recall_effectiveness` |
+| Recall outcome feedback | `pi recall-feedback` | `pi.recall_feedback` |
 | Store quality | `pi quality store` | `pi.store_quality` |
 | Patch simulation | `pi simulate-patch <patch-id>` | `pi.simulate_patch` |
 | Procedure candidates | `pi procedure-candidates` | `pi.procedure_candidates` |
@@ -32,7 +33,7 @@ Procedure and failure outputs are report-only: they preserve source record or af
 
 ## Recall telemetry
 
-Recall telemetry is disabled by default. When enabled, it is local, bounded by `max_events`, stores a SHA-256 query hash rather than raw query text, and is excluded from ordinary store export. Use `pi config set-recall-telemetry on --max-events 1000` to enable it.
+Recall telemetry is disabled by default. When enabled, it is local, bounded by `max_events`, stores a SHA-256 query hash rather than raw query text, aggregates exclusion reasons, accepts explicit success/correction/ignored feedback, and is excluded from ordinary store export. Use `pi config set-recall-telemetry on --max-events 1000` to enable it.
 
 ## Intentional differences
 

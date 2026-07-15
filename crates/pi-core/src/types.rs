@@ -1,6 +1,7 @@
 use crate::schema::current_schema_version;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
 use uuid::Uuid;
@@ -849,7 +850,11 @@ pub enum RecallEventClient { Cli, Mcp }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum RecallEventOperation { Retrieve, BuildContext, RecallXray }
+pub enum RecallEventOperation { Retrieve, BuildContext, RecallXray, Feedback }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RecallEventOutcome { Successful, Corrected, Ignored }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecallEvent {
@@ -863,15 +868,21 @@ pub struct RecallEvent {
     pub operation: RecallEventOperation,
     pub query_hash: String,
     pub selected_record_ids: Vec<String>,
+    #[serde(default)]
+    pub excluded_reason_counts: BTreeMap<String, usize>,
+    #[serde(default)]
+    pub outcome: Option<RecallEventOutcome>,
     pub budget_requested: usize,
     pub budget_used: usize,
 }
 
 impl RecallEvent {
     pub fn new(namespace: impl Into<String>, client: RecallEventClient, operation: RecallEventOperation, query_hash: impl Into<String>, selected_record_ids: Vec<String>, budget_requested: usize, budget_used: usize) -> Self {
-        Self { schema_version: current_schema_version(), namespace: namespace.into(), id: format!("recall_{}", Uuid::new_v4()), timestamp: Utc::now(), client, operation, query_hash: query_hash.into(), selected_record_ids, budget_requested, budget_used }
+        Self { schema_version: current_schema_version(), namespace: namespace.into(), id: format!("recall_{}", Uuid::new_v4()), timestamp: Utc::now(), client, operation, query_hash: query_hash.into(), selected_record_ids, excluded_reason_counts: BTreeMap::new(), outcome: None, budget_requested, budget_used }
     }
 }
+
+fn default_event_category() -> String { "general".to_string() }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreEvent {
@@ -881,6 +892,8 @@ pub struct StoreEvent {
     pub namespace: String,
     pub id: String,
     pub severity: String,
+    #[serde(default = "default_event_category")]
+    pub category: String,
     pub message: String,
     pub object_id: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -893,11 +906,14 @@ impl StoreEvent {
             namespace: default_namespace(),
             id: format!("evt_{}", Uuid::new_v4()),
             severity: "info".to_string(),
+            category: default_event_category(),
             message: message.into(),
             object_id,
             created_at: Utc::now(),
         }
     }
+
+    pub fn with_category(mut self, category: impl Into<String>) -> Self { self.category = category.into(); self }
 
     pub fn warning(message: impl Into<String>, object_id: Option<String>) -> Self {
         Self {
@@ -905,6 +921,7 @@ impl StoreEvent {
             namespace: default_namespace(),
             id: format!("evt_{}", Uuid::new_v4()),
             severity: "warning".to_string(),
+            category: default_event_category(),
             message: message.into(),
             object_id,
             created_at: Utc::now(),

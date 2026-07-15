@@ -86,6 +86,7 @@ review
 context
 session
 recall-xray
+recall-feedback
 graph
 quality memory
 quality relationship

@@ -50,8 +50,10 @@ fn enabled_telemetry_records_only_query_hash_and_respects_retention() {
     success(&["--store", &root, "config", "set-recall-telemetry", "true", "--max-events", "1"]);
     success(&["--store", &root, "retrieve", "private raw query alpha", "--format", "json"]);
     success(&["--store", &root, "recall-xray", "private raw query beta", "--json"]);
+    success(&["--store", &root, "recall-feedback", "corrected", "rec_perf_1"]);
     let telemetry = std::fs::read_to_string(format!("{root}/recall-events.jsonl")).unwrap();
     assert_eq!(telemetry.lines().count(), 1);
     assert!(!telemetry.contains("private raw query"));
     assert!(telemetry.contains("query_hash"));
+    assert!(telemetry.contains("\"outcome\":\"corrected\""));
 }

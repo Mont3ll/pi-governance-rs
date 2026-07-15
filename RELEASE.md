@@ -27,8 +27,8 @@ It includes:
 - trust, durability, source, evidence, and namespace metadata
 - scoped context output for agent tasks
 - session add/search/decisions
-- recall-xray and optional privacy-safe recall telemetry
-- bounded memory graph and quality reports
+- recall-xray, privacy-safe exclusion aggregates, and explicit recall outcome feedback
+- bounded memory graph and quality reports with relationship bands, dead ends, hubs, and cycles
 - recall-effectiveness and aggregate store-quality reports
 - read-only patch simulation
 - review-only procedure-candidate and failure-analysis reports

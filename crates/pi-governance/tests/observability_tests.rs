@@ -83,6 +83,8 @@ fn procedure_and_failure_analysis_are_report_only_and_provenance_backed() {
     assert_eq!(procedures.candidates.len(), 1);
     assert_eq!(procedures.candidates[0].source_record_ids.len(), 2);
     assert!(procedures.candidates[0].review_required);
+    assert!(!procedures.candidates[0].pitfalls.is_empty());
+    assert_eq!(procedures.candidates[0].export_status, pi_governance_engine::ProcedureExportStatus::ReviewRequired);
 
     let mut rejected = Patch::propose_record(record("rec_rejected", "rejected workflow"), "unsafe");
     rejected.status = PatchStatus::Rejected;
@@ -94,6 +96,7 @@ fn procedure_and_failure_analysis_are_report_only_and_provenance_backed() {
     assert!(failures.summary.rejected_patch_count > 0);
     assert!(failures.summary.stale_deferred_patch_count > 0);
     assert!(failures.summary.warning_event_count > 0);
+    assert!(failures.summary.event_category_count > 0);
 }
 
 #[test]
@@ -120,9 +123,12 @@ fn patch_simulation_reports_quality_delta_without_mutating_store() {
 fn recall_effectiveness_and_store_quality_use_recorded_selection_history() {
     let now = Utc.with_ymd_and_hms(2026, 7, 14, 12, 0, 0).unwrap();
     let records = vec![record("rec_used", "used workflow"), record("rec_never", "never used workflow")];
-    let events = vec![RecallEvent::new("default", RecallEventClient::Cli, RecallEventOperation::Retrieve, "hash", vec!["rec_used".into()], 1200, 80)];
+    let mut feedback = RecallEvent::new("default", RecallEventClient::Cli, RecallEventOperation::Feedback, "", vec!["rec_used".into()], 0, 0);
+    feedback.outcome = Some(pi_governance_core::RecallEventOutcome::Corrected);
+    let events = vec![RecallEvent::new("default", RecallEventClient::Cli, RecallEventOperation::Retrieve, "hash", vec!["rec_used".into()], 1200, 80), feedback];
     let recall = analyze_recall_effectiveness(&records, &events, "default", now);
-    assert_eq!(recall.summary.total_events, 1);
+    assert_eq!(recall.summary.total_events, 2);
+    assert_eq!(recall.summary.corrected_after_recall_count, 1);
     assert_eq!(recall.summary.never_recalled_count, 1);
     let memory = analyze_memory_quality(&records, "default", now);
     let graph = build_memory_graph(&records, &[], &[], "default", 100, 100, now);
@@ -130,6 +136,7 @@ fn recall_effectiveness_and_store_quality_use_recorded_selection_history() {
     let store = build_store_quality(&memory, &relationships, Some(&recall), 0, 0, now);
     assert!(!store.mutation_performed);
     assert!(store.metrics.iter().any(|metric| metric.id == "recall_effectiveness"));
+    assert!(store.metrics.iter().any(|metric| metric.id == "governance"));
 }
 
 #[test]
@@ -155,7 +162,9 @@ fn relationship_quality_reports_dangling_and_orphan_relationships() {
         value.evidence.clear();
         value
     };
-    let records = vec![dangling, orphan];
+    let mut cycle_a = record("rec_cycle_a", "cycle a"); cycle_a.supersedes.push("rec_cycle_b".into());
+    let mut cycle_b = record("rec_cycle_b", "cycle b"); cycle_b.supersedes.push("rec_cycle_a".into());
+    let records = vec![dangling, orphan, cycle_a, cycle_b];
     let graph = build_memory_graph(&records, &[], &[], "default", 100, 100, now);
 
     let report = analyze_relationship_quality(&graph, &records, now);
@@ -163,4 +172,6 @@ fn relationship_quality_reports_dangling_and_orphan_relationships() {
     assert!(!report.mutation_performed);
     assert!(report.summary.dangling_edge_count > 0);
     assert!(report.summary.orphan_memory_count > 0);
+    assert!(report.summary.cyclic_memory_pair_count > 0);
+    assert!(report.relationships.iter().any(|item| item.quality_band == pi_governance_engine::RelationshipQualityBand::Broken));
 }

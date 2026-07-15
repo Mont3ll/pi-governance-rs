@@ -450,6 +450,7 @@ pi --store .pi quality relationship --json
 pi --store .pi quality recall --json
 pi --store .pi quality store --json
 pi --store .pi config set-recall-telemetry on --max-events 1000
+pi --store .pi recall-feedback corrected <record-id>
 pi --store .pi simulate-patch <patch-id> --json
 pi --store .pi procedure-candidates --min-source-records 2 --json
 pi --store .pi failure-analysis --stale-days 30 --json

@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
-use pi_governance_core::{default_namespace, ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, PatchStatus, PolicyProfile, RecallEventClient, RecallEventOperation, RecordClass, RetrievalFormat, RetrievalOptions, Scope, SourceKind, TrustClass};
+use pi_governance_core::{default_namespace, ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, PatchStatus, PolicyProfile, RecallEventClient, RecallEventOperation, RecallEventOutcome, RecordClass, RetrievalFormat, RetrievalOptions, Scope, SourceKind, TrustClass};
 use pi_governance_engine::{
-    analyze_failure_patterns, analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_context, build_memory_graph, build_store_quality, generate_procedure_candidates, claim_from_capture, evidence_for_capture, recall_xray, record_recall_event, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
+    analyze_failure_patterns, analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_context, build_memory_graph, build_store_quality, generate_procedure_candidates, claim_from_capture, evidence_for_capture, recall_exclusion_counts, recall_xray, record_recall_event, record_recall_event_with_details, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
     ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
@@ -727,7 +727,8 @@ impl McpStdioServer {
             {"name":"pi.store_quality","description":"Aggregate memory, relationship, recall, inbox, and runtime quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
             {"name":"pi.simulate_patch","description":"Preview a proposed patch and quality deltas without mutating the store.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"patch_id":{"type":"string"}},"required":["patch_id"]}},
             {"name":"pi.procedure_candidates","description":"Generate review-only procedure candidates from governed workflows.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"min_source_records":{"type":"integer","minimum":2,"default":2},"max_steps":{"type":"integer","minimum":1,"maximum":1000,"default":100}}}},
-            {"name":"pi.failure_analysis","description":"Analyze rejected patches, stale deferrals, and warning events without mutation.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"stale_days":{"type":"integer","minimum":1,"default":30},"limit":{"type":"integer","minimum":1,"maximum":1000,"default":100}}}}
+            {"name":"pi.failure_analysis","description":"Analyze rejected patches, stale deferrals, and warning events without mutation.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"stale_days":{"type":"integer","minimum":1,"default":30},"limit":{"type":"integer","minimum":1,"maximum":1000,"default":100}}}},
+            {"name":"pi.recall_feedback","description":"Record explicit recall outcome feedback when telemetry is enabled.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"outcome":{"type":"string","enum":["successful","corrected","ignored"]},"record_ids":{"type":"array","items":{"type":"string"}}},"required":["outcome","record_ids"]}}
         ])
     }
 
@@ -780,6 +781,7 @@ impl McpStdioServer {
             "pi.simulate_patch" => self.tool_simulate_patch(arguments),
             "pi.procedure_candidates" => self.tool_procedure_candidates(arguments),
             "pi.failure_analysis" => self.tool_failure_analysis(arguments),
+            "pi.recall_feedback" => self.tool_recall_feedback(arguments),
             other => bail!("unknown PI MCP tool: {other}"),
         }
     }
@@ -865,7 +867,7 @@ impl McpStdioServer {
         let include_l3 = optional_bool(&args, "include_l3").unwrap_or(false);
         let include_contested = optional_bool(&args, "include_contested").unwrap_or(false);
         let report = recall_xray(self.engine.store(), &namespace, &query, project, budget, include_l3, include_contested)?;
-        record_recall_event(self.engine.store(), &namespace, RecallEventClient::Mcp, RecallEventOperation::RecallXray, &query, report.included.iter().map(|item| item.record_id.clone()).collect(), budget, report.budget.used)?;
+        record_recall_event_with_details(self.engine.store(), &namespace, RecallEventClient::Mcp, RecallEventOperation::RecallXray, &query, report.included.iter().map(|item| item.record_id.clone()).collect(), recall_exclusion_counts(&report), None, budget, report.budget.used)?;
         Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
     }
 
@@ -1461,6 +1463,12 @@ impl McpStdioServer {
         report.relationships.truncate(limit); report.recommendations.truncate(limit);
         let text = format!("PI Relationship Quality: average={}/100, total={}, returned={}", report.summary.average_relationship_quality, report.summary.total_edges, report.relationships.len());
         Ok(tool_result(text, serde_json::to_value(report)?))
+    }
+
+    fn tool_recall_feedback(&self, args: Value) -> Result<Value> {
+        let namespace = self.namespace_arg(&args); let outcome = match required_string(&args, "outcome")?.as_str() { "successful" => RecallEventOutcome::Successful, "corrected" => RecallEventOutcome::Corrected, "ignored" => RecallEventOutcome::Ignored, _ => bail!("unsupported recall outcome") }; let ids = optional_string_array(&args, "record_ids")?.unwrap_or_default(); if ids.is_empty() { bail!("record_ids must not be empty"); }
+        let recorded = record_recall_event_with_details(self.engine.store(), &namespace, RecallEventClient::Mcp, RecallEventOperation::Feedback, "", ids, std::collections::BTreeMap::new(), Some(outcome), 0, 0)?;
+        Ok(tool_result(format!("Recall feedback recorded={recorded}"), json!({"recorded":recorded})))
     }
 
     fn tool_procedure_candidates(&self, args: Value) -> Result<Value> {
