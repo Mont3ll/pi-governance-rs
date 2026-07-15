@@ -15,4 +15,4 @@ Operational inspection tools:
 - `pi.procedure_candidates` accepts optional `namespace` and `min_source_records`.
 - `pi.failure_analysis` accepts optional `namespace` and `stale_days`.
 
-The graph is a bounded computed report. Evidence node identifiers do not contain evidence URIs. Quality metric versions are separate from the persisted store schema version.
+The graph is a bounded computed report. MCP defaults return at most 200 graph nodes, 400 graph edges, 100 memory/relationship items, and 50 recall items; clients may request larger bounded limits. Non-explain retrieval omits full ranked-record metadata and returns compact context blocks. Evidence node identifiers do not contain evidence URIs. Quality metric versions are separate from the persisted store schema version.

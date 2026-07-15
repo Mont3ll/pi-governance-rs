@@ -720,14 +720,14 @@ impl McpStdioServer {
             {"name":"pi.session_decisions","description":"List extracted session decision markers.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"project":{"type":"string"},"days":{"type":"integer"}}}},
             {"name":"pi.recall_xray","description":"Explain recall inclusion and exclusion.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"query":{"type":"string"},"project":{"type":"string"},"budget":{"type":"integer","default":1200},"include_l3":{"type":"boolean"},"include_contested":{"type":"boolean"}},"required":["query"]}},
             {"name":"pi.list_inbox","description":"List proposed/deferred candidate patches.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"all":{"type":"boolean"}}}},
-            {"name":"pi.memory_graph","description":"Build a bounded read-only memory graph.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"max_nodes":{"type":"integer","minimum":1,"default":5000},"max_edges":{"type":"integer","minimum":1,"default":10000}}}},
-            {"name":"pi.memory_quality","description":"Analyze per-record governed memory quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
-            {"name":"pi.relationship_quality","description":"Analyze memory graph relationship quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"max_nodes":{"type":"integer","minimum":1,"default":5000},"max_edges":{"type":"integer","minimum":1,"default":10000}}}},
-            {"name":"pi.recall_effectiveness","description":"Analyze longitudinal recall selection history.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
+            {"name":"pi.memory_graph","description":"Build a bounded read-only memory graph.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"max_nodes":{"type":"integer","minimum":1,"maximum":5000,"default":200},"max_edges":{"type":"integer","minimum":1,"maximum":10000,"default":400}}}},
+            {"name":"pi.memory_quality","description":"Analyze per-record governed memory quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":1000,"default":100}}}},
+            {"name":"pi.relationship_quality","description":"Analyze memory graph relationship quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"max_nodes":{"type":"integer","minimum":1,"maximum":5000,"default":200},"max_edges":{"type":"integer","minimum":1,"maximum":10000,"default":400},"limit":{"type":"integer","minimum":1,"maximum":1000,"default":100}}}},
+            {"name":"pi.recall_effectiveness","description":"Analyze longitudinal recall selection history.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":1000,"default":50}}}},
             {"name":"pi.store_quality","description":"Aggregate memory, relationship, recall, inbox, and runtime quality.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"}}}},
             {"name":"pi.simulate_patch","description":"Preview a proposed patch and quality deltas without mutating the store.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"patch_id":{"type":"string"}},"required":["patch_id"]}},
-            {"name":"pi.procedure_candidates","description":"Generate review-only procedure candidates from governed workflows.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"min_source_records":{"type":"integer","minimum":2,"default":2}}}},
-            {"name":"pi.failure_analysis","description":"Analyze rejected patches, stale deferrals, and warning events without mutation.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"stale_days":{"type":"integer","minimum":1,"default":30}}}}
+            {"name":"pi.procedure_candidates","description":"Generate review-only procedure candidates from governed workflows.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"min_source_records":{"type":"integer","minimum":2,"default":2},"max_steps":{"type":"integer","minimum":1,"maximum":1000,"default":100}}}},
+            {"name":"pi.failure_analysis","description":"Analyze rejected patches, stale deferrals, and warning events without mutation.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"namespace":{"type":"string"},"stale_days":{"type":"integer","minimum":1,"default":30},"limit":{"type":"integer","minimum":1,"maximum":1000,"default":100}}}}
         ])
     }
 
@@ -980,12 +980,14 @@ impl McpStdioServer {
 
         record_recall_event(self.engine.store(), &bundle.namespace, RecallEventClient::Mcp, RecallEventOperation::Retrieve, &bundle.query, bundle.records.iter().map(|ranked| ranked.record.id.clone()).collect(), bundle.budget.max_tokens, bundle.used_estimated_tokens)?;
 
+        let mut structured = serde_json::to_value(&bundle)?;
+        if !explain { if let Some(object) = structured.as_object_mut() { object.remove("records"); } }
         let text = match retrieval_format {
-            RetrievalFormat::Json => serde_json::to_string_pretty(&bundle)?,
+            RetrievalFormat::Json => serde_json::to_string_pretty(&structured)?,
             RetrievalFormat::Markdown => render_markdown(&bundle),
         };
 
-        Ok(tool_result(text, serde_json::to_value(bundle)?))
+        Ok(tool_result(text, structured))
     }
 
     fn tool_propose_record(&self, args: Value) -> Result<Value> {
@@ -1431,39 +1433,50 @@ impl McpStdioServer {
 
     fn tool_memory_graph(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
-        let max_nodes = optional_usize(&args, "max_nodes").unwrap_or(5000);
-        let max_edges = optional_usize(&args, "max_edges").unwrap_or(10000);
+        let max_nodes = optional_usize(&args, "max_nodes").unwrap_or(200).min(5000);
+        let max_edges = optional_usize(&args, "max_edges").unwrap_or(400).min(10000);
         if max_nodes == 0 || max_edges == 0 { bail!("graph limits must be greater than zero"); }
         let report = build_memory_graph(&self.engine.store().load_records()?, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now());
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        let text = format!("PI Memory Graph: {} node(s), {} edge(s), truncated={}", report.nodes.len(), report.edges.len(), report.truncated);
+        Ok(tool_result(text, serde_json::to_value(report)?))
     }
 
     fn tool_memory_quality(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
-        let report = analyze_memory_quality(&self.engine.store().load_records()?, &namespace, chrono::Utc::now());
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        let mut report = analyze_memory_quality(&self.engine.store().load_records()?, &namespace, chrono::Utc::now());
+        let limit = optional_usize(&args, "limit").unwrap_or(100).min(1000).max(1);
+        report.items.truncate(limit); report.recommendations.truncate(limit);
+        let text = format!("PI Memory Quality: average={}/100, total={}, returned={}", report.summary.average_quality, report.summary.total_records, report.items.len());
+        Ok(tool_result(text, serde_json::to_value(report)?))
     }
 
     fn tool_relationship_quality(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
-        let max_nodes = optional_usize(&args, "max_nodes").unwrap_or(5000);
-        let max_edges = optional_usize(&args, "max_edges").unwrap_or(10000);
+        let max_nodes = optional_usize(&args, "max_nodes").unwrap_or(200).min(5000);
+        let max_edges = optional_usize(&args, "max_edges").unwrap_or(400).min(10000);
         if max_nodes == 0 || max_edges == 0 { bail!("graph limits must be greater than zero"); }
         let records = self.engine.store().load_records()?;
-        let report = analyze_relationship_quality(&build_memory_graph(&records, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now()), &records, chrono::Utc::now());
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        let mut report = analyze_relationship_quality(&build_memory_graph(&records, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now()), &records, chrono::Utc::now());
+        let limit = optional_usize(&args, "limit").unwrap_or(100).min(1000).max(1);
+        report.relationships.truncate(limit); report.recommendations.truncate(limit);
+        let text = format!("PI Relationship Quality: average={}/100, total={}, returned={}", report.summary.average_relationship_quality, report.summary.total_edges, report.relationships.len());
+        Ok(tool_result(text, serde_json::to_value(report)?))
     }
 
     fn tool_procedure_candidates(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
-        let report = generate_procedure_candidates(&self.engine.store().load_records()?, &namespace, optional_usize(&args, "min_source_records").unwrap_or(2), chrono::Utc::now());
+        let mut report = generate_procedure_candidates(&self.engine.store().load_records()?, &namespace, optional_usize(&args, "min_source_records").unwrap_or(2), chrono::Utc::now());
+        let max_steps = optional_usize(&args, "max_steps").unwrap_or(100).min(1000).max(1);
+        for candidate in &mut report.candidates { candidate.steps.truncate(max_steps); candidate.verification_steps.truncate(max_steps); candidate.source_record_ids.truncate(max_steps); }
         Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
     }
 
     fn tool_failure_analysis(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
         let stale_days = args.get("stale_days").and_then(Value::as_i64).unwrap_or(30);
-        let report = analyze_failure_patterns(&self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, stale_days, chrono::Utc::now());
+        let mut report = analyze_failure_patterns(&self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, stale_days, chrono::Utc::now());
+        let limit = optional_usize(&args, "limit").unwrap_or(100).min(1000).max(1);
+        report.patterns.truncate(limit); for pattern in &mut report.patterns { pattern.affected_object_ids.truncate(limit); }
         Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
     }
 
@@ -1474,8 +1487,11 @@ impl McpStdioServer {
 
     fn tool_recall_effectiveness(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
-        let report = analyze_recall_effectiveness(&self.engine.store().load_records()?, &self.engine.store().load_recall_events()?, &namespace, chrono::Utc::now());
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        let mut report = analyze_recall_effectiveness(&self.engine.store().load_records()?, &self.engine.store().load_recall_events()?, &namespace, chrono::Utc::now());
+        let limit = optional_usize(&args, "limit").unwrap_or(50).min(1000).max(1);
+        report.memory_stats.truncate(limit); report.recommendations.truncate(limit);
+        let text = format!("PI Recall Effectiveness: average={}/100, events={}, returned={}", report.summary.average_effectiveness, report.summary.total_events, report.memory_stats.len());
+        Ok(tool_result(text, serde_json::to_value(report)?))
     }
 
     fn tool_store_quality(&self, args: Value) -> Result<Value> {

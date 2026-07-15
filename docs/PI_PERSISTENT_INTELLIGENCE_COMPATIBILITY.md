@@ -32,7 +32,7 @@ Procedure and failure outputs are report-only: they preserve source record or af
 
 ## Recall telemetry
 
-Recall telemetry is disabled by default. When enabled, it is local, bounded by `max_events`, stores a SHA-256 query hash rather than raw query text, and is excluded from ordinary store export. Use `pi config set-recall-telemetry on --max-events 10000` to enable it.
+Recall telemetry is disabled by default. When enabled, it is local, bounded by `max_events`, stores a SHA-256 query hash rather than raw query text, and is excluded from ordinary store export. Use `pi config set-recall-telemetry on --max-events 1000` to enable it.
 
 ## Intentional differences
 

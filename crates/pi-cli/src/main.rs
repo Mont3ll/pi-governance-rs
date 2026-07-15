@@ -587,7 +587,7 @@ enum ConfigCommands {
     /// Set a namespace policy profile.
     SetPolicy { namespace: String, profile: PolicyProfile },
     /// Enable or disable bounded local recall telemetry.
-    SetRecallTelemetry { enabled: String, #[arg(long, default_value_t = 10000)] max_events: usize },
+    SetRecallTelemetry { enabled: String, #[arg(long, default_value_t = 1000)] max_events: usize },
 }
 
 #[derive(Debug, Subcommand)]

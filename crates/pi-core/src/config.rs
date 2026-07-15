@@ -20,7 +20,7 @@ pub struct RecallTelemetryConfig {
 }
 
 impl Default for RecallTelemetryConfig {
-    fn default() -> Self { Self { enabled: false, max_events: 10_000 } }
+    fn default() -> Self { Self { enabled: false, max_events: 1_000 } }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

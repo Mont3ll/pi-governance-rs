@@ -70,7 +70,7 @@ Use the printed configuration with your MCP-capable client. The server command i
 2. Review the patch before it changes durable memory.
 3. Apply, reject, or defer the patch.
 4. Retrieve scoped context for the current agent task.
-5. Optionally enable bounded recall telemetry with `pi config set-recall-telemetry on --max-events 10000`.
+5. Optionally enable bounded recall telemetry with `pi config set-recall-telemetry on --max-events 1000`.
 6. Inspect graph, memory, relationship, recall, and aggregate store quality when needed.
 
 Common commands include:

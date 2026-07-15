@@ -130,4 +130,14 @@ fn mcp_lists_and_calls_rc9_tools_with_object_content() {
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(json["result"]["structuredContent"]["mutation_performed"], false);
     assert_eq!(json["result"]["structuredContent"]["schema_version"], 1);
+    assert!(json["result"]["structuredContent"]["nodes"].as_array().unwrap().len() <= 200);
+
+    let call = "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"pi.retrieve_context\",\"arguments\":{\"query\":\"release workflow\",\"format\":\"json\"}}}\n";
+    let mut child = Command::new(bin()).args(["--store", &s, "mcp-stdio"]).stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).spawn().unwrap();
+    child.stdin.as_mut().unwrap().write_all(call.as_bytes()).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(json["result"]["structuredContent"].get("records").is_none());
+    assert!(json["result"]["structuredContent"]["blocks"].is_array());
 }
