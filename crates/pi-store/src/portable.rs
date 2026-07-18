@@ -400,11 +400,6 @@ fn normalize_record_value(value: &mut Value, fallback_namespace: &str, fallback_
     object.entry("tags").or_insert(json!([]));
     object.entry("supersedes").or_insert(json!([]));
     if object.get("status").and_then(Value::as_str) == Some("deleted") { object.insert("status".into(), json!("tombstoned")); }
-    let domain_key = object.get("scope").and_then(Value::as_object).filter(|scope| scope.get("level").and_then(Value::as_str) == Some("domain")).and_then(|scope| scope.get("key")).and_then(Value::as_str).map(str::to_string);
-    if let Some(key) = domain_key {
-        if let Some(tags) = object.get_mut("tags").and_then(Value::as_array_mut) { tags.push(json!(format!("domain:{key}"))); }
-        if let Some(scope) = object.get_mut("scope").and_then(Value::as_object_mut) { scope.insert("level".into(), json!("global")); scope.insert("key".into(), Value::Null); }
-    }
     if let Some(evidence) = object.get_mut("evidence").and_then(Value::as_array_mut) { for item in evidence { normalize_evidence_value(item); } }
     set_timestamp(object, "created_at", fallback_time)?;
     set_timestamp(object, "updated_at", fallback_time)?;

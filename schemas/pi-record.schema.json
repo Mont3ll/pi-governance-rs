@@ -14,6 +14,14 @@
     "rule_type": { "enum": ["avoid_pattern", "prefer_pattern", "convention", "architecture", "workflow", "preference", "testing", "correction", "tool"] },
     "trust_class": { "enum": ["direct_user_instruction", "user_correction", "agent_inference", "repository_text", "generated_content", "third_party_documentation", "codebase_analysis", "human_review", "unknown"] },
     "durability": { "enum": ["temporary", "task", "project", "long_term", "unknown"] },
-    "source_kind": { "enum": ["manual_cli", "manual_mcp", "session_text", "transcript_file", "stdin", "agent_observation", "codebase_analysis", "imported_bundle", "unknown"] }
+    "source_kind": { "enum": ["manual_cli", "manual_mcp", "session_text", "transcript_file", "stdin", "agent_observation", "codebase_analysis", "imported_bundle", "unknown"] },
+    "scope": {
+      "type": "object",
+      "required": ["level", "key"],
+      "properties": {
+        "level": { "enum": ["global", "project", "domain", "session"] },
+        "key": { "type": ["string", "null"] }
+      }
+    }
   }
 }

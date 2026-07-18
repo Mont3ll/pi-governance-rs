@@ -1,4 +1,4 @@
-use pi_governance_core::{RecallEvent, RecallEventClient, RecallEventOperation, CURRENT_SCHEMA_VERSION};
+use pi_governance_core::{RecallEvent, RecallEventClient, RecallEventOperation, ScopeLevel, CURRENT_SCHEMA_VERSION};
 use pi_governance_store::{JsonlStore, SchemaMigrationOptions};
 use std::fs;
 use std::path::PathBuf;
@@ -125,10 +125,13 @@ fn imports_javascript_bundle_and_preserves_auxiliary_sections() -> anyhow::Resul
     fs::write(&path, serde_json::to_vec_pretty(&bundle)?)?;
     let report = store.import_bundle_from_path(&path, StoreImportOptions { namespace:"interop-test".into(), preserve_namespaces:true, dry_run:false, backup:true })?;
     assert_eq!(report.imported_records, 2);
-    assert!(store.load_records()?.iter().any(|record| record.id == "mem_domain" && record.tags.iter().any(|tag| tag == "domain:release")));
+    let domain = store.load_records()?.into_iter().find(|record| record.id == "mem_domain").unwrap();
+    assert_eq!(domain.scope.level, ScopeLevel::Domain);
+    assert_eq!(domain.scope.key.as_deref(), Some("release"));
     assert_eq!(report.imported_patches, 2);
     assert_eq!(report.imported_events, 5);
     let exported = store.export_bundle(StoreExportOptions { namespace:Some("interop-test".into()), all_namespaces:false, project:None, redacted:false })?;
+    assert!(exported.records.iter().any(|record| record.id == "mem_domain" && record.scope.level == ScopeLevel::Domain && record.scope.key.as_deref() == Some("release")));
     assert_eq!(exported.evidence.len(), 1);
     assert_eq!(exported.sessions.len(), 1);
     assert_eq!(exported.inquiries.len(), 1);

@@ -30,7 +30,7 @@ pub fn eligible(record: &Record, project: Option<&str>, classes: &[RecordClass],
         Some(project_key) => match record.scope.level {
             ScopeLevel::Project => record.scope.key.as_deref() == Some(project_key),
             ScopeLevel::Global => include_global,
-            ScopeLevel::Session => false,
+            ScopeLevel::Domain | ScopeLevel::Session => false,
         },
         None => true,
     }

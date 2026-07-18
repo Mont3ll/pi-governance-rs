@@ -280,6 +280,7 @@ pub enum RecordStatus {
 pub enum ScopeLevel {
     Global,
     Project,
+    Domain,
     Session,
 }
 
@@ -304,6 +305,13 @@ impl Scope {
         }
     }
 
+    pub fn domain(domain: impl Into<String>) -> Self {
+        Self {
+            level: ScopeLevel::Domain,
+            key: Some(domain.into()),
+        }
+    }
+
     pub fn session(session: impl Into<String>) -> Self {
         Self {
             level: ScopeLevel::Session,
@@ -317,7 +325,7 @@ impl Scope {
             Some(project_key) => match self.level {
                 ScopeLevel::Global => true,
                 ScopeLevel::Project => self.key.as_deref() == Some(project_key),
-                ScopeLevel::Session => false,
+                ScopeLevel::Domain | ScopeLevel::Session => false,
             },
         }
     }
