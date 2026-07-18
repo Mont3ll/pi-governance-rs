@@ -4,13 +4,13 @@ use clap::{Parser, Subcommand};
 use pi_governance_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, PatchStatus, PolicyProfile, RecallEventClient, RecallEventOperation, RecallEventOutcome, RecordClass, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
 use pi_governance_engine::{
     analyze_failure_patterns, analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_context, build_memory_graph, build_store_quality, generate_procedure_candidates, claim_from_capture, evidence_for_capture, read_text_input, recall_exclusion_counts, recall_xray, record_recall_event, record_recall_event_with_details, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
-    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection, PatchSummary, ProposalInput, RecordInspection, ReinforceInput, ResolveContestInput,
+    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection, PatchSummary, ProposalInput, ReconcileInput, RecordInspection, ReinforceInput, ResolveContestInput,
     SupersedeInput, TombstoneInput, MemoryWorthDecision,
 };
 use serde_json::json;
 use pi_governance_mcp::{registered_tool_names, McpStdioServer};
 use pi_governance_retrieval::render_markdown;
-use pi_governance_store::JsonlStore;
+use pi_governance_store::{JsonlStore, StoreExportBundle};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -368,6 +368,19 @@ enum Commands {
         /// Create a timestamped backup under the store before rewriting.
         #[arg(long)]
         backup: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Compare this independent store with a peer bundle. This command never mutates either peer.
+    Reconcile {
+        /// Peer pi-governance bundle to compare as the destination snapshot.
+        path: PathBuf,
+
+        /// Optional project filter. Global records and matching project records are selected.
+        #[arg(long)]
+        project: Option<String>,
 
         #[arg(long)]
         json: bool,
@@ -1658,6 +1671,27 @@ fn main() -> Result<()> {
                     for warning in &report.warnings {
                         println!("- {warning}");
                     }
+                }
+            }
+        }
+
+        Commands::Reconcile { path, project, json } => {
+            let destination: StoreExportBundle = serde_json::from_slice(&fs::read(&path)
+                .with_context(|| format!("failed to read peer bundle {}", path.display()))?)
+                .with_context(|| format!("invalid peer bundle {}", path.display()))?;
+            let report = engine.reconcile_store(
+                &destination,
+                ReconcileInput { namespace: namespace.clone(), project },
+            )?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!("PI Reconciliation Report (read-only)");
+                println!("Mutation performed: {}", report.mutation_performed);
+                if let Some(records) = report.sections.get("records") {
+                    println!("Source-only records: {}", records.source_only_ids.len());
+                    println!("Destination-only records: {}", records.destination_only_ids.len());
+                    println!("Divergent records: {}", records.divergent_ids.len());
                 }
             }
         }

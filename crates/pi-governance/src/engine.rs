@@ -7,8 +7,9 @@ use pi_governance_core::{
 };
 use pi_governance_retrieval::{retrieve, retrieve_with_options};
 use pi_governance_store::{
-    plan_record_integrity, JsonlStore, SchemaMigrationOptions, SchemaMigrationReport,
-    StoreExportBundle, StoreExportOptions, StoreImportOptions, StoreImportReport,
+    plan_record_integrity, reconcile_bundles, JsonlStore, ReconciliationReport,
+    SchemaMigrationOptions, SchemaMigrationReport, StoreExportBundle, StoreExportOptions,
+    StoreImportOptions, StoreImportReport,
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -51,6 +52,12 @@ pub struct ImportInput {
     pub preserve_namespaces: bool,
     pub dry_run: bool,
     pub backup: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReconcileInput {
+    pub namespace: String,
+    pub project: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -848,6 +855,20 @@ impl GovernanceEngine {
             project: input.project,
             redacted: input.redacted,
         })
+    }
+
+    pub fn reconcile_store(
+        &self,
+        destination: &StoreExportBundle,
+        input: ReconcileInput,
+    ) -> Result<ReconciliationReport> {
+        let source = self.store.export_bundle(StoreExportOptions {
+            namespace: Some(input.namespace),
+            all_namespaces: false,
+            project: input.project,
+            redacted: false,
+        })?;
+        Ok(reconcile_bundles(&source, destination))
     }
 
     pub fn export_store_to_path(

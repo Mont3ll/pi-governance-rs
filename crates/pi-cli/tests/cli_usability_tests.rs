@@ -42,6 +42,34 @@ fn store_integrity_previews_by_default_and_applies_with_reviewed_fingerprint() {
 }
 
 #[test]
+fn reconcile_is_report_only_and_preserves_store_files() {
+    let store = tmp_store("reconcile");
+    assert!(Command::new(bin()).args(["--store", &store, "demo", "--json"]).status().unwrap().success());
+    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../pi-store/tests/fixtures/pi-governance-conformance/filtered-bundle.json");
+    let files = ["records.jsonl", "patches.jsonl", "events.jsonl"];
+    let before = files.map(|name| {
+        let path = format!("{store}/{name}");
+        (std::fs::read(&path).unwrap(), std::fs::metadata(&path).unwrap().modified().unwrap())
+    });
+
+    let output = Command::new(bin())
+        .args(["--store", &store, "--namespace", "default", "reconcile", fixture.to_str().unwrap(), "--json"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["dry_run"], true);
+    assert_eq!(report["mutation_performed"], false);
+    for (index, name) in files.iter().enumerate() {
+        let path = format!("{store}/{name}");
+        assert_eq!(std::fs::read(&path).unwrap(), before[index].0);
+        assert_eq!(std::fs::metadata(&path).unwrap().modified().unwrap(), before[index].1);
+    }
+}
+
+#[test]
 fn migrate_previews_by_default_and_requires_apply_for_mutation() {
     let store = tmp_store("migrate-preview");
     std::fs::create_dir_all(&store).unwrap();

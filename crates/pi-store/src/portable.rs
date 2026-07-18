@@ -80,8 +80,6 @@ pub struct StoreImportReport {
 
 impl JsonlStore {
     pub fn export_bundle(&self, options: StoreExportOptions) -> Result<StoreExportBundle> {
-        self.init()?;
-
         let records = self.load_records()?;
         let patches = self.load_patches()?;
         let events = self.load_events()?;
