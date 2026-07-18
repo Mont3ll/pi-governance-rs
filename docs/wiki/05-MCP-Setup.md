@@ -25,7 +25,9 @@ pi mcp-config pi-agent --command /path/to/pi --store /path/to/.pi --namespace de
 pi mcp-doctor pi-agent --command /path/to/pi --store /path/to/.pi --namespace default
 ```
 
-Restart the client after installation. Client-prefixed tool names may look like `pi.retrieve_context`, `pi-governance_pi_retrieve_context`, `pi_governance_pi.retrieve_context`, or `mcp__pi_governance__.pi_retrieve_context`.
+Restart the client after installation. The MCP initialize response and `pi.doctor` structured output include `piStoreIdentity` with the active store path, whether it resolved to an existing path, and the configured namespace. Check this identity before trusting diagnostics or applying patches, especially when multiple test and production servers are configured.
+
+Client-prefixed tool names may look like `pi.retrieve_context`, `pi-governance_pi_retrieve_context`, `pi_governance_pi.retrieve_context`, or `mcp__pi_governance__.pi_retrieve_context`.
 
 
 ---

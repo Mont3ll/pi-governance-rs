@@ -6,9 +6,14 @@ pi --store .pi export --redacted --output pi-export.redacted.json
 pi --store .pi export --all-namespaces --redacted --output pi-export.all.redacted.json
 pi --store .pi import pi-export.json
 pi --store .pi import pi-export.json --backup
+pi --store .pi reconcile peer-export.json --json
 ```
 
 Redacted export includes metadata indicating redaction was requested. PI is not a secret scanner or DLP system. Do not store secrets in PI. Redacted export is best-effort and must be reviewed before sharing.
+
+Project filters retain global and matching project records, keep domain scope distinct from project scope, reconstruct compatible auxiliary sections before filtering, and report omitted unscoped artifacts. Generic events remain generic events.
+
+`reconcile` compares snapshots rather than synchronizing stores. It normalizes set-like arrays but treats status, scope, timestamps, and claims as substantive. Both stores remain independent canonical peers, and the command has no mutation path.
 
 
 ---

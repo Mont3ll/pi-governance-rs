@@ -10,7 +10,7 @@ Inspect generated config, ensure the client is reading the expected config, and 
 
 ## Wrong Namespace or No Records Visible
 
-Confirm `--namespace`, store path, and MCP config namespace. Use `namespace list` and `namespace doctor`.
+Confirm `--namespace`, store path, and MCP config namespace. Inspect `piStoreIdentity` in the MCP initialize response or `pi.doctor` structured output before trusting row counts. Use `namespace list` and `namespace doctor`.
 
 ## structured content Expected Record, Received Array
 

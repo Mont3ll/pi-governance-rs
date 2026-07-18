@@ -98,6 +98,7 @@ failure-analysis
 retrieve
 export
 import
+reconcile
 inspect-record
 list-patches
 inspect-patch
@@ -125,7 +126,7 @@ Use `pi-governance-rs` when you want governed memory through CLI or MCP across m
 
 Use `pi-persistent-intelligence` when you want the lightweight native memory extension inside PI agent.
 
-They can interoperate through the shared memory contract and compatible import/export formats.
+They interoperate through the shared memory contract, compatible import/export formats, and report-only snapshot reconciliation. They remain independent canonical peers; reconciliation does not silently synchronize them or choose an authority.
 
 ## Security and Privacy
 

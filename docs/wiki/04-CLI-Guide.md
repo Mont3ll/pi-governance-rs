@@ -212,6 +212,17 @@ Expected output summary: human-readable or JSON output describing the requested 
 
 Notes/cautions: review output before applying durable changes; use namespaces intentionally; redacted output is best-effort.
 
+## `reconcile`
+
+Purpose: compare this independent canonical store with a peer `pi-governance` snapshot without importing or synchronizing data.
+
+```bash
+pi --store .pi --namespace default reconcile peer-bundle.json --json
+pi --store .pi --namespace default reconcile peer-bundle.json --project my-project --json
+```
+
+The report covers records, patches, evidence, inquiries, sessions, reinforcement, generic events, and tombstones. It shows source-only, destination-only, matching, divergent, duplicate, and conflicting IDs. There is intentionally no apply option.
+
 ## `store-integrity`
 
 Purpose: preview duplicate stable-ID and self-supersession repair. The preview is read-only and emits the fingerprint required for apply.
