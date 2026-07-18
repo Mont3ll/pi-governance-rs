@@ -118,7 +118,7 @@ fn same_id_in_different_namespaces_is_not_a_duplicate() {
 fn apply_requires_preview_fingerprint_and_creates_backup_and_report() -> anyhow::Result<()> {
     let root = temp_store_dir("apply");
     fs::create_dir_all(&root)?;
-    let records = vec![
+    let records = [
         record("alpha", "rec_dup", RecordStatus::Superseded, &["rec_previous", "rec_dup"]),
         record("alpha", "rec_dup", RecordStatus::Active, &["rec_dup"]),
     ];
@@ -145,7 +145,7 @@ fn apply_requires_preview_fingerprint_and_creates_backup_and_report() -> anyhow:
 fn apply_rejects_stale_fingerprint_without_writing() -> anyhow::Result<()> {
     let root = temp_store_dir("drift");
     fs::create_dir_all(&root)?;
-    let records = vec![
+    let records = [
         record("alpha", "rec_dup", RecordStatus::Superseded, &["rec_dup"]),
         record("alpha", "rec_dup", RecordStatus::Active, &[]),
     ];
