@@ -24,6 +24,30 @@ fn stdio_server_can_be_constructed() {
 }
 
 #[test]
+fn initialize_exposes_distinct_resolved_and_configured_store_identities() {
+    let existing = temp_store_dir("identity-existing");
+    std::fs::create_dir_all(&existing).unwrap();
+    let missing = temp_store_dir("identity-missing");
+    let existing_server = McpStdioServer::new_with_namespace(
+        GovernanceEngine::new(JsonlStore::new(&existing)),
+        "persistent-intelligence".into(),
+    );
+    let missing_server = McpStdioServer::new_with_namespace(
+        GovernanceEngine::new(JsonlStore::new(&missing)),
+        "persistent-intelligence".into(),
+    );
+
+    let resolved = existing_server.initialize_result(serde_json::json!({}));
+    let configured = missing_server.initialize_result(serde_json::json!({}));
+
+    assert_eq!(resolved["piStoreIdentity"]["resolved"], true);
+    assert_eq!(resolved["piStoreIdentity"]["namespace"], "persistent-intelligence");
+    assert_eq!(configured["piStoreIdentity"]["resolved"], false);
+    assert_ne!(resolved["piStoreIdentity"]["store"], configured["piStoreIdentity"]["store"]);
+    std::fs::remove_dir_all(existing).unwrap();
+}
+
+#[test]
 fn registered_tool_names_come_from_the_canonical_registry() {
     let names = registered_tool_names();
     assert!(names.iter().any(|name| name == "pi.retrieve_context"));

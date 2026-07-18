@@ -7,6 +7,7 @@ use pi_governance_engine::{
 };
 use pi_governance_retrieval::render_markdown;
 use serde_json::{json, Map, Value};
+use std::fs;
 use std::io::{self, BufRead, Write};
 use std::str::FromStr;
 
@@ -120,17 +121,35 @@ impl McpStdioServer {
         }
     }
 
-    fn initialize_result(&self, _params: Value) -> Value {
-        let instructions = [
-            "PI Governance exposes governed memory tools for coding agents.",
-            "Use pi.retrieve_context before making project-sensitive changes.",
-            "Use pi.propose_record for durable memory updates instead of directly mutating the store.",
-            "Use pi.list_patches and pi.inspect_patch before applying queued patches.",
-            "Use pi.supersede_record, pi.tombstone_record, and pi.reinforce_record for direct belief revision.",
-            "Use pi.contest_record and pi.resolve_contest when a claim is disputed but not yet ready to supersede or tombstone.",
-            "Use pi.export_store and pi.import_store to move governed memory between stores without direct file mutation.",
-            "The JSONL store now uses a local store.lock file to serialize mutating operations.",
-            "Identity-level records and risky mutations may require force/manual review.",
+    pub fn store_identity(&self) -> Value {
+        let configured = self.engine.store().root();
+        match fs::canonicalize(configured) {
+            Ok(path) => json!({
+                "store": path.display().to_string(),
+                "resolved": true,
+                "namespace": self.default_namespace,
+            }),
+            Err(_) => json!({
+                "store": configured.display().to_string(),
+                "resolved": false,
+                "namespace": self.default_namespace,
+            }),
+        }
+    }
+
+    pub fn initialize_result(&self, _params: Value) -> Value {
+        let identity = self.store_identity();
+        let instructions = vec![
+            "PI Governance exposes governed memory tools for coding agents.".to_string(),
+            "Use pi.retrieve_context before making project-sensitive changes.".to_string(),
+            "Use pi.propose_record for durable memory updates instead of directly mutating the store.".to_string(),
+            "Use pi.list_patches and pi.inspect_patch before applying queued patches.".to_string(),
+            "Use pi.supersede_record, pi.tombstone_record, and pi.reinforce_record for direct belief revision.".to_string(),
+            "Use pi.contest_record and pi.resolve_contest when a claim is disputed but not yet ready to supersede or tombstone.".to_string(),
+            "Use pi.export_store and pi.import_store to move governed memory between stores without direct file mutation.".to_string(),
+            format!("Active store identity: {} (namespace {}).", identity["store"].as_str().unwrap_or("unknown"), self.default_namespace),
+            "The JSONL store now uses a local store.lock file to serialize mutating operations.".to_string(),
+            "Identity-level records and risky mutations may require force/manual review.".to_string(),
         ]
         .join("\n");
 
@@ -145,7 +164,8 @@ impl McpStdioServer {
                 "name": SERVER_NAME,
                 "version": SERVER_VERSION
             },
-            "instructions": instructions
+            "instructions": instructions,
+            "piStoreIdentity": identity
         })
     }
 
@@ -1516,9 +1536,13 @@ impl McpStdioServer {
 
     fn tool_doctor(&self) -> Result<Value> {
         let report = self.engine.doctor_in_namespace(&self.default_namespace)?;
-        let text = serde_json::to_string_pretty(&report)?;
+        let mut structured = serde_json::to_value(report)?;
+        if let Some(object) = structured.as_object_mut() {
+            object.insert("piStoreIdentity".to_string(), self.store_identity());
+        }
+        let text = serde_json::to_string_pretty(&structured)?;
 
-        Ok(tool_result(text, serde_json::to_value(report)?))
+        Ok(tool_result(text, structured))
     }
 
     fn tool_list_records(&self, args: Value) -> Result<Value> {

@@ -24,6 +24,20 @@ fn mcp_call(store: &str, namespace: &str, request: serde_json::Value) -> serde_j
 }
 
 #[test]
+fn initialize_and_doctor_expose_active_store_identity() {
+    let first = tmp_store("mcp-identity-first");
+    let second = tmp_store("mcp-identity-second");
+    let initialize_first = mcp_call(&first, "persistent-intelligence", serde_json::json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}));
+    let initialize_second = mcp_call(&second, "persistent-intelligence", serde_json::json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{}}));
+    assert_eq!(initialize_first["result"]["piStoreIdentity"]["resolved"], true);
+    assert_eq!(initialize_first["result"]["piStoreIdentity"]["namespace"], "persistent-intelligence");
+    assert_ne!(initialize_first["result"]["piStoreIdentity"]["store"], initialize_second["result"]["piStoreIdentity"]["store"]);
+
+    let doctor = mcp_call(&first, "persistent-intelligence", serde_json::json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"pi.doctor","arguments":{}}}));
+    assert_eq!(doctor["result"]["structuredContent"]["piStoreIdentity"], initialize_first["result"]["piStoreIdentity"]);
+}
+
+#[test]
 fn list_tools_exposes_expected_tools() {
     let store = tmp_store("mcp-tools-list");
     let response = mcp_call(&store, "interop-test", serde_json::json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}));
