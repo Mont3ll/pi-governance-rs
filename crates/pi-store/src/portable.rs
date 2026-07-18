@@ -3,7 +3,7 @@ use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use pi_governance_core::{Patch, Record, StoreEvent, CURRENT_SCHEMA_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
 
@@ -246,22 +246,37 @@ impl JsonlStore {
         let mut patches = session.load_patches()?;
         let mut events = session.load_events()?;
 
-        let existing_record_ids: HashSet<String> = records.iter().map(|record| record.id.clone()).collect();
+        let existing_record_ids: HashSet<(String, String)> = records.iter().map(|record| (record.namespace.clone(), record.id.clone())).collect();
         let existing_patch_ids: HashSet<String> = patches.iter().map(|patch| patch.id.clone()).collect();
         let existing_event_ids: HashSet<String> = events.iter().map(|event| event.id.clone()).collect();
 
-        let import_records: Vec<Record> = bundle
-            .records
-            .iter()
-            .filter(|record| !existing_record_ids.contains(&record.id))
-            .cloned()
-            .map(|mut record| {
-                if !options.preserve_namespaces {
-                    record.namespace = options.namespace.clone();
-                }
-                record
-            })
-            .collect();
+        let mut incoming_record_groups: BTreeMap<(String, String), Vec<Record>> = BTreeMap::new();
+        for mut record in bundle.records.iter().cloned() {
+            if !options.preserve_namespaces {
+                record.namespace = options.namespace.clone();
+            }
+            incoming_record_groups
+                .entry((record.namespace.clone(), record.id.clone()))
+                .or_default()
+                .push(record);
+        }
+        let mut import_records = Vec::new();
+        for ((namespace, id), group) in incoming_record_groups {
+            if existing_record_ids.contains(&(namespace.clone(), id.clone())) {
+                continue;
+            }
+            if group.len() == 1 {
+                import_records.push(group.into_iter().next().expect("single record group"));
+                continue;
+            }
+            let first = serde_json::to_value(&group[0])?;
+            if group.iter().skip(1).all(|record| serde_json::to_value(record).ok().as_ref() == Some(&first)) {
+                warnings.push(format!("collapsed exact duplicate record {namespace}/{id} during import"));
+                import_records.push(group.into_iter().next().expect("duplicate record group"));
+            } else {
+                warnings.push(format!("quarantined divergent duplicate record {namespace}/{id}; no row from this group was imported"));
+            }
+        }
         let import_patches: Vec<Patch> = bundle
             .patches
             .iter()

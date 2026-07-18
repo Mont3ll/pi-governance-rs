@@ -1,8 +1,34 @@
 use pi_governance_core::{EvidenceKind, EvidenceRef, Record, RecordClass, RecordStatus, Scope};
-use pi_governance_store::{plan_record_integrity, JsonlStore};
+use chrono::Utc;
+use pi_governance_store::{
+    plan_record_integrity, JsonlStore, RedactionMetadata, StoreExportBundle,
+    StoreImportOptions,
+};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+fn bundle(records: Vec<Record>) -> StoreExportBundle {
+    StoreExportBundle {
+        schema_version: 1,
+        format: Some("pi-governance".into()),
+        producer: None,
+        exported_at: Utc::now(),
+        redacted: false,
+        redaction: RedactionMetadata { enabled: false, fields_checked: vec![], fields_redacted: vec![], notes: vec![] },
+        namespace: Some("alpha".into()),
+        all_namespaces: false,
+        project: None,
+        records,
+        patches: vec![],
+        events: vec![],
+        evidence: vec![],
+        inquiries: vec![],
+        sessions: vec![],
+        reinforcement: vec![],
+        tombstones: vec![],
+    }
+}
 
 fn temp_store_dir(test_name: &str) -> PathBuf {
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
@@ -134,6 +160,44 @@ fn apply_rejects_stale_fingerprint_without_writing() -> anyhow::Result<()> {
     assert!(error.to_string().contains("integrity preview is stale"));
     assert_eq!(fs::read_to_string(root.join("records.jsonl"))?, changed);
     assert!(!root.join("backups").exists());
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn import_collapses_exact_incoming_duplicates() -> anyhow::Result<()> {
+    let root = temp_store_dir("import-exact-duplicate");
+    let store = JsonlStore::new(&root);
+    let value = record("alpha", "rec_dup", RecordStatus::Active, &[]);
+
+    let report = store.import_bundle(bundle(vec![value.clone(), value]), StoreImportOptions {
+        namespace: "alpha".into(), preserve_namespaces: true, dry_run: false, backup: false,
+    })?;
+
+    assert_eq!(report.imported_records, 1);
+    assert_eq!(report.skipped_records, 1);
+    assert!(report.warnings.iter().any(|warning| warning.contains("collapsed exact duplicate record alpha/rec_dup")));
+    assert_eq!(store.load_records()?.len(), 1);
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn import_quarantines_divergent_incoming_duplicates() -> anyhow::Result<()> {
+    let root = temp_store_dir("import-divergent-duplicate");
+    let store = JsonlStore::new(&root);
+    let first = record("alpha", "rec_dup", RecordStatus::Active, &[]);
+    let mut second = first.clone();
+    second.claim = "different claim".into();
+
+    let report = store.import_bundle(bundle(vec![first, second]), StoreImportOptions {
+        namespace: "alpha".into(), preserve_namespaces: true, dry_run: false, backup: false,
+    })?;
+
+    assert_eq!(report.imported_records, 0);
+    assert_eq!(report.skipped_records, 2);
+    assert!(report.warnings.iter().any(|warning| warning.contains("quarantined divergent duplicate record alpha/rec_dup")));
+    assert!(store.load_records()?.is_empty());
     fs::remove_dir_all(root)?;
     Ok(())
 }
