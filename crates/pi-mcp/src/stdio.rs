@@ -139,7 +139,7 @@ impl McpStdioServer {
 
     pub fn initialize_result(&self, _params: Value) -> Value {
         let identity = self.store_identity();
-        let instructions = vec![
+        let instructions = [
             "PI Governance exposes governed memory tools for coding agents.".to_string(),
             "Use pi.retrieve_context before making project-sensitive changes.".to_string(),
             "Use pi.propose_record for durable memory updates instead of directly mutating the store.".to_string(),
