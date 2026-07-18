@@ -46,8 +46,7 @@ impl JsonlStore {
         &self,
         options: SchemaMigrationOptions,
     ) -> Result<SchemaMigrationReport> {
-        self.init()?;
-        let _session = self.write_session()?;
+        let _session = if options.dry_run { None } else { Some(self.write_session()?) };
 
         let mut files = Vec::new();
         let targets = [

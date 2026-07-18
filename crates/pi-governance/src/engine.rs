@@ -833,8 +833,6 @@ impl GovernanceEngine {
     }
 
     pub fn migrate_store(&self, input: MigrationInput) -> Result<SchemaMigrationReport> {
-        self.store.init()?;
-
         self.store.migrate_schema_versions(SchemaMigrationOptions {
             dry_run: input.dry_run,
             backup: input.backup,

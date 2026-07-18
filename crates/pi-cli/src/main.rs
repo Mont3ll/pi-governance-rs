@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::DateTime;
 use clap::{Parser, Subcommand};
 use pi_governance_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, PatchStatus, PolicyProfile, RecallEventClient, RecallEventOperation, RecallEventOutcome, RecordClass, RetrievalFormat, RetrievalOptions, RuleType, Scope, SourceKind, StoreEvent, TrustClass};
@@ -373,15 +373,25 @@ enum Commands {
         json: bool,
     },
 
-    /// Migrate legacy JSONL entries to the current schema version.
-    Migrate {
-        /// Report planned migration changes without rewriting files.
+    /// Preview or apply canonical duplicate/self-supersession repairs.
+    StoreIntegrity {
+        /// Apply the reviewed integrity plan.
         #[arg(long)]
-        dry_run: bool,
+        apply: bool,
 
-        /// Create a timestamped backup under the store before rewriting.
+        /// Fingerprint emitted by the reviewed preview; required with --apply.
+        #[arg(long, requires = "apply")]
+        fingerprint: Option<String>,
+
         #[arg(long)]
-        backup: bool,
+        json: bool,
+    },
+
+    /// Preview or apply migration of legacy JSONL entries to the current schema version.
+    Migrate {
+        /// Apply the migration. Without this flag the command is read-only.
+        #[arg(long)]
+        apply: bool,
 
         #[arg(long)]
         json: bool,
@@ -1652,12 +1662,43 @@ fn main() -> Result<()> {
             }
         }
 
-        Commands::Migrate {
-            dry_run,
-            backup,
-            json,
-        } => {
-            let report = engine.migrate_store(MigrationInput { dry_run, backup })?;
+        Commands::StoreIntegrity { apply, fingerprint, json } => {
+            if apply {
+                let fingerprint = fingerprint.context("--apply requires --fingerprint from a reviewed preview")?;
+                let report = engine.store().apply_record_integrity(&fingerprint)?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&report)?);
+                } else {
+                    println!("PI Store Integrity Apply");
+                    println!("Mutation performed: {}", report.mutation_performed);
+                    println!("Rows: {} -> {}", report.rows_before, report.rows_after);
+                    println!("Rows removed: {}", report.rows_removed);
+                    println!("Self edges removed: {}", report.self_edges_removed);
+                    if let Some(backup) = &report.backup { println!("Backup: {}", backup.backup_dir); }
+                    if let Some(path) = &report.report_path { println!("Report: {path}"); }
+                }
+            } else {
+                let report = engine.store().plan_record_integrity()?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&report)?);
+                } else {
+                    println!("PI Store Integrity Preview");
+                    println!("Mutation performed: false");
+                    println!("Migration needed: {}", report.migration_needed);
+                    println!("Rows: {} -> {}", report.rows_before, report.rows_after);
+                    println!("Unique keys: {}", report.unique_keys_before);
+                    println!("Duplicate groups: {}", report.duplicate_groups);
+                    println!("Self edges: {}", report.self_edges_removed);
+                    println!("Fingerprint: {}", report.fingerprint);
+                    if report.migration_needed {
+                        println!("Next: pi --store <path> store-integrity --apply --fingerprint {}", report.fingerprint);
+                    }
+                }
+            }
+        }
+
+        Commands::Migrate { apply, json } => {
+            let report = engine.migrate_store(MigrationInput { dry_run: !apply, backup: apply })?;
 
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);

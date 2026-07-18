@@ -14,6 +14,14 @@ pub(crate) fn create_store_backup(
     root: &Path,
     files: &[(&str, &Path)],
 ) -> Result<StoreBackupReport> {
+    create_store_backup_with_label(root, "schema-v1", files)
+}
+
+pub(crate) fn create_store_backup_with_label(
+    root: &Path,
+    label: &str,
+    files: &[(&str, &Path)],
+) -> Result<StoreBackupReport> {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .context("system clock is before UNIX_EPOCH")?
@@ -21,7 +29,7 @@ pub(crate) fn create_store_backup(
 
     let backup_dir = root
         .join("backups")
-        .join(format!("schema-v1-{timestamp}-pid{}", std::process::id()));
+        .join(format!("{label}-{timestamp}-pid{}", std::process::id()));
 
     fs::create_dir_all(&backup_dir)
         .with_context(|| format!("failed to create backup directory {:?}", backup_dir))?;
