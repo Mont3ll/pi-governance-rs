@@ -7,8 +7,8 @@ use pi_governance_core::{
 };
 use pi_governance_retrieval::{retrieve, retrieve_with_options};
 use pi_governance_store::{
-    JsonlStore, SchemaMigrationOptions, SchemaMigrationReport, StoreExportBundle,
-    StoreExportOptions, StoreImportOptions, StoreImportReport,
+    plan_record_integrity, JsonlStore, SchemaMigrationOptions, SchemaMigrationReport,
+    StoreExportBundle, StoreExportOptions, StoreImportOptions, StoreImportReport,
 };
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -242,6 +242,9 @@ pub struct DoctorReport {
     pub schema_audits: Vec<SchemaFileAudit>,
     pub migration_needed: bool,
     pub total_records: usize,
+    pub unique_record_keys: usize,
+    pub duplicate_record_groups: usize,
+    pub self_supersession_groups: usize,
     pub active_records: usize,
     pub superseded_records: usize,
     pub tombstoned_records: usize,
@@ -1126,7 +1129,8 @@ impl GovernanceEngine {
         let patches = self.store.load_patches()?;
         let events = self.store.load_events()?;
         let schema_audits = self.store.audit_schema_versions(CURRENT_SCHEMA_VERSION)?;
-        let migration_needed = schema_audits.iter().any(|audit| {
+        let integrity = plan_record_integrity(&records);
+        let migration_needed = integrity.migration_needed || schema_audits.iter().any(|audit| {
             audit.missing_schema_version > 0 || audit.mismatched_schema_version > 0
         });
 
@@ -1153,7 +1157,26 @@ impl GovernanceEngine {
             .filter(|record| record.status == RecordStatus::Contested)
             .count();
 
-        for record in &records {
+        for group in &integrity.groups {
+            if group.removed_rows > 0 {
+                errors.push(format!(
+                    "duplicate stable record key {}/{} has {} physical rows",
+                    group.namespace,
+                    group.id,
+                    group.removed_rows + 1,
+                ));
+            }
+            if group.removed_self_edges > 0 {
+                errors.push(format!(
+                    "self-supersession {}/{} contains {} self edge(s)",
+                    group.namespace,
+                    group.id,
+                    group.removed_self_edges,
+                ));
+            }
+        }
+
+        for record in &integrity.records {
             let decision = validate_record(record, &[]);
 
             match decision.status {
@@ -1237,6 +1260,9 @@ impl GovernanceEngine {
             schema_audits,
             migration_needed,
             total_records: records.len(),
+            unique_record_keys: integrity.unique_keys_before,
+            duplicate_record_groups: integrity.duplicate_groups,
+            self_supersession_groups: integrity.groups.iter().filter(|group| group.removed_self_edges > 0).count(),
             active_records,
             superseded_records,
             tombstoned_records,

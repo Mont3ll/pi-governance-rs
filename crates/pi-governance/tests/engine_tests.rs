@@ -7,6 +7,21 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+fn integrity_record(namespace: &str, id: &str, supersedes: Vec<&str>) -> pi_governance_core::Record {
+    let mut record = pi_governance_core::Record::new(
+        RecordClass::Requirement,
+        format!("{id} integrity fixture"),
+        0.9,
+        Scope::project("demo"),
+        vec!["integrity".into()],
+        vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:integrity")],
+    );
+    record.namespace = namespace.into();
+    record.id = id.into();
+    record.supersedes = supersedes.into_iter().map(String::from).collect();
+    record
+}
+
 fn temp_store_dir(test_name: &str) -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -17,6 +32,34 @@ fn temp_store_dir(test_name: &str) -> PathBuf {
         "pi-engine-{test_name}-{}-{nonce}",
         std::process::id()
     ))
+}
+
+#[test]
+fn doctor_reports_unique_keys_duplicate_groups_and_self_edges_once() -> anyhow::Result<()> {
+    let root = temp_store_dir("doctor-integrity");
+    let engine = GovernanceEngine::new(JsonlStore::new(&root));
+    engine.init()?;
+    let rows = [
+        integrity_record("alpha", "rec_dup", vec!["rec_dup"]),
+        integrity_record("alpha", "rec_dup", vec!["rec_previous"]),
+        integrity_record("beta", "rec_dup", vec![]),
+    ];
+    fs::write(
+        root.join("records.jsonl"),
+        rows.iter().map(serde_json::to_string).collect::<Result<Vec<_>, _>>()?.join("\n") + "\n",
+    )?;
+
+    let report = engine.doctor_in_namespace("alpha")?;
+
+    assert_eq!(report.total_records, 3);
+    assert_eq!(report.unique_record_keys, 2);
+    assert_eq!(report.duplicate_record_groups, 1);
+    assert_eq!(report.self_supersession_groups, 1);
+    assert_eq!(report.errors.iter().filter(|error| error.contains("duplicate stable record key alpha/rec_dup")).count(), 1);
+    assert_eq!(report.errors.iter().filter(|error| error.contains("self-supersession alpha/rec_dup")).count(), 1);
+
+    fs::remove_dir_all(root)?;
+    Ok(())
 }
 
 #[test]
