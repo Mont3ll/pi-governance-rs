@@ -149,6 +149,42 @@ fn imports_javascript_bundle_and_preserves_auxiliary_sections() -> anyhow::Resul
 }
 
 #[test]
+fn project_filter_preserves_related_compatibility_artifacts() -> anyhow::Result<()> {
+    use pi_governance_store::{StoreExportBundle, StoreExportOptions, StoreImportOptions};
+    let root = temp_store_dir("project-filter");
+    let store = JsonlStore::new(&root);
+    store.init()?;
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/pi-governance-conformance/full-bundle.json");
+    let bundle: StoreExportBundle = serde_json::from_slice(&fs::read(fixture)?)?;
+    store.import_bundle(bundle, StoreImportOptions {
+        namespace: "persistent-intelligence".into(),
+        preserve_namespaces: true,
+        dry_run: false,
+        backup: false,
+    })?;
+
+    let exported = store.export_bundle(StoreExportOptions {
+        namespace: Some("persistent-intelligence".into()),
+        all_namespaces: false,
+        project: Some("alpha".into()),
+        redacted: false,
+    })?;
+
+    assert_eq!(exported.records.iter().map(|item| item.id.as_str()).collect::<Vec<_>>(), vec!["rec_divergent", "rec_match"]);
+    assert_eq!(exported.evidence.iter().filter_map(|item| item.get("id")?.as_str()).collect::<Vec<_>>(), vec!["evidence_match"]);
+    assert_eq!(exported.inquiries.iter().filter_map(|item| item.get("id")?.as_str()).collect::<Vec<_>>(), vec!["inquiry_match"]);
+    assert_eq!(exported.sessions.iter().filter_map(|item| item.get("id")?.as_str()).collect::<Vec<_>>(), vec!["session_match"]);
+    assert_eq!(exported.reinforcement.iter().filter_map(|item| item.get("id")?.as_str()).collect::<Vec<_>>(), vec!["reinforcement_match"]);
+    assert_eq!(exported.tombstones.iter().filter_map(|item| item.get("id")?.as_str()).collect::<Vec<_>>(), vec!["tombstone_match"]);
+    assert_eq!(exported.events.iter().map(|item| item.id.as_str()).collect::<Vec<_>>(), vec!["event_match"]);
+    assert!(exported.warnings.iter().any(|warning| warning.contains("session") && warning.contains("omitted")));
+
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
 fn exports_and_imports_portable_bundle_without_overwriting_duplicates() -> anyhow::Result<()> {
     use pi_governance_core::{EvidenceKind, EvidenceRef, Record, RecordClass, Scope};
     use pi_governance_store::{StoreExportOptions, StoreImportOptions};

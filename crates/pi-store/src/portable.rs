@@ -56,6 +56,7 @@ pub struct StoreExportBundle {
     #[serde(default)] pub sessions: Vec<Value>,
     #[serde(default)] pub reinforcement: Vec<Value>,
     #[serde(default)] pub tombstones: Vec<Value>,
+    #[serde(default)] pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,27 +124,34 @@ impl JsonlStore {
             .map(|patch| patch.id.clone())
             .collect();
 
-        let mut selected_events: Vec<StoreEvent> = events
+        let mut namespace_events: Vec<StoreEvent> = events
             .into_iter()
             .filter(|event| namespace_filter.map(|namespace| event.namespace == namespace).unwrap_or(true))
+            .collect();
+        let mut evidence = take_compatibility_events(&mut namespace_events, "evidence");
+        let mut inquiries = take_compatibility_events(&mut namespace_events, "inquiry");
+        let mut sessions = take_compatibility_events(&mut namespace_events, "session");
+        let mut reinforcement = take_compatibility_events(&mut namespace_events, "reinforcement");
+        let mut tombstones = take_compatibility_events(&mut namespace_events, "tombstone");
+        let mut warnings = Vec::new();
+        if let Some(project) = options.project.as_deref() {
+            evidence = filter_compatibility_values(evidence, "evidence", project, &["record_id", "related_memory_ids"], &selected_record_ids, &mut warnings);
+            inquiries = filter_compatibility_values(inquiries, "inquiry", project, &["record_ids", "related_memory_ids", "answer_memory_id"], &selected_record_ids, &mut warnings);
+            sessions = filter_compatibility_values(sessions, "session", project, &[], &selected_record_ids, &mut warnings);
+            reinforcement = filter_compatibility_values(reinforcement, "reinforcement", project, &["memory_id"], &selected_record_ids, &mut warnings);
+            tombstones = filter_compatibility_values(tombstones, "tombstone", project, &["memory_id", "deleted_record_id"], &selected_record_ids, &mut warnings);
+        }
+        let mut selected_events: Vec<StoreEvent> = namespace_events
+            .into_iter()
             .filter(|event| {
                 options.project.is_none()
                     || event
                         .object_id
                         .as_ref()
-                        .map(|object_id| {
-                            selected_record_ids.contains(object_id)
-                                || selected_patch_ids.contains(object_id)
-                        })
+                        .map(|object_id| selected_record_ids.contains(object_id) || selected_patch_ids.contains(object_id))
                         .unwrap_or(false)
             })
             .collect();
-
-        let mut evidence = take_compatibility_events(&mut selected_events, "evidence");
-        let mut inquiries = take_compatibility_events(&mut selected_events, "inquiry");
-        let mut sessions = take_compatibility_events(&mut selected_events, "session");
-        let reinforcement = take_compatibility_events(&mut selected_events, "reinforcement");
-        let mut tombstones = take_compatibility_events(&mut selected_events, "tombstone");
         if options.redacted {
             redact_records(&mut selected_records);
             redact_patches(&mut selected_patches);
@@ -177,6 +185,7 @@ impl JsonlStore {
             sessions,
             reinforcement,
             tombstones,
+            warnings,
         })
     }
 
@@ -477,6 +486,42 @@ fn take_compatibility_events(events: &mut Vec<StoreEvent>, category: &str) -> Ve
     let target = format!("interop_{category}"); let mut values = Vec::new(); let mut retained = Vec::new();
     for event in events.drain(..) { if event.category == target { if let Ok(value) = serde_json::from_str(&event.message) { values.push(value); } } else { retained.push(event); } }
     *events = retained; values
+}
+
+fn value_references_selected(value: &Value, fields: &[&str], selected_ids: &HashSet<String>) -> bool {
+    let Some(object) = value.as_object() else { return false; };
+    fields.iter().any(|field| match object.get(*field) {
+        Some(Value::String(id)) => selected_ids.contains(id),
+        Some(Value::Array(ids)) => ids.iter().filter_map(Value::as_str).any(|id| selected_ids.contains(id)),
+        _ => false,
+    })
+}
+
+fn value_matches_project(value: &Value, project: &str) -> bool {
+    let Some(object) = value.as_object() else { return false; };
+    object.get("project").and_then(Value::as_str) == Some(project)
+        || (object.get("scope_level").and_then(Value::as_str) == Some("project")
+            && object.get("scope_ref").and_then(Value::as_str) == Some(project))
+}
+
+fn filter_compatibility_values(
+    values: Vec<Value>,
+    section: &str,
+    project: &str,
+    relation_fields: &[&str],
+    selected_ids: &HashSet<String>,
+    warnings: &mut Vec<String>,
+) -> Vec<Value> {
+    let before = values.len();
+    let retained: Vec<Value> = values
+        .into_iter()
+        .filter(|value| value_references_selected(value, relation_fields, selected_ids) || value_matches_project(value, project))
+        .collect();
+    let omitted = before.saturating_sub(retained.len());
+    if omitted > 0 {
+        warnings.push(format!("{section}: omitted {omitted} artifact(s) without a selected record relationship or explicit project scope"));
+    }
+    retained
 }
 
 fn redact_portable_values(values: &mut [Value], fields: &[&str]) {

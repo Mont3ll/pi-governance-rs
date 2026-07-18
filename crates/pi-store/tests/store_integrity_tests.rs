@@ -27,6 +27,7 @@ fn bundle(records: Vec<Record>) -> StoreExportBundle {
         sessions: vec![],
         reinforcement: vec![],
         tombstones: vec![],
+        warnings: vec![],
     }
 }
 
