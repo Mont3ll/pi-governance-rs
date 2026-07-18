@@ -1,3 +1,4 @@
+use pi_governance_core::RecordStatus;
 use pi_governance_store::{reconcile_bundles, StoreExportBundle};
 use serde_json::Value;
 use std::fs;
@@ -22,6 +23,24 @@ fn reconciliation_fixture_report_matches_shared_contract() {
     .unwrap();
 
     assert_eq!(serde_json::to_value(report).unwrap(), expected);
+}
+
+#[test]
+fn reconciliation_fixture_normalizes_sets_and_envelope_fields_only() {
+    let source = bundle("full-bundle.json");
+    let mut destination = source.clone();
+    destination.exported_at = "2030-01-01T00:00:00Z".parse().unwrap();
+    destination.producer.as_mut().unwrap().version = "99.0.0".into();
+    destination.records[0].tags.reverse();
+    destination.records[0].evidence.reverse();
+
+    let normalized = reconcile_bundles(&source, &destination);
+    assert!(normalized.sections["records"].divergent_ids.is_empty());
+    assert!(normalized.sections["records"].matching_ids.contains(&"rec_match".to_string()));
+
+    destination.records[0].status = RecordStatus::Contested;
+    let substantive = reconcile_bundles(&source, &destination);
+    assert!(substantive.sections["records"].divergent_ids.contains(&"rec_match".to_string()));
 }
 
 #[test]

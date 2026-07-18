@@ -5,6 +5,7 @@ pub mod jsonl;
 pub mod lock;
 pub mod migrations;
 pub mod portable;
+pub mod reconcile;
 
 pub use backup::*;
 pub use integrity::*;
@@ -12,3 +13,4 @@ pub use jsonl::*;
 pub use lock::*;
 pub use migrations::*;
 pub use portable::*;
+pub use reconcile::*;
