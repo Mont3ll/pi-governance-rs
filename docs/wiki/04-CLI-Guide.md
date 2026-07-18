@@ -212,19 +212,27 @@ Expected output summary: human-readable or JSON output describing the requested 
 
 Notes/cautions: review output before applying durable changes; use namespaces intentionally; redacted output is best-effort.
 
-## `migrate`
+## `store-integrity`
 
-Purpose: migrate command for governed memory operation, inspection, setup, or validation.
-
-Example:
+Purpose: preview duplicate stable-ID and self-supersession repair. The preview is read-only and emits the fingerprint required for apply.
 
 ```bash
-pi --store .pi migrate
+pi --store .pi store-integrity --json
+pi --store .pi store-integrity --apply --fingerprint <fingerprint-from-preview> --json
 ```
 
-Expected output summary: human-readable or JSON output describing the requested operation, errors, or next review step.
+Apply refuses a stale fingerprint, creates a mandatory backup, atomically rewrites `records.jsonl`, and writes an audit report.
 
-Notes/cautions: review output before applying durable changes; use namespaces intentionally; redacted output is best-effort.
+## `migrate`
+
+Purpose: migrate legacy JSONL schema versions. The command is read-only unless `--apply` is supplied.
+
+```bash
+pi --store .pi migrate --json
+pi --store .pi migrate --apply --json
+```
+
+Applied migrations always create a timestamped backup. Review preview output before applying durable changes.
 
 ## `namespace list`
 

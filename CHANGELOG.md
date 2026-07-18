@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+Added:
+- Dry-run-first `store-integrity` preview/apply workflow with reviewed fingerprints, mandatory backups, and audit reports.
+- Doctor counts for unique record keys, duplicate groups, and self-supersession groups.
+
+Changed:
+- `migrate` now previews by default and requires `--apply`; applied migrations always create a backup.
+- Portable import collapses exact incoming duplicate IDs and quarantines divergent duplicates.
+
 ## v1.1.0
 
 Added:
