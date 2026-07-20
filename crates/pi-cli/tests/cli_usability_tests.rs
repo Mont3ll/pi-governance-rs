@@ -72,11 +72,13 @@ fn reconcile_normalizes_javascript_compatibility_bundle_without_mutation() {
         "schema_version":1,"format":"pi-governance","namespace":"default","exported_at":"2026-07-20T00:00:00Z",
         "records":[{"id":"mem_deleted","claim":"[deleted]","status":"tombstoned","layer":"l2_playbook","confidence":0,"tags":[]}],
         "patches":[{"id":"cap_legacy","status":"applied","operation":"propose_record","claim":"Legacy candidate","layer":"l2_playbook","tags":[]}],
-        "evidence":[],"inquiries":[],"sessions":[],"reinforcement":[],"events":[],"tombstones":[]
+        "evidence":[{"id":"ev_js","created_at":"2026-07-20T00:00:00Z","source_kind":"file","source_summary":"portable evidence","trust_class":"unknown","polarity":"supports","related_memory_ids":["mem_deleted"]}],"inquiries":[],"sessions":[],"reinforcement":[],"events":[],"tombstones":[]
     })).unwrap()).unwrap();
     let before = std::fs::read(format!("{store}/records.jsonl")).unwrap();
     let output = Command::new(bin()).args(["--store", &store, "reconcile", &peer, "--json"]).output().unwrap();
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["sections"]["evidence"]["destination_only_ids"], serde_json::json!(["ev_js"]));
     assert_eq!(std::fs::read(format!("{store}/records.jsonl")).unwrap(), before);
 }
 

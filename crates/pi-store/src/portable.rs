@@ -464,8 +464,7 @@ fn normalize_portable_bundle(mut value: Value) -> Result<StoreExportBundle> {
     let project = object.get("project").and_then(Value::as_str).map(str::to_string);
     for record in object.entry("records").or_insert(json!([])).as_array_mut().context("records must be an array")? { normalize_record_value(record, &namespace, fallback_time)?; }
     for patch in object.entry("patches").or_insert(json!([])).as_array_mut().context("patches must be an array")? { normalize_patch_value(patch, &namespace, project.as_deref(), fallback_time)?; }
-    let bundle: StoreExportBundle = serde_json::from_value(value).context("normalized bundle does not satisfy the pi-governance v1 contract")?;
-    materialize_auxiliary_events(bundle)
+    serde_json::from_value(value).context("normalized bundle does not satisfy the pi-governance v1 contract")
 }
 
 fn artifact_event(category: &str, value: &Value, namespace: &str) -> Result<StoreEvent> {
