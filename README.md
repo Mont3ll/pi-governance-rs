@@ -99,6 +99,7 @@ retrieve
 export
 import
 reconcile
+privacy-purge
 inspect-record
 list-patches
 inspect-patch

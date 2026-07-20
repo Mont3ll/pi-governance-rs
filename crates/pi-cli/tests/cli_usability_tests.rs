@@ -42,6 +42,28 @@ fn store_integrity_previews_by_default_and_applies_with_reviewed_fingerprint() {
 }
 
 #[test]
+fn privacy_purge_previews_and_requires_force_apply_with_fingerprint() {
+    let store = tmp_store("privacy-purge");
+    assert!(Command::new(bin()).args(["--store", &store, "demo", "--json"]).status().unwrap().success());
+    let records: Vec<serde_json::Value> = std::fs::read_to_string(format!("{store}/records.jsonl")).unwrap().lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+    let target = records[0]["id"].as_str().unwrap();
+    let preview = Command::new(bin()).args(["--store", &store, "privacy-purge", target, "--reason", "privacy cleanup", "--json"]).output().unwrap();
+    assert!(preview.status.success());
+    let preview_json: serde_json::Value = serde_json::from_slice(&preview.stdout).unwrap();
+    assert_eq!(preview_json["dry_run"], true);
+    let fingerprint = preview_json["fingerprint"].as_str().unwrap();
+
+    let missing_force = Command::new(bin()).args(["--store", &store, "privacy-purge", target, "--reason", "privacy cleanup", "--apply", "--fingerprint", fingerprint, "--json"]).output().unwrap();
+    assert!(!missing_force.status.success());
+    let applied = Command::new(bin()).args(["--store", &store, "privacy-purge", target, "--reason", "privacy cleanup", "--apply", "--force", "--fingerprint", fingerprint, "--json"]).output().unwrap();
+    assert!(applied.status.success(), "{}", String::from_utf8_lossy(&applied.stderr));
+    let applied_json: serde_json::Value = serde_json::from_slice(&applied.stdout).unwrap();
+    assert_eq!(applied_json["mutation_performed"], true);
+    let contents = std::fs::read_to_string(format!("{store}/records.jsonl")).unwrap();
+    assert!(contents.contains("[privacy purged]"));
+}
+
+#[test]
 fn reconcile_is_report_only_and_preserves_store_files() {
     let store = tmp_store("reconcile");
     assert!(Command::new(bin()).args(["--store", &store, "demo", "--json"]).status().unwrap().success());

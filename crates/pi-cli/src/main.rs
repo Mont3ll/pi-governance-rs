@@ -225,6 +225,26 @@ enum Commands {
         force: bool,
     },
 
+    /// Permanently redact a secret-bearing record while preserving its stable identity and an external backup.
+    PrivacyPurge {
+        target_id: String,
+
+        #[arg(long)]
+        reason: String,
+
+        #[arg(long)]
+        apply: bool,
+
+        #[arg(long)]
+        force: bool,
+
+        #[arg(long)]
+        fingerprint: Option<String>,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Reinforce an active record with additional evidence and a confidence bump.
     Reinforce {
         target_id: String,
@@ -1371,6 +1391,19 @@ fn main() -> Result<()> {
             )?;
 
             println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+
+        Commands::PrivacyPurge { target_id, reason, apply, force, fingerprint, json } => {
+            if apply {
+                let fingerprint = fingerprint.context("privacy purge apply requires --fingerprint from a reviewed preview")?;
+                let result = engine.apply_privacy_purge(&namespace, &target_id, &reason, &fingerprint, force)?;
+                if json { println!("{}", serde_json::to_string_pretty(&result)?); }
+                else { println!("Privacy purge applied: {}", result.mutation_performed); }
+            } else {
+                let result = engine.plan_privacy_purge(&namespace, &target_id, &reason)?;
+                if json { println!("{}", serde_json::to_string_pretty(&result)?); }
+                else { println!("Privacy purge preview for {} (fingerprint {})", target_id, result.fingerprint); }
+            }
         }
 
         Commands::Reinforce {

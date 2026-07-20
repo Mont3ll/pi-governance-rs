@@ -7,7 +7,8 @@ use pi_governance_core::{
 };
 use pi_governance_retrieval::{retrieve, retrieve_with_options};
 use pi_governance_store::{
-    plan_record_integrity, reconcile_bundles, JsonlStore, ReconciliationReport,
+    apply_record_privacy_purge, plan_record_integrity, plan_record_privacy_purge, JsonlStore,
+    PrivacyPurgeApplyResult, PrivacyPurgePlan, ReconciliationReport, reconcile_bundles,
     SchemaMigrationOptions, SchemaMigrationReport, StoreExportBundle, StoreExportOptions,
     StoreImportOptions, StoreImportReport,
 };
@@ -494,6 +495,15 @@ impl GovernanceEngine {
             queued: true,
             applied,
         })
+    }
+
+    pub fn plan_privacy_purge(&self, namespace: &str, target_id: &str, reason: &str) -> Result<PrivacyPurgePlan> {
+        plan_record_privacy_purge(&self.store, namespace, target_id, reason)
+    }
+
+    pub fn apply_privacy_purge(&self, namespace: &str, target_id: &str, reason: &str, fingerprint: &str, force: bool) -> Result<PrivacyPurgeApplyResult> {
+        if !force { bail!("privacy purge apply requires --force"); }
+        apply_record_privacy_purge(&self.store, namespace, target_id, reason, fingerprint)
     }
 
     pub fn tombstone_record(

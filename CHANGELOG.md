@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- Preview-first `privacy-purge` for secret-bearing active or terminal records, with reviewed fingerprints, explicit force/apply, backups, redacted tombstoned shells, and audit reports.
+
 Added:
 - Dry-run-first `store-integrity` preview/apply workflow with reviewed fingerprints, mandatory backups, and audit reports.
 - Doctor counts for unique record keys, duplicate groups, and self-supersession groups.

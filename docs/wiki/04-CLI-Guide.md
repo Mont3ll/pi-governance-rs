@@ -223,6 +223,17 @@ pi --store .pi --namespace default reconcile peer-bundle.json --project my-proje
 
 The report covers records, patches, evidence, inquiries, sessions, reinforcement, generic events, and tombstones. It shows source-only, destination-only, matching, divergent, duplicate, and conflicting IDs. There is intentionally no apply option.
 
+## `privacy-purge`
+
+Permanently redacts secret-bearing record content while preserving the stable record ID, namespace, a tombstoned shell, and an external byte-for-byte backup. Preview is read-only; apply requires both the reviewed fingerprint and `--force`.
+
+```bash
+pi --store .pi --namespace default privacy-purge <record-id> --reason "privacy cleanup" --json
+pi --store .pi --namespace default privacy-purge <record-id> --reason "privacy cleanup" --apply --force --fingerprint <preview-fingerprint> --json
+```
+
+The stored reason is represented by its SHA-256 digest. Previous claim, evidence, tags, and supersession links are excluded from the rewritten record and audit report.
+
 ## `store-integrity`
 
 Purpose: preview duplicate stable-ID and self-supersession repair. The preview is read-only and emits the fingerprint required for apply.
