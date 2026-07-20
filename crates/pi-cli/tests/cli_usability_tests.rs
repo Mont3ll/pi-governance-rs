@@ -64,6 +64,23 @@ fn privacy_purge_previews_and_requires_force_apply_with_fingerprint() {
 }
 
 #[test]
+fn reconcile_normalizes_javascript_compatibility_bundle_without_mutation() {
+    let store = tmp_store("reconcile-js");
+    assert!(Command::new(bin()).args(["--store", &store, "demo", "--json"]).status().unwrap().success());
+    let peer = format!("{store}/js-peer.json");
+    std::fs::write(&peer, serde_json::to_vec(&serde_json::json!({
+        "schema_version":1,"format":"pi-governance","namespace":"default","exported_at":"2026-07-20T00:00:00Z",
+        "records":[{"id":"mem_deleted","claim":"[deleted]","status":"tombstoned","layer":"l2_playbook","confidence":0,"tags":[]}],
+        "patches":[{"id":"cap_legacy","status":"applied","operation":"propose_record","claim":"Legacy candidate","layer":"l2_playbook","tags":[]}],
+        "evidence":[],"inquiries":[],"sessions":[],"reinforcement":[],"events":[],"tombstones":[]
+    })).unwrap()).unwrap();
+    let before = std::fs::read(format!("{store}/records.jsonl")).unwrap();
+    let output = Command::new(bin()).args(["--store", &store, "reconcile", &peer, "--json"]).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(std::fs::read(format!("{store}/records.jsonl")).unwrap(), before);
+}
+
+#[test]
 fn reconcile_is_report_only_and_preserves_store_files() {
     let store = tmp_store("reconcile");
     assert!(Command::new(bin()).args(["--store", &store, "demo", "--json"]).status().unwrap().success());

@@ -10,7 +10,7 @@ use pi_governance_engine::{
 use serde_json::json;
 use pi_governance_mcp::{registered_tool_names, McpStdioServer};
 use pi_governance_retrieval::render_markdown;
-use pi_governance_store::{JsonlStore, StoreExportBundle};
+use pi_governance_store::JsonlStore;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -1709,8 +1709,7 @@ fn main() -> Result<()> {
         }
 
         Commands::Reconcile { path, project, json } => {
-            let destination: StoreExportBundle = serde_json::from_slice(&fs::read(&path)
-                .with_context(|| format!("failed to read peer bundle {}", path.display()))?)
+            let destination = engine.store().read_portable_bundle_from_path(&path)
                 .with_context(|| format!("invalid peer bundle {}", path.display()))?;
             let report = engine.reconcile_store(
                 &destination,

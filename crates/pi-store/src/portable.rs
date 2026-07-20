@@ -205,17 +205,21 @@ impl JsonlStore {
         Ok(bundle)
     }
 
+    pub fn read_portable_bundle_from_path(&self, path: &Path) -> Result<StoreExportBundle> {
+        let contents = fs::read_to_string(path)
+            .with_context(|| format!("failed to read portable bundle {:?}", path))?;
+        let value: Value = serde_json::from_str(&contents)
+            .with_context(|| format!("failed to parse portable bundle JSON {:?}", path))?;
+        normalize_portable_bundle(value)
+            .with_context(|| format!("failed to normalize portable bundle {:?}", path))
+    }
+
     pub fn import_bundle_from_path(
         &self,
         path: &Path,
         options: StoreImportOptions,
     ) -> Result<StoreImportReport> {
-        let contents = fs::read_to_string(path)
-            .with_context(|| format!("failed to read import bundle {:?}", path))?;
-        let value: Value = serde_json::from_str(&contents)
-            .with_context(|| format!("failed to parse import bundle JSON {:?}", path))?;
-        let bundle = normalize_portable_bundle(value)
-            .with_context(|| format!("failed to normalize import bundle {:?}", path))?;
+        let bundle = self.read_portable_bundle_from_path(path)?;
         self.import_bundle(bundle, options)
     }
 
