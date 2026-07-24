@@ -2,7 +2,7 @@
 
 Schema docs: [record](../schema/record.md), [patch](../schema/patch.md), [policy](../schema/policy.md), [export bundle](../schema/export-bundle.md), and [MCP](../schema/mcp.md). JSON schemas live under [`schemas/`](../../schemas/).
 
-Schemas are release-candidate level and intended to stabilize at `v1.0.0`.
+Schema version 1 is the stable interchange and store contract for v1.1.0. Changes remain backward-compatible or require an explicit reviewed migration.
 
 
 ---

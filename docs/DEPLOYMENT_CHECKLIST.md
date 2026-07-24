@@ -1,6 +1,6 @@
 # Deployment Checklist
 
-`v1.0.0` is the current stable public release.
+`v1.1.0` is the current coordinated workspace release.
 
 ## Pre-release Local Checks
 
@@ -49,7 +49,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
 
 ## Docs Checks
 
-- [ ] README is current and does not claim stable has shipped.
+- [ ] README and installation documentation identify v1.1.0 consistently.
 - [ ] [docs/WIKI_INDEX.md](WIKI_INDEX.md) links every wiki page.
 - [ ] [docs/RELEASE_STRATEGY.md](RELEASE_STRATEGY.md) is current.
 - [ ] [docs/STABLE_V1_GATE.md](STABLE_V1_GATE.md) is current.
@@ -80,7 +80,7 @@ Expected: no hidden/bidi matches, no public-doc local path leakage, and only doc
 - [ ] Stable version bump complete.
 - [ ] Stable docs wording complete.
 - [ ] `CHANGELOG.md` stable entry complete.
-- [ ] `v1.0.0` tag not created until all gates pass.
+- [ ] `v1.1.0` tag not created until all gates pass.
 
 ## Post-release Checks
 
@@ -97,4 +97,4 @@ Expected: no hidden/bidi matches, no public-doc local path leakage, and only doc
 
 ## Portable Workflow Parity
 
-`v1.0.0` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.
+`v1.0.0` introduced deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.

@@ -5,7 +5,7 @@
 | cargo check | `cargo check --workspace` | pass | pass | required |
 | cargo test | `cargo test --workspace` | pass | pass | required |
 | cargo build | `cargo build -p pi-governance-rs` | pass | pass | required |
-| version | `pi --version` | `pi 1.0.0` | pass | must show `pi 1.0.0` |
+| version | `pi --version` | `pi 1.1.0` | pass | must show `pi 1.1.0` |
 | demo | `pi demo` | demo store created | pass | required |
 | review | `pi review` | queue visible | pass | required |
 | review --apply | review action | patch applied | pass | required |
@@ -30,7 +30,7 @@
 | mcp-config pi-agent | CLI | JSON config | pass | required |
 | mcp-install temp config | CLI | merge/preview safe | pass | required |
 | mcp-doctor temp config | CLI | direct stdio ok | pass | required |
-| OpenCode install/doctor + documented live limitation | client test | setup checks complete | documented exception | accepted for v1.0.0 |
+| OpenCode install/doctor + documented live limitation | client test | setup checks complete | documented exception | accepted for v1.1.0 |
 | Codex full interop | client test | pass | pass | required |
 | PI agent full interop | client test | pass | pass | required |
 | OpenCode inspect-record micro-test | client test | pass in prior an earlier release candidate live validation | not rerun due client-run limitation | historical evidence |

@@ -1,12 +1,12 @@
 # PI Governance
 
-**Current version:** `v1.0.0`
+**Current version:** `v1.1.0`
 
 PI Governance is local-first governed memory for AI agents: a Rust CLI and MCP stdio server that stores durable memory in local JSONL files and requires changes to pass through reviewable patches. It is for maintainers and agent users who want auditable, namespace-scoped agent memory rather than silent belief rewrites.
 
 ## Who Should Use It
 
-Use PI if you run local AI coding agents, want memory changes with evidence, need an MCP-compatible governed memory server, or are preparing/testing the stable `v1.0.0` release path.
+Use PI if you run local AI coding agents, want memory changes with evidence, or need an MCP-compatible governed memory server with reviewable integrity, privacy, and interoperability workflows.
 
 ## Quick Links
 
@@ -18,7 +18,7 @@ Use PI if you run local AI coding agents, want memory changes with evidence, nee
 
 ## Portable Workflow Parity
 
-`v1.0.0` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.
+`v1.0.0` introduced deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.
 
 
 ## Distribution and MCP Sharing

@@ -10,7 +10,7 @@ cargo build -p pi-governance-rs
 Expected for the current stable public release:
 
 ```text
-pi 1.0.0
+pi 1.1.0
 ```
 
 ## Troubleshooting Build Failures

@@ -1,6 +1,6 @@
 # PI Governance Wiki Index
 
-These markdown files are prepared so maintainers can copy them into a GitHub Wiki. They describe the `v1.0.0` stable public release.
+These markdown files are prepared so maintainers can copy them into a GitHub Wiki. They describe the current `v1.1.0` release and its operational boundaries.
 
 - [Home](wiki/Home.md)
 - [01 Overview](wiki/01-Overview.md)

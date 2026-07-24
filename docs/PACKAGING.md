@@ -7,14 +7,14 @@ License: MIT OR Apache-2.0
 
 This repository is a Cargo workspace. The binary crate is `crates/pi-cli`, the package name is `pi-governance-rs`, and the installed binary name is `pi`.
 
-Workspace crates:
+Workspace packages:
 
-- `pi-core`
-- `pi-store`
-- `pi-retrieval`
-- `pi-governance`
-- `pi-mcp`
-- `pi-cli`
+- `pi-governance-core`
+- `pi-governance-store`
+- `pi-governance-retrieval`
+- `pi-governance-engine`
+- `pi-governance-mcp`
+- `pi-governance-rs`
 
 ## Binary crate
 
@@ -46,12 +46,12 @@ cargo install pi-governance-rs
 
 Because `pi-governance-rs` depends on workspace crates, crates.io publishing must publish the supporting crates first. Current intended order:
 
-1. `pi-core`
-2. `pi-store`
-3. `pi-retrieval`
-4. `pi-governance`
-5. `pi-mcp`
-6. `pi-cli`
+1. `pi-governance-core`
+2. `pi-governance-store`
+3. `pi-governance-retrieval`
+4. `pi-governance-engine`
+5. `pi-governance-mcp`
+6. `pi-governance-rs`
 
 Do not publish without explicit approval.
 
@@ -60,9 +60,9 @@ Do not publish without explicit approval.
 Run package checks before any publish:
 
 ```bash
-cargo package -p pi-core --list
-cargo package -p pi-core
-cargo publish -p pi-core
+cargo package -p pi-governance-core --list
+cargo package -p pi-governance-core
+cargo publish -p pi-governance-core
 ```
 
 Repeat for dependent crates after each upstream package is available on crates.io.
@@ -80,4 +80,4 @@ Verify source archives with a fresh extraction, `cargo check --workspace`, `carg
 Packages should include Rust sources, tests, `Cargo.toml`, `Cargo.lock` where Cargo includes it for binaries, README text, schemas, examples, documentation, and license files. Local stores, `.pi/`, `target/`, `.env`, private config, and download artifacts must remain excluded.
 
 
-Release lineage: v1.0.0 was the first GitHub/source release. v1.0.1 prepared package identity but crates.io publication was partial. v1.0.3 completes crates.io publishing and is the public crates.io install target.
+Release lineage: v1.0.0 was the first stable GitHub/source release. v1.0.3 completed the initial crates.io publication. v1.1.0 is the current coordinated workspace release.

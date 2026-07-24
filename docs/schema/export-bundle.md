@@ -1,6 +1,6 @@
 # Export Bundle Schema
 
-Schema is release-candidate level and intended to stabilize at v1.0.0.
+Schema version 1 is the stable portable-bundle contract for v1.1.0.
 
 Export bundles contain `schema_version`, `format`, `producer`, `exported_at`, `redacted`, `redaction`, `namespace`, `all_namespaces`, `project`, `records`, `patches`, `evidence`, `inquiries`, `sessions`, `reinforcement`, `events`, `tombstones`, and `warnings`. Record scope levels include `global`, `project`, `domain`, and `session`.
 

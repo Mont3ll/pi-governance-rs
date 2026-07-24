@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PI Governance v1.0.0 Product Guide</title>
+  <title>PI Governance v1.1.0 Product Guide</title>
   <style>
     :root { color-scheme: light dark; --accent:#5b6ee1; --muted:#667085; --card:#f6f7fb; }
     body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; line-height: 1.55; max-width: 1040px; margin: 0 auto; padding: 32px; }
@@ -20,7 +20,7 @@
   <header>
     <p class="muted">PI Governance Rust Port</p>
     <h1>Local-first governed memory for coding agents</h1>
-    <p>Current stable release: <strong>v1.0.0</strong>. Stable v1.0.0 has shipped.</p>
+    <p>Current coordinated release: <strong>v1.1.0</strong>.</p>
   </header>
 
   <section>
@@ -61,7 +61,7 @@
       <li><strong>Belief revision:</strong> contest, supersede, tombstone, reinforce, and resolve contested records.</li>
       <li><strong>Import/export:</strong> portable JSON bundles with preview and backup options.</li>
       <li><strong>MCP stdio integration:</strong> coding agents can retrieve governed memory and propose changes.</li>
-      <li><strong>MCP setup helpers:</strong> <code>pi mcp-config opencode/codex/pi-agent</code>, <code>pi mcp-install</code>, and <code>pi mcp-doctor</code> streamline client registration. Some clients display prefixed tool names such as <code>pi-governance_pi_retrieve_context</code> or <code>pi_governance_pi.retrieve_context</code>; these are equivalent to <code>pi.retrieve_context</code>. The <code>pi.inspect_record</code> MCP tool remains deferred unless implemented separately.</li>
+      <li><strong>MCP setup helpers:</strong> <code>pi mcp-config opencode/codex/pi-agent</code>, <code>pi mcp-install</code>, and <code>pi mcp-doctor</code> streamline client registration. Some clients display prefixed tool names such as <code>pi-governance_pi_retrieve_context</code> or <code>pi_governance_pi.retrieve_context</code>; these are equivalent to <code>pi.retrieve_context</code>. The <code>pi.inspect_record</code> MCP tool is available and can be verified with <code>mcp-doctor</code>.</li>
     </ul>
   </section>
 
@@ -77,11 +77,11 @@
   </section>
 
   <section>
-    <h2>Path to stable v1.0.0</h2>
-    <p>The stable line preserves public CLI command names and MCP tool names. This guide reflects v1.0.0 as the stable public release.</p>
+    <h2>Current v1.1.0 release</h2>
+    <p>The stable line preserves public CLI command names and MCP tool names. This guide reflects v1.1.0 as the current coordinated workspace release.</p>
   </section>
 <section><h2>Release Documentation Links</h2><ul><li><a href="WIKI_INDEX.md">Wiki index</a></li><li><a href="DEPLOYMENT_CHECKLIST.md">Deployment checklist</a></li><li><a href="RELEASE_STRATEGY.md">Release strategy</a></li><li><a href="STABLE_V1_GATE.md">Stable v1 gate</a></li><li><a href="wiki/13-Release-And-Deployment.md">Release and deployment wiki</a></li><li><a href="wiki/14-QA-And-Test-Matrix.md">QA and test matrix</a></li></ul></section>
 <section><h2>Portable Workflow Parity</h2><p>v1.0.0 includes deterministic memory-worth scoring, capture candidates, inbox review, scoped context output, session search/decisions, recall X-ray, explicit L1/L2/L3 layers, and trust/durability/source verification gates. Capture creates candidates or L3 evidence only; durable L1/L2 records remain patch-governed.</p></section>
 </body>
 </html>
-<!-- an earlier release candidate: adds MCP inspect_record, review actions, maintenance scan, deterministic/lexical/hybrid retrievers, redacted export metadata, and schema documentation. Stable v1.0.0 has shipped. -->
+<!-- The stable line includes MCP record inspection, review actions, maintenance scan, deterministic/lexical/hybrid retrievers, redacted export metadata, and schema documentation. -->

@@ -1,6 +1,6 @@
-# Stable v1 Gate
+# Historical v1.0 Stable Gate
 
-`v1.0.0` is the current stable public release. Stable `v1.0.0` is tagged only after every local gate passes.
+This file records the original `v1.0.0` stable-release gate. For the current `v1.1.0` process, use `RELEASE_STRATEGY.md`, `DEPLOYMENT_CHECKLIST.md`, and the QA matrix.
 
 ## Hard Pass/Fail Gates
 

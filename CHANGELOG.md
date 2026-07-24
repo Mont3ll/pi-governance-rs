@@ -2,24 +2,14 @@
 
 ## Unreleased
 
-### Added
-- Preview-first `privacy-purge` for secret-bearing active or terminal records, with reviewed fingerprints, explicit force/apply, collision-resistant backups, redacted tombstoned shells, and explicit reviewed historical-patch correlation.
+## v1.1.0 - 2026-07-24
 
 Added:
+- Preview-first `privacy-purge` for secret-bearing active or terminal records, with reviewed fingerprints, explicit force/apply, collision-resistant backups, redacted tombstoned shells, and explicit reviewed historical-patch correlation.
 - Dry-run-first `store-integrity` preview/apply workflow with reviewed fingerprints, mandatory backups, and audit reports.
 - Doctor counts for unique record keys, duplicate groups, and self-supersession groups.
 - Report-only `reconcile` command with deterministic eight-section peer comparison.
 - MCP initialize and doctor store identity metadata.
-
-Changed:
-- `migrate` now previews by default and requires `--apply`; applied migrations always create a backup.
-- Portable import collapses exact incoming duplicate IDs and quarantines divergent duplicates.
-- Domain scope now round-trips without being converted to global/project scope.
-- Project-filtered exports reconstruct and retain related compatibility artifacts before filtering.
-
-## v1.1.0
-
-Added:
 - Bounded read-only memory graph reports through CLI and MCP.
 - Per-record memory quality and relationship quality reports with versioned heuristic signals.
 - Accurate recall budget omission counts.
@@ -32,6 +22,12 @@ Added:
 - Privacy-safe exclusion reason aggregates and explicit recall outcome feedback.
 - Store-wide governance quality metric and richer procedure/failure metadata.
 - Direct import and round-trip preservation of `pi-persistent-intelligence` bundles, including date-only timestamps, candidate patches, evidence, sessions, inquiries, reinforcement, and tombstones.
+
+Changed:
+- `migrate` now previews by default and requires `--apply`; applied migrations always create a backup.
+- Portable import collapses exact incoming duplicate IDs and quarantines divergent duplicates.
+- Domain scope now round-trips without being converted to global/project scope.
+- Project-filtered exports reconstruct and retain related compatibility artifacts before filtering.
 
 ## v1.0.3
 

@@ -1,6 +1,6 @@
 # Patch Schema
 
-Schema is release-candidate level and intended to stabilize at v1.0.0.
+Schema version 1 is the stable patch contract for v1.1.0.
 
 Patches are auditable proposed changes. Key fields: `schema_version`, `namespace`, `id`, `operation`, `status`, `target_id`, `proposed_record`, `contest_resolution`, `evidence`, `reason`, `created_at`, and `updated_at`.
 

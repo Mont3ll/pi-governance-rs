@@ -1617,7 +1617,7 @@ fn main() -> Result<()> {
                 .propose_record(
                     input(
                         RecordClass::Observation,
-                        "v1.0.0-rc.2 is current.",
+                        "v1.1.0 is current.",
                         "supersede",
                         "demo:old-current",
                     ),
@@ -1631,7 +1631,7 @@ fn main() -> Result<()> {
                     namespace: "default".to_string(),
                     target_id: old,
                     class: RecordClass::Observation,
-                    claim: "v1.0.0 is current.".to_string(),
+                    claim: "v1.1.0 is current.".to_string(),
                     confidence: 0.8,
                     scope: Scope::project("pi-governance-rs"),
                     tags: vec!["supersede".to_string()],

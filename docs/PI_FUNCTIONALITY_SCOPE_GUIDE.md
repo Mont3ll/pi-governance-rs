@@ -1,45 +1,26 @@
 # PI Functionality Scope Guide
 
-Current stable release: v1.0.0. Stable v1.0.0 has shipped.
+Current coordinated release: `v1.1.0`.
 
-## Release-quality improvements now included in an earlier release candidate
+## Included
 
-- MCP record inspection
-- Review queue actions
-- Minimal maintenance scan
-- Local lexical/hybrid retrieval hardening
-- Redacted export hardening
-- Schema documentation
+- Local JSONL governed memory with namespace-aware stable identities
+- Reviewable proposal, reinforcement, contest, supersession, tombstone, and resolution workflows
+- Deterministic, lexical, and hybrid retrieval modes
+- MCP stdio server and CLI with explicit store identity diagnostics
+- Portable JS/Rust import, export, redaction metadata, and report-only reconciliation
+- Preview-first schema migration, store-integrity repair, and privacy purge with backups and reviewed fingerprints
+- Read-only graph, memory quality, relationship quality, recall effectiveness, store quality, patch simulation, procedure-candidate, and failure-analysis reports
+- Disabled-by-default bounded recall telemetry using query hashes rather than raw queries
 
-## Post-stable quality improvements
+## Explicit boundaries
 
-- `pi capture --stdin`
-- FTS/BM25 persistent index if still needed
-- Memory capsules
-- Relationship edges
-- Maintenance auto-suggestions as governed patches
-- Machine-readable schemas if not completed
+- No hosted service or remote memory backend
+- No automatic authority selection between independent peer stores
+- No automatic application of durable L1/L2 memory
+- No automatic skill writing or vault mutation
+- No embeddings or vector database requirement
 
-## Product expansion
+## Future work
 
-- Dashboard / TUI
-- Hosted MCP endpoint
-- Connectors
-- Vector backend
-- Graph backend
-- Team RBAC / SSO
-- Central audit logs
-- Cloud sync
-
-## Release Documentation Links
-
-- [Wiki index](docs/WIKI_INDEX.md)
-- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
-- [Release strategy](docs/RELEASE_STRATEGY.md)
-- [Stable v1 gate](docs/STABLE_V1_GATE.md)
-- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
-- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)
-
-## Portable Workflow Parity
-
-`v1.0.0` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.
+Future releases may add optional backends or additional client integrations only when they preserve the same review, provenance, privacy, and local-first boundaries.

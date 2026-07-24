@@ -38,9 +38,9 @@ Agent instructions should say when to retrieve PI memory, how to treat contested
 
 ## Release Documentation Links
 
-- [Wiki index](docs/WIKI_INDEX.md)
-- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
-- [Release strategy](docs/RELEASE_STRATEGY.md)
-- [Stable v1 gate](docs/STABLE_V1_GATE.md)
-- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
-- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)
+- [Wiki index](WIKI_INDEX.md)
+- [Deployment checklist](DEPLOYMENT_CHECKLIST.md)
+- [Release strategy](RELEASE_STRATEGY.md)
+- [Historical v1.0 gate](STABLE_V1_GATE.md)
+- [Release and deployment wiki](wiki/13-Release-And-Deployment.md)
+- [QA and test matrix](wiki/14-QA-And-Test-Matrix.md)

@@ -135,19 +135,19 @@ Expected MCP tools include:
 - `pi.policy_explain`
 - `pi.smoke_test`
 
-## Known Limitation: pi.inspect_record MCP Tool Deferred
+## Record inspection
 
-`pi inspect-record` exists as a CLI command and `pi.inspect_record` is available as an MCP tool in v1.0.0. `mcp-doctor` reports whether the configured client can see it.
+`pi inspect-record` exists as a CLI command and `pi.inspect_record` is available as an MCP tool. `mcp-doctor` reports whether the configured client can see it.
 
-## an earlier release candidate MCP Notes
+## MCP notes
 
-an earlier release candidate adds `pi.inspect_record` and `pi.maintenance_scan`. `pi.retrieve_context` accepts `retriever` values `deterministic`, `lexical`, and `hybrid`. Some clients still show prefixed tool names; these are equivalent to the canonical `pi.*` names.
+v1.1.0 includes `pi.inspect_record` and `pi.maintenance_scan`. `pi.retrieve_context` accepts `retriever` values `deterministic`, `lexical`, and `hybrid`. Some clients still show prefixed tool names; these are equivalent to the canonical `pi.*` names.
 
 ## Release Documentation Links
 
-- [Wiki index](docs/WIKI_INDEX.md)
-- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
-- [Release strategy](docs/RELEASE_STRATEGY.md)
-- [Stable v1 gate](docs/STABLE_V1_GATE.md)
-- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
-- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)
+- [Wiki index](WIKI_INDEX.md)
+- [Deployment checklist](DEPLOYMENT_CHECKLIST.md)
+- [Release strategy](RELEASE_STRATEGY.md)
+- [Historical v1.0 gate](STABLE_V1_GATE.md)
+- [Release and deployment wiki](wiki/13-Release-And-Deployment.md)
+- [QA and test matrix](wiki/14-QA-And-Test-Matrix.md)

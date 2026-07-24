@@ -1,62 +1,42 @@
 # Release Strategy
 
-## Release Principles
+## Release principles
 
-PI Governance releases should be conservative, auditable, and easy to verify from source. `v1.0.0` is the stable public release.
+PI Governance releases are conservative, auditable, and reproducible from source. Runtime behavior, public documentation, crate metadata, and release notes must describe the same version.
 
-## Historical an earlier release candidate Baseline
+## v1.1.0 release process
 
-an earlier release candidate validated CLI checks, MCP interoperability, review actions, maintenance scan, local retrieval modes, redacted export metadata, and schema documentation. the final release candidate added portable workflow parity and is promoted by v1.0.0.
+1. Run rustfmt, clippy with warnings denied, workspace tests, release build, smoke test, and release audit.
+2. Verify all six workspace packages report version `1.1.0` and the binary reports `pi 1.1.0`.
+3. Inspect every package file list and scan packaged text for private paths, hidden bidirectional controls, and secret-like content.
+4. Verify local `cargo install --path crates/pi-cli --locked`.
+5. Publish supporting crates in dependency order, waiting for each version to appear on crates.io before publishing dependents.
+6. Publish `pi-governance-rs` last and verify `cargo install pi-governance-rs --version 1.1.0` from the registry.
+7. Create and push `v1.1.0` only after the release commit and package artifacts are verified.
 
-## Feature Freeze Strategy
+## Artifact publishing
 
-The stable release is a release-only pass from the final release candidate. Do not add product features, redesign governance semantics, or alter runtime behavior during release preparation.
+The primary artifacts are the crates.io packages and the source archive for the verified Git tag. Optional compiled binaries may be attached to a GitHub release only when they are built reproducibly and accompanied by checksums.
 
-## Stable Release Process
+## Crates.io publishing order
 
-1. Re-run full workspace, CLI, MCP, interop, docs, security, fresh clone, and archive checks.
-2. Stable v1.0.0 bumps the package/runtime version to `1.0.0` without runtime feature expansion.
-3. Update README, CHANGELOG, wiki docs, release docs, and product guide stable wording.
-4. Re-run all checks after the bump.
-5. Tag `v1.0.0` only after all gates pass.
-6. Publish artifacts only after tag and archive verification.
+1. `pi-governance-core`
+2. `pi-governance-store`
+3. `pi-governance-retrieval`
+4. `pi-governance-engine`
+5. `pi-governance-mcp`
+6. `pi-governance-rs`
 
-## Artifact Publishing Strategy
+Do not claim a package is available until crates.io serves the expected version and a registry installation succeeds.
 
-Primary artifact is source from Git. Optional GitHub release assets and future packaged binaries should be generated from the verified tag and inspected before publication.
+## Documentation and security
 
-## Crates.io Strategy
+Public documentation must remain user-facing and accurate. Release archives must exclude local stores, credentials, private configuration, development reports, and machine-specific paths. Redaction, privacy purge, reconciliation, and migration guarantees must match the tested implementation.
 
-Crates.io publishing is a future target. Do not claim it has happened until the package is actually published and verified.
+## Compatibility
 
-## GitHub Release Strategy
+Direct MCP, namespace propagation, client-prefixed tool names, structured content, portable bundle import/export, and report-only reconciliation are compatibility gates for v1.1.0.
 
-Use the verified `v1.0.0` tag, include release notes that match `CHANGELOG.md`, attach only verified assets, and avoid claiming unsupported features.
+## Rollback
 
-## Version Bump Strategy
-
-Change only version identifiers and stable wording required for the release unless a issue requires a targeted fix. The version command must report `pi 1.0.0` for stable.
-
-## Changelog Strategy
-
-`CHANGELOG.md` keeps historical rc entries and includes a top stable v1.0.0 entry.
-
-## Documentation Strategy
-
-Docs should stay honest about scope: no embeddings, no vector backend, no hosted service, no dashboard, no secret-scanner claims, and no shipped-stable wording before the stable release.
-
-## MCP Compatibility Strategy
-
-For stable v1.0.0, direct MCP, `mcp-config`, `mcp-install`, `mcp-doctor`, namespace propagation, client-prefixed tool names, and structured content compatibility were validated for PI agent and Codex CLI; OpenCode setup checks completed, with the live client run documented as an environmental/client-run limitation.
-
-## Rollback Strategy
-
-Keep previous tags and do not delete tags. If stable has an issue, document the known issue, revert via Git if needed, and publish a patch release rather than rewriting release history.
-
-## Post-release Patch Policy
-
-Patch releases should be small, targeted, documented, and independently verified through the same core checks that guard stable.
-
-## Portable Workflow Parity
-
-`v1.0.0` adds deterministic portable memory workflow parity: `memory-worth`, `capture`, `inbox`, `context`, `session add/search/decisions`, `recall-xray`, explicit L1/L2/L3 layers, trust class, durability, source kind, and minimal verification gates. Capture creates candidates or L3 evidence only; it does not silently apply durable L1/L2 memory. L1 is never auto-applied. L3 is session/evidence context, not authoritative memory.
+Never rewrite or delete a published version. If a release has a defect, document it, revert through Git where appropriate, and publish a new patch release after the full release gates pass.

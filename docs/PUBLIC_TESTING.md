@@ -60,7 +60,7 @@ pi mcp-doctor opencode --command /path/to/pi --store /path/to/.pi --namespace in
 
 Run `mcp-doctor` before opening the client. Restart the client after `mcp-install`. If `mcp-doctor` passes but the client has no tools, inspect the client-specific config loading rules. For Codex or shared PI-agent MCP config, substitute `codex` or `pi-agent` in the commands.
 
-Then confirm `tools/list` contains PI tools and `pi.smoke_test` returns pass. Some clients display PI tools with client/server-prefixed names such as `pi-governance_pi_retrieve_context` or `pi_governance_pi.retrieve_context`; these are equivalent to `pi.retrieve_context`. `pi.inspect_record` remains deferred through MCP unless implemented separately.
+Then confirm `tools/list` contains PI tools and `pi.smoke_test` returns pass. Some clients display PI tools with client/server-prefixed names such as `pi-governance_pi_retrieve_context` or `pi_governance_pi.retrieve_context`; these are equivalent to `pi.retrieve_context`. Confirm `pi.inspect_record` is present and can inspect a record in the configured namespace.
 
 ## Memory Governance Test
 
@@ -70,9 +70,9 @@ Check whether propose, review, apply, contest, supersede, tombstone, and resolve
 
 Use `pi list` to find a record ID, then run `pi inspect-record <record_id>` and `pi inspect-record <record_id> --json`.
 
-## What Not to Test Yet
+## Out-of-scope systems
 
-Do not test capture/extraction, semantic retrieval, vector search, graph memory, dashboards, hosted services, cloud sync, or connectors. These are deferred.
+Do not expect a vector database, hosted service, cloud sync, dashboard, or external connectors. Capture, local retrieval, and read-only graph/quality reports are included in v1.1.0.
 
 ## Known Limitations
 
@@ -87,21 +87,21 @@ PI uses local plaintext JSONL by default, does not prove memories are true, does
 - What felt too manual?
 - What should be automated later?
 - Would you use this with Claude, Cursor, or Codex?
-- What should block stable v1.0.0?
+- What should block a future patch release?
 
 ## How to Report Issues
 
 Use the GitHub issue templates for bugs, usability feedback, MCP setup issues, memory governance feedback, or docs feedback. Redact secrets and sensitive store contents.
 
-## an earlier release candidate Release-Quality Checks
+## Release-quality checks
 
-Test `pi.inspect_record` through MCP when available, `pi maintenance scan`, review queue actions (`review --apply`, `review --reject`, `review --defer`), and retrieval modes (`deterministic`, `lexical`, `hybrid`). Redacted export is best-effort; review bundles before sharing.
+Test `pi.inspect_record` through MCP, `pi maintenance scan`, review queue actions (`review --apply`, `review --reject`, `review --defer`), and retrieval modes (`deterministic`, `lexical`, `hybrid`). Redacted export is best-effort; review bundles before sharing.
 
 ## Release Documentation Links
 
-- [Wiki index](docs/WIKI_INDEX.md)
-- [Deployment checklist](docs/DEPLOYMENT_CHECKLIST.md)
-- [Release strategy](docs/RELEASE_STRATEGY.md)
-- [Stable v1 gate](docs/STABLE_V1_GATE.md)
-- [Release and deployment wiki](docs/wiki/13-Release-And-Deployment.md)
-- [QA and test matrix](docs/wiki/14-QA-And-Test-Matrix.md)
+- [Wiki index](WIKI_INDEX.md)
+- [Deployment checklist](DEPLOYMENT_CHECKLIST.md)
+- [Release strategy](RELEASE_STRATEGY.md)
+- [Historical v1.0 gate](STABLE_V1_GATE.md)
+- [Release and deployment wiki](wiki/13-Release-And-Deployment.md)
+- [QA and test matrix](wiki/14-QA-And-Test-Matrix.md)
