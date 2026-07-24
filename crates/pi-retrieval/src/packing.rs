@@ -1,10 +1,13 @@
 use pi_governance_core::RankedRecord;
 
 pub fn estimate_tokens(input: &str) -> usize {
-    ((input.chars().count() + 3) / 4).max(1) + 24
+    input.chars().count().div_ceil(4).max(1) + 24
 }
 
-pub fn pack_ranked(mut ranked: Vec<RankedRecord>, budget: usize) -> (Vec<RankedRecord>, usize, usize, Vec<String>) {
+pub fn pack_ranked(
+    mut ranked: Vec<RankedRecord>,
+    budget: usize,
+) -> (Vec<RankedRecord>, usize, usize, Vec<String>) {
     let ranked_count = ranked.len();
     let mut packed = Vec::new();
     let mut used = 0usize;
@@ -14,7 +17,10 @@ pub fn pack_ranked(mut ranked: Vec<RankedRecord>, budget: usize) -> (Vec<RankedR
         let estimate = estimate_tokens(&item.record.claim);
         if !packed.is_empty() && used + estimate > budget {
             item.explanation.push("excluded by budget".to_string());
-            warnings.push(format!("budget reached; skipped record {} and remaining matches", item.record.id));
+            warnings.push(format!(
+                "budget reached; skipped record {} and remaining matches",
+                item.record.id
+            ));
             break;
         }
         used += estimate;

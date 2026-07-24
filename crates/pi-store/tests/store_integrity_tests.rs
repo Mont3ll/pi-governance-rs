@@ -1,8 +1,7 @@
-use pi_governance_core::{EvidenceKind, EvidenceRef, Record, RecordClass, RecordStatus, Scope};
 use chrono::Utc;
+use pi_governance_core::{EvidenceKind, EvidenceRef, Record, RecordClass, RecordStatus, Scope};
 use pi_governance_store::{
-    plan_record_integrity, JsonlStore, RedactionMetadata, StoreExportBundle,
-    StoreImportOptions,
+    plan_record_integrity, JsonlStore, RedactionMetadata, StoreExportBundle, StoreImportOptions,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -15,7 +14,12 @@ fn bundle(records: Vec<Record>) -> StoreExportBundle {
         producer: None,
         exported_at: Utc::now(),
         redacted: false,
-        redaction: RedactionMetadata { enabled: false, fields_checked: vec![], fields_redacted: vec![], notes: vec![] },
+        redaction: RedactionMetadata {
+            enabled: false,
+            fields_checked: vec![],
+            fields_redacted: vec![],
+            notes: vec![],
+        },
         namespace: Some("alpha".into()),
         all_namespaces: false,
         project: None,
@@ -32,8 +36,14 @@ fn bundle(records: Vec<Record>) -> StoreExportBundle {
 }
 
 fn temp_store_dir(test_name: &str) -> PathBuf {
-    let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-    std::env::temp_dir().join(format!("pi-integrity-{test_name}-{}-{nonce}", std::process::id()))
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "pi-integrity-{test_name}-{}-{nonce}",
+        std::process::id()
+    ))
 }
 
 fn record(namespace: &str, id: &str, status: RecordStatus, supersedes: &[&str]) -> Record {
@@ -120,10 +130,20 @@ fn apply_requires_preview_fingerprint_and_creates_backup_and_report() -> anyhow:
     let root = temp_store_dir("apply");
     fs::create_dir_all(&root)?;
     let records = [
-        record("alpha", "rec_dup", RecordStatus::Superseded, &["rec_previous", "rec_dup"]),
+        record(
+            "alpha",
+            "rec_dup",
+            RecordStatus::Superseded,
+            &["rec_previous", "rec_dup"],
+        ),
         record("alpha", "rec_dup", RecordStatus::Active, &["rec_dup"]),
     ];
-    let original = records.iter().map(serde_json::to_string).collect::<Result<Vec<_>, _>>()?.join("\n") + "\n";
+    let original = records
+        .iter()
+        .map(serde_json::to_string)
+        .collect::<Result<Vec<_>, _>>()?
+        .join("\n")
+        + "\n";
     fs::write(root.join("records.jsonl"), &original)?;
     fs::write(root.join("patches.jsonl"), "")?;
     fs::write(root.join("events.jsonl"), "")?;
@@ -135,7 +155,12 @@ fn apply_requires_preview_fingerprint_and_creates_backup_and_report() -> anyhow:
     assert!(result.mutation_performed);
     assert_eq!(result.rows_before, 2);
     assert_eq!(result.rows_after, 1);
-    assert_eq!(fs::read_to_string(PathBuf::from(result.backup.as_ref().unwrap().backup_dir.clone()).join("records.jsonl"))?, original);
+    assert_eq!(
+        fs::read_to_string(
+            PathBuf::from(result.backup.as_ref().unwrap().backup_dir.clone()).join("records.jsonl")
+        )?,
+        original
+    );
     assert!(PathBuf::from(result.report_path.as_ref().unwrap()).exists());
     assert!(!store.plan_record_integrity()?.migration_needed);
     fs::remove_dir_all(root)?;
@@ -150,13 +175,27 @@ fn apply_rejects_stale_fingerprint_without_writing() -> anyhow::Result<()> {
         record("alpha", "rec_dup", RecordStatus::Superseded, &["rec_dup"]),
         record("alpha", "rec_dup", RecordStatus::Active, &[]),
     ];
-    fs::write(root.join("records.jsonl"), records.iter().map(serde_json::to_string).collect::<Result<Vec<_>, _>>()?.join("\n") + "\n")?;
+    fs::write(
+        root.join("records.jsonl"),
+        records
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()?
+            .join("\n")
+            + "\n",
+    )?;
     let store = JsonlStore::new(&root);
     let preview = store.plan_record_integrity()?;
-    let changed = format!("{}{}\n", fs::read_to_string(root.join("records.jsonl"))?, serde_json::to_string(&record("alpha", "rec_new", RecordStatus::Active, &[]))?);
+    let changed = format!(
+        "{}{}\n",
+        fs::read_to_string(root.join("records.jsonl"))?,
+        serde_json::to_string(&record("alpha", "rec_new", RecordStatus::Active, &[]))?
+    );
     fs::write(root.join("records.jsonl"), &changed)?;
 
-    let error = store.apply_record_integrity(&preview.fingerprint).unwrap_err();
+    let error = store
+        .apply_record_integrity(&preview.fingerprint)
+        .unwrap_err();
 
     assert!(error.to_string().contains("integrity preview is stale"));
     assert_eq!(fs::read_to_string(root.join("records.jsonl"))?, changed);
@@ -171,13 +210,22 @@ fn import_collapses_exact_incoming_duplicates() -> anyhow::Result<()> {
     let store = JsonlStore::new(&root);
     let value = record("alpha", "rec_dup", RecordStatus::Active, &[]);
 
-    let report = store.import_bundle(bundle(vec![value.clone(), value]), StoreImportOptions {
-        namespace: "alpha".into(), preserve_namespaces: true, dry_run: false, backup: false,
-    })?;
+    let report = store.import_bundle(
+        bundle(vec![value.clone(), value]),
+        StoreImportOptions {
+            namespace: "alpha".into(),
+            preserve_namespaces: true,
+            dry_run: false,
+            backup: false,
+        },
+    )?;
 
     assert_eq!(report.imported_records, 1);
     assert_eq!(report.skipped_records, 1);
-    assert!(report.warnings.iter().any(|warning| warning.contains("collapsed exact duplicate record alpha/rec_dup")));
+    assert!(report
+        .warnings
+        .iter()
+        .any(|warning| warning.contains("collapsed exact duplicate record alpha/rec_dup")));
     assert_eq!(store.load_records()?.len(), 1);
     fs::remove_dir_all(root)?;
     Ok(())
@@ -191,13 +239,22 @@ fn import_quarantines_divergent_incoming_duplicates() -> anyhow::Result<()> {
     let mut second = first.clone();
     second.claim = "different claim".into();
 
-    let report = store.import_bundle(bundle(vec![first, second]), StoreImportOptions {
-        namespace: "alpha".into(), preserve_namespaces: true, dry_run: false, backup: false,
-    })?;
+    let report = store.import_bundle(
+        bundle(vec![first, second]),
+        StoreImportOptions {
+            namespace: "alpha".into(),
+            preserve_namespaces: true,
+            dry_run: false,
+            backup: false,
+        },
+    )?;
 
     assert_eq!(report.imported_records, 0);
     assert_eq!(report.skipped_records, 2);
-    assert!(report.warnings.iter().any(|warning| warning.contains("quarantined divergent duplicate record alpha/rec_dup")));
+    assert!(report
+        .warnings
+        .iter()
+        .any(|warning| warning.contains("quarantined divergent duplicate record alpha/rec_dup")));
     assert!(store.load_records()?.is_empty());
     fs::remove_dir_all(root)?;
     Ok(())

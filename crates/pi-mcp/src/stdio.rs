@@ -1,9 +1,18 @@
 use anyhow::{bail, Context, Result};
-use pi_governance_core::{default_namespace, ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, PatchStatus, PolicyProfile, RecallEventClient, RecallEventOperation, RecallEventOutcome, RecordClass, RetrievalFormat, RetrievalOptions, Scope, SourceKind, TrustClass};
+use pi_governance_core::{
+    default_namespace, ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer,
+    PatchStatus, PolicyProfile, RecallEventClient, RecallEventOperation, RecallEventOutcome,
+    RecordClass, RetrievalFormat, RetrievalOptions, Scope, SourceKind, TrustClass,
+};
 use pi_governance_engine::{
-    analyze_failure_patterns, analyze_memory_quality, analyze_recall_effectiveness, analyze_relationship_quality, build_context, build_memory_graph, build_store_quality, generate_procedure_candidates, claim_from_capture, evidence_for_capture, recall_exclusion_counts, recall_xray, record_recall_event, record_recall_event_with_details, score_memory_worth, search_session_events, session_decisions, session_event, scope_for_project, verify_candidate,
-    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
-    SupersedeInput, TombstoneInput, MemoryWorthDecision,
+    analyze_failure_patterns, analyze_memory_quality, analyze_recall_effectiveness,
+    analyze_relationship_quality, build_context, build_memory_graph, build_store_quality,
+    claim_from_capture, evidence_for_capture, generate_procedure_candidates,
+    recall_exclusion_counts, recall_xray, record_recall_event, record_recall_event_with_details,
+    scope_for_project, score_memory_worth, search_session_events, session_decisions, session_event,
+    verify_candidate, ContestInput, ExportInput, GovernanceEngine, ImportInput,
+    MemoryWorthDecision, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput,
+    SupersedeInput, TombstoneInput,
 };
 use pi_governance_retrieval::render_markdown;
 use serde_json::{json, Map, Value};
@@ -27,7 +36,10 @@ impl McpStdioServer {
     }
 
     pub fn new_with_namespace(engine: GovernanceEngine, default_namespace: String) -> Self {
-        Self { engine, default_namespace }
+        Self {
+            engine,
+            default_namespace,
+        }
     }
 
     fn namespace_arg(&self, args: &Value) -> String {
@@ -754,7 +766,10 @@ impl McpStdioServer {
 
     fn handle_tool_call(&self, params: Value) -> Result<Value> {
         let name = required_string(&params, "name")?;
-        let arguments = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
+        let arguments = params
+            .get("arguments")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
 
         match name.as_str() {
             "pi.retrieve_context" => self.tool_retrieve_context(arguments),
@@ -808,10 +823,16 @@ impl McpStdioServer {
 
     fn tool_score_memory_worth(&self, args: Value) -> Result<Value> {
         let observation = required_string(&args, "observation")?;
-        let trust = optional_string(&args, "trust_class").and_then(|s| TrustClass::from_str(&s).ok());
-        let source = optional_string(&args, "source_kind").and_then(|s| SourceKind::from_str(&s).ok()).or(Some(SourceKind::ManualMcp));
+        let trust =
+            optional_string(&args, "trust_class").and_then(|s| TrustClass::from_str(&s).ok());
+        let source = optional_string(&args, "source_kind")
+            .and_then(|s| SourceKind::from_str(&s).ok())
+            .or(Some(SourceKind::ManualMcp));
         let report = score_memory_worth(&observation, trust, source);
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        Ok(tool_result(
+            serde_json::to_string_pretty(&report)?,
+            serde_json::to_value(report)?,
+        ))
     }
 
     fn tool_capture_candidates(&self, args: Value) -> Result<Value> {
@@ -819,22 +840,74 @@ impl McpStdioServer {
         let text = required_string(&args, "text")?;
         let project = optional_string(&args, "project");
         let layer = optional_string(&args, "layer").and_then(|s| MemoryLayer::from_str(&s).ok());
-        let trust = optional_string(&args, "trust_class").and_then(|s| TrustClass::from_str(&s).ok());
+        let trust =
+            optional_string(&args, "trust_class").and_then(|s| TrustClass::from_str(&s).ok());
         let worth = score_memory_worth(&text, trust, Some(SourceKind::ManualMcp));
-        let mut report = pi_governance_engine::CaptureReport { input_summary: text.chars().take(80).collect(), candidates: Vec::new(), daily_only: Vec::new(), inquiries: Vec::new(), rejected: Vec::new(), applied: false };
+        let mut report = pi_governance_engine::CaptureReport {
+            input_summary: text.chars().take(80).collect(),
+            candidates: Vec::new(),
+            daily_only: Vec::new(),
+            inquiries: Vec::new(),
+            rejected: Vec::new(),
+            applied: false,
+        };
         match worth.decision {
             MemoryWorthDecision::Reject => report.rejected.push(text.clone()),
-            MemoryWorthDecision::DailyOnly => { let event = session_event(&namespace, project.as_deref(), &text, SourceKind::ManualMcp); self.engine.store().append_event(&event)?; report.daily_only.push(text.clone()); }
+            MemoryWorthDecision::DailyOnly => {
+                let event =
+                    session_event(&namespace, project.as_deref(), &text, SourceKind::ManualMcp);
+                self.engine.store().append_event(&event)?;
+                report.daily_only.push(text.clone());
+            }
             MemoryWorthDecision::Inquiry => report.inquiries.push(text.clone()),
             MemoryWorthDecision::Candidate => {
                 let claim = claim_from_capture(&text);
                 let suggested_layer = layer.unwrap_or(worth.suggested_layer);
-                let verification = verify_candidate(&claim, suggested_layer, worth.trust_class, worth.durability);
-                let result = self.engine.propose_record(ProposalInput { namespace: namespace.clone(), class: worth.suggested_class.clone(), claim: claim.clone(), confidence: worth.confidence, scope: scope_for_project(project), tags: worth.suggested_tags.clone(), evidence_refs: vec![evidence_for_capture(SourceKind::ManualMcp, worth.trust_class, worth.durability)], reason: Some("captured deterministic memory candidate".to_string()), layer: Some(suggested_layer), memory_kind: Some(worth.suggested_memory_kind), rule_type: worth.suggested_rule_type, trust_class: worth.trust_class, durability: worth.durability, source_kind: SourceKind::ManualMcp }, false, false)?;
-                report.candidates.push(pi_governance_engine::CaptureCandidate { claim, decision: worth.decision, patch_id: Some(result.patch_id), suggested_layer, trust_class: worth.trust_class, durability: worth.durability, memory_kind: worth.suggested_memory_kind, rule_type: worth.suggested_rule_type, verification });
+                let verification =
+                    verify_candidate(&claim, suggested_layer, worth.trust_class, worth.durability);
+                let result = self.engine.propose_record(
+                    ProposalInput {
+                        namespace: namespace.clone(),
+                        class: worth.suggested_class.clone(),
+                        claim: claim.clone(),
+                        confidence: worth.confidence,
+                        scope: scope_for_project(project),
+                        tags: worth.suggested_tags.clone(),
+                        evidence_refs: vec![evidence_for_capture(
+                            SourceKind::ManualMcp,
+                            worth.trust_class,
+                            worth.durability,
+                        )],
+                        reason: Some("captured deterministic memory candidate".to_string()),
+                        layer: Some(suggested_layer),
+                        memory_kind: Some(worth.suggested_memory_kind),
+                        rule_type: worth.suggested_rule_type,
+                        trust_class: worth.trust_class,
+                        durability: worth.durability,
+                        source_kind: SourceKind::ManualMcp,
+                    },
+                    false,
+                    false,
+                )?;
+                report
+                    .candidates
+                    .push(pi_governance_engine::CaptureCandidate {
+                        claim,
+                        decision: worth.decision,
+                        patch_id: Some(result.patch_id),
+                        suggested_layer,
+                        trust_class: worth.trust_class,
+                        durability: worth.durability,
+                        memory_kind: worth.suggested_memory_kind,
+                        rule_type: worth.suggested_rule_type,
+                        verification,
+                    });
             }
         }
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        Ok(tool_result(
+            serde_json::to_string_pretty(&report)?,
+            serde_json::to_value(report)?,
+        ))
     }
 
     fn tool_build_context(&self, args: Value) -> Result<Value> {
@@ -844,11 +917,41 @@ impl McpStdioServer {
         let include_l3 = optional_bool(&args, "include_l3").unwrap_or(false);
         let include_contested = optional_bool(&args, "include_contested").unwrap_or(false);
         let format = optional_string(&args, "format").unwrap_or_else(|| "markdown".to_string());
-        let (markdown, value) = build_context(self.engine.store(), &self.default_namespace, &query, project, budget, include_l3, include_contested)?;
-        let selected = value["selected_record_ids"].as_array().map(|ids| ids.iter().filter_map(|id| id.as_str().map(str::to_owned)).collect()).unwrap_or_default();
-        let used = value["retrieval_notes"]["used_estimated_tokens"].as_u64().unwrap_or(0) as usize;
-        record_recall_event(self.engine.store(), &self.default_namespace, RecallEventClient::Mcp, RecallEventOperation::BuildContext, &query, selected, budget, used)?;
-        let text = if format == "json" { serde_json::to_string_pretty(&value)? } else { markdown };
+        let (markdown, value) = build_context(
+            self.engine.store(),
+            &self.default_namespace,
+            &query,
+            project,
+            budget,
+            include_l3,
+            include_contested,
+        )?;
+        let selected = value["selected_record_ids"]
+            .as_array()
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| id.as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let used = value["retrieval_notes"]["used_estimated_tokens"]
+            .as_u64()
+            .unwrap_or(0) as usize;
+        record_recall_event(
+            self.engine.store(),
+            &self.default_namespace,
+            RecallEventClient::Mcp,
+            RecallEventOperation::BuildContext,
+            &query,
+            selected,
+            budget,
+            used,
+        )?;
+        let text = if format == "json" {
+            serde_json::to_string_pretty(&value)?
+        } else {
+            markdown
+        };
         Ok(tool_result(text, value))
     }
 
@@ -858,14 +961,23 @@ impl McpStdioServer {
         let project = optional_string(&args, "project");
         let event = session_event(&namespace, project.as_deref(), &text, SourceKind::ManualMcp);
         self.engine.store().append_event(&event)?;
-        Ok(tool_result(serde_json::to_string_pretty(&event)?, serde_json::to_value(event)?))
+        Ok(tool_result(
+            serde_json::to_string_pretty(&event)?,
+            serde_json::to_value(event)?,
+        ))
     }
 
     fn tool_session_search(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
         let query = required_string(&args, "query")?;
         let project = optional_string(&args, "project");
-        let events = search_session_events(self.engine.store(), &namespace, &query, project.as_deref(), None)?;
+        let events = search_session_events(
+            self.engine.store(),
+            &namespace,
+            &query,
+            project.as_deref(),
+            None,
+        )?;
         let value = json!({"events": events});
         Ok(tool_result(serde_json::to_string_pretty(&value)?, value))
     }
@@ -874,7 +986,8 @@ impl McpStdioServer {
         let namespace = self.namespace_arg(&args);
         let project = optional_string(&args, "project");
         let days = args.get("days").and_then(Value::as_i64);
-        let decisions = session_decisions(self.engine.store(), &namespace, project.as_deref(), days)?;
+        let decisions =
+            session_decisions(self.engine.store(), &namespace, project.as_deref(), days)?;
         let value = json!({"decisions": decisions});
         Ok(tool_result(serde_json::to_string_pretty(&value)?, value))
     }
@@ -886,16 +999,50 @@ impl McpStdioServer {
         let budget = optional_usize(&args, "budget").unwrap_or(1200);
         let include_l3 = optional_bool(&args, "include_l3").unwrap_or(false);
         let include_contested = optional_bool(&args, "include_contested").unwrap_or(false);
-        let report = recall_xray(self.engine.store(), &namespace, &query, project, budget, include_l3, include_contested)?;
-        record_recall_event_with_details(self.engine.store(), &namespace, RecallEventClient::Mcp, RecallEventOperation::RecallXray, &query, report.included.iter().map(|item| item.record_id.clone()).collect(), recall_exclusion_counts(&report), None, budget, report.budget.used)?;
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        let report = recall_xray(
+            self.engine.store(),
+            &namespace,
+            &query,
+            project,
+            budget,
+            include_l3,
+            include_contested,
+        )?;
+        record_recall_event_with_details(
+            self.engine.store(),
+            &namespace,
+            RecallEventClient::Mcp,
+            RecallEventOperation::RecallXray,
+            &query,
+            report
+                .included
+                .iter()
+                .map(|item| item.record_id.clone())
+                .collect(),
+            recall_exclusion_counts(&report),
+            None,
+            budget,
+            report.budget.used,
+        )?;
+        Ok(tool_result(
+            serde_json::to_string_pretty(&report)?,
+            serde_json::to_value(report)?,
+        ))
     }
 
     fn tool_list_inbox(&self, args: Value) -> Result<Value> {
         let all = optional_bool(&args, "all").unwrap_or(false);
         let mut rows = Vec::new();
         for p in self.engine.list_patches(200)? {
-            if !all && !matches!(p.latest_status, pi_governance_core::PatchStatus::Proposed | pi_governance_core::PatchStatus::Deferred) { continue; }
+            if !all
+                && !matches!(
+                    p.latest_status,
+                    pi_governance_core::PatchStatus::Proposed
+                        | pi_governance_core::PatchStatus::Deferred
+                )
+            {
+                continue;
+            }
             rows.push(p);
         }
         let value = json!({"pending_count": rows.len(), "patches": rows});
@@ -917,12 +1064,17 @@ impl McpStdioServer {
         Ok(tool_result(text, serde_json::to_value(config)?))
     }
 
-    fn tool_policy_doctor(&self) -> Result<Value> { self.tool_config_show() }
+    fn tool_policy_doctor(&self) -> Result<Value> {
+        self.tool_config_show()
+    }
 
     fn tool_policy_explain(&self, args: Value) -> Result<Value> {
         let operation = required_string(&args, "operation")?;
         let text = GovernanceEngine::policy_explain(&operation);
-        Ok(tool_result(text.clone(), json!({"operation": operation, "explanation": text})))
+        Ok(tool_result(
+            text.clone(),
+            json!({"operation": operation, "explanation": text}),
+        ))
     }
 
     fn tool_smoke_test(&self, _args: Value) -> Result<Value> {
@@ -952,7 +1104,10 @@ impl McpStdioServer {
         let summaries = self.engine.namespace_summaries()?;
         let text = serde_json::to_string_pretty(&summaries)?;
         let count = summaries.len();
-        Ok(tool_result(text, json!({ "namespaces": summaries, "count": count })))
+        Ok(tool_result(
+            text,
+            json!({ "namespaces": summaries, "count": count }),
+        ))
     }
 
     fn tool_namespace_doctor(&self) -> Result<Value> {
@@ -967,7 +1122,8 @@ impl McpStdioServer {
         let project = optional_string(&args, "project");
         let budget = optional_usize(&args, "budget").unwrap_or(1200);
         let format = optional_string(&args, "format").unwrap_or_else(|| "markdown".to_string());
-        let retriever = optional_string(&args, "retriever").unwrap_or_else(|| "deterministic".to_string());
+        let retriever =
+            optional_string(&args, "retriever").unwrap_or_else(|| "deterministic".to_string());
         let explain = optional_bool(&args, "explain").unwrap_or(false);
         let include_global = optional_bool(&args, "include_global").unwrap_or(true);
         let include_contested = optional_bool(&args, "include_contested").unwrap_or(false);
@@ -1000,10 +1156,27 @@ impl McpStdioServer {
             })
             .context("failed to retrieve PI context")?;
 
-        record_recall_event(self.engine.store(), &bundle.namespace, RecallEventClient::Mcp, RecallEventOperation::Retrieve, &bundle.query, bundle.records.iter().map(|ranked| ranked.record.id.clone()).collect(), bundle.budget.max_tokens, bundle.used_estimated_tokens)?;
+        record_recall_event(
+            self.engine.store(),
+            &bundle.namespace,
+            RecallEventClient::Mcp,
+            RecallEventOperation::Retrieve,
+            &bundle.query,
+            bundle
+                .records
+                .iter()
+                .map(|ranked| ranked.record.id.clone())
+                .collect(),
+            bundle.budget.max_tokens,
+            bundle.used_estimated_tokens,
+        )?;
 
         let mut structured = serde_json::to_value(&bundle)?;
-        if !explain { if let Some(object) = structured.as_object_mut() { object.remove("records"); } }
+        if !explain {
+            if let Some(object) = structured.as_object_mut() {
+                object.remove("records");
+            }
+        }
         let text = match retrieval_format {
             RetrievalFormat::Json => serde_json::to_string_pretty(&structured)?,
             RetrievalFormat::Markdown => render_markdown(&bundle),
@@ -1175,10 +1348,12 @@ impl McpStdioServer {
         let evidence_uri = required_string(&args, "evidence_uri")?;
         let evidence_kind_raw =
             optional_string(&args, "evidence_kind").unwrap_or_else(|| "conversation".to_string());
-        let evidence_kind = EvidenceKind::from_str(&evidence_kind_raw).map_err(anyhow::Error::msg)?;
+        let evidence_kind =
+            EvidenceKind::from_str(&evidence_kind_raw).map_err(anyhow::Error::msg)?;
         let reason = optional_string(&args, "reason")
             .unwrap_or_else(|| "reinforce record with new evidence".to_string());
-        let outcome = optional_string(&args, "outcome").unwrap_or_else(|| "explicit_reinforcement".to_string());
+        let outcome = optional_string(&args, "outcome")
+            .unwrap_or_else(|| "explicit_reinforcement".to_string());
         let apply = optional_bool(&args, "apply").unwrap_or(false);
         let force = optional_bool(&args, "force").unwrap_or(false);
 
@@ -1212,7 +1387,8 @@ impl McpStdioServer {
         let evidence_uri = required_string(&args, "evidence_uri")?;
         let evidence_kind_raw =
             optional_string(&args, "evidence_kind").unwrap_or_else(|| "conversation".to_string());
-        let evidence_kind = EvidenceKind::from_str(&evidence_kind_raw).map_err(anyhow::Error::msg)?;
+        let evidence_kind =
+            EvidenceKind::from_str(&evidence_kind_raw).map_err(anyhow::Error::msg)?;
         let reason = required_string(&args, "reason")?;
         let apply = optional_bool(&args, "apply").unwrap_or(false);
         let force = optional_bool(&args, "force").unwrap_or(false);
@@ -1310,9 +1486,18 @@ impl McpStdioServer {
         let patch_id = required_string(&args, "patch_id")?;
         let reason = required_string(&args, "reason")?;
         let namespace = self.namespace_arg(&args);
-        match self.engine.reject_patch_by_id(&patch_id, &namespace, &reason) {
-            Ok(result) => Ok(tool_result(serde_json::to_string_pretty(&result)?, serde_json::to_value(result)?)),
-            Err(error) => Ok(tool_error(error.to_string(), json!({"code":"reject_patch_failed","patch_id":patch_id}))),
+        match self
+            .engine
+            .reject_patch_by_id(&patch_id, &namespace, &reason)
+        {
+            Ok(result) => Ok(tool_result(
+                serde_json::to_string_pretty(&result)?,
+                serde_json::to_value(result)?,
+            )),
+            Err(error) => Ok(tool_error(
+                error.to_string(),
+                json!({"code":"reject_patch_failed","patch_id":patch_id}),
+            )),
         }
     }
 
@@ -1320,9 +1505,18 @@ impl McpStdioServer {
         let patch_id = required_string(&args, "patch_id")?;
         let reason = required_string(&args, "reason")?;
         let namespace = self.namespace_arg(&args);
-        match self.engine.defer_patch_by_id(&patch_id, &namespace, &reason) {
-            Ok(result) => Ok(tool_result(serde_json::to_string_pretty(&result)?, serde_json::to_value(result)?)),
-            Err(error) => Ok(tool_error(error.to_string(), json!({"code":"defer_patch_failed","patch_id":patch_id}))),
+        match self
+            .engine
+            .defer_patch_by_id(&patch_id, &namespace, &reason)
+        {
+            Ok(result) => Ok(tool_result(
+                serde_json::to_string_pretty(&result)?,
+                serde_json::to_value(result)?,
+            )),
+            Err(error) => Ok(tool_error(
+                error.to_string(),
+                json!({"code":"defer_patch_failed","patch_id":patch_id}),
+            )),
         }
     }
 
@@ -1352,7 +1546,10 @@ impl McpStdioServer {
         let text = serde_json::to_string_pretty(&patches)?;
         let count = patches.len();
 
-        Ok(tool_result(text, json!({ "patches": patches, "count": count })))
+        Ok(tool_result(
+            text,
+            json!({ "patches": patches, "count": count }),
+        ))
     }
 
     fn tool_inspect_patch(&self, args: Value) -> Result<Value> {
@@ -1373,14 +1570,18 @@ impl McpStdioServer {
         }
     }
 
-
     fn tool_export_store(&self, args: Value) -> Result<Value> {
         let namespace = Some(self.namespace_arg(&args));
         let all_namespaces = optional_bool(&args, "all_namespaces").unwrap_or(false);
         let project = optional_string(&args, "project");
         let redacted = optional_bool(&args, "redacted").unwrap_or(false);
 
-        match self.engine.export_store(ExportInput { namespace, all_namespaces, project, redacted }) {
+        match self.engine.export_store(ExportInput {
+            namespace,
+            all_namespaces,
+            project,
+            redacted,
+        }) {
             Ok(bundle) => {
                 let text = serde_json::to_string_pretty(&bundle)?;
                 Ok(tool_result(text, serde_json::to_value(bundle)?))
@@ -1403,7 +1604,12 @@ impl McpStdioServer {
 
         match self.engine.import_store_from_path(
             std::path::Path::new(&path),
-            ImportInput { namespace, preserve_namespaces, dry_run, backup },
+            ImportInput {
+                namespace,
+                preserve_namespaces,
+                dry_run,
+                backup,
+            },
         ) {
             Ok(report) => {
                 let text = serde_json::to_string_pretty(&report)?;
@@ -1423,7 +1629,9 @@ impl McpStdioServer {
         let dry_run = optional_bool(&args, "dry_run").unwrap_or(true);
         let backup = optional_bool(&args, "backup").unwrap_or(true);
 
-        let report = self.engine.migrate_store(MigrationInput { dry_run, backup })?;
+        let report = self
+            .engine
+            .migrate_store(MigrationInput { dry_run, backup })?;
         let text = serde_json::to_string_pretty(&report)?;
 
         Ok(tool_result(text, serde_json::to_value(report)?))
@@ -1432,7 +1640,10 @@ impl McpStdioServer {
     fn tool_inspect_record(&self, args: Value) -> Result<Value> {
         let record_id = required_string(&args, "record_id")?;
         let namespace = self.namespace_arg(&args);
-        match self.engine.inspect_record_in_namespace(&namespace, &record_id)? {
+        match self
+            .engine
+            .inspect_record_in_namespace(&namespace, &record_id)?
+        {
             Some(inspection) => {
                 let record = inspection.record;
                 let value = json!({
@@ -1443,32 +1654,63 @@ impl McpStdioServer {
                 });
                 Ok(tool_result(serde_json::to_string_pretty(&value)?, value))
             }
-            None => Ok(tool_error(format!("record not found in namespace {namespace}: {record_id}"), json!({"code":"record_not_found","record_id":record_id,"namespace":namespace}))),
+            None => Ok(tool_error(
+                format!("record not found in namespace {namespace}: {record_id}"),
+                json!({"code":"record_not_found","record_id":record_id,"namespace":namespace}),
+            )),
         }
     }
 
     fn tool_maintenance_scan(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
         let report = self.engine.maintenance_scan(&namespace)?;
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        Ok(tool_result(
+            serde_json::to_string_pretty(&report)?,
+            serde_json::to_value(report)?,
+        ))
     }
 
     fn tool_memory_graph(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
         let max_nodes = optional_usize(&args, "max_nodes").unwrap_or(200).min(5000);
         let max_edges = optional_usize(&args, "max_edges").unwrap_or(400).min(10000);
-        if max_nodes == 0 || max_edges == 0 { bail!("graph limits must be greater than zero"); }
-        let report = build_memory_graph(&self.engine.store().load_records()?, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now());
-        let text = format!("PI Memory Graph: {} node(s), {} edge(s), truncated={}", report.nodes.len(), report.edges.len(), report.truncated);
+        if max_nodes == 0 || max_edges == 0 {
+            bail!("graph limits must be greater than zero");
+        }
+        let report = build_memory_graph(
+            &self.engine.store().load_records()?,
+            &self.engine.store().load_patches()?,
+            &self.engine.store().load_events()?,
+            &namespace,
+            max_nodes,
+            max_edges,
+            chrono::Utc::now(),
+        );
+        let text = format!(
+            "PI Memory Graph: {} node(s), {} edge(s), truncated={}",
+            report.nodes.len(),
+            report.edges.len(),
+            report.truncated
+        );
         Ok(tool_result(text, serde_json::to_value(report)?))
     }
 
     fn tool_memory_quality(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
-        let mut report = analyze_memory_quality(&self.engine.store().load_records()?, &namespace, chrono::Utc::now());
-        let limit = optional_usize(&args, "limit").unwrap_or(100).min(1000).max(1);
-        report.items.truncate(limit); report.recommendations.truncate(limit);
-        let text = format!("PI Memory Quality: average={}/100, total={}, returned={}", report.summary.average_quality, report.summary.total_records, report.items.len());
+        let mut report = analyze_memory_quality(
+            &self.engine.store().load_records()?,
+            &namespace,
+            chrono::Utc::now(),
+        );
+        let limit = optional_usize(&args, "limit").unwrap_or(100).clamp(1, 1000);
+        report.items.truncate(limit);
+        report.recommendations.truncate(limit);
+        let text = format!(
+            "PI Memory Quality: average={}/100, total={}, returned={}",
+            report.summary.average_quality,
+            report.summary.total_records,
+            report.items.len()
+        );
         Ok(tool_result(text, serde_json::to_value(report)?))
     }
 
@@ -1476,62 +1718,189 @@ impl McpStdioServer {
         let namespace = self.namespace_arg(&args);
         let max_nodes = optional_usize(&args, "max_nodes").unwrap_or(200).min(5000);
         let max_edges = optional_usize(&args, "max_edges").unwrap_or(400).min(10000);
-        if max_nodes == 0 || max_edges == 0 { bail!("graph limits must be greater than zero"); }
+        if max_nodes == 0 || max_edges == 0 {
+            bail!("graph limits must be greater than zero");
+        }
         let records = self.engine.store().load_records()?;
-        let mut report = analyze_relationship_quality(&build_memory_graph(&records, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, max_nodes, max_edges, chrono::Utc::now()), &records, chrono::Utc::now());
-        let limit = optional_usize(&args, "limit").unwrap_or(100).min(1000).max(1);
-        report.relationships.truncate(limit); report.recommendations.truncate(limit);
-        let text = format!("PI Relationship Quality: average={}/100, total={}, returned={}", report.summary.average_relationship_quality, report.summary.total_edges, report.relationships.len());
+        let mut report = analyze_relationship_quality(
+            &build_memory_graph(
+                &records,
+                &self.engine.store().load_patches()?,
+                &self.engine.store().load_events()?,
+                &namespace,
+                max_nodes,
+                max_edges,
+                chrono::Utc::now(),
+            ),
+            &records,
+            chrono::Utc::now(),
+        );
+        let limit = optional_usize(&args, "limit").unwrap_or(100).clamp(1, 1000);
+        report.relationships.truncate(limit);
+        report.recommendations.truncate(limit);
+        let text = format!(
+            "PI Relationship Quality: average={}/100, total={}, returned={}",
+            report.summary.average_relationship_quality,
+            report.summary.total_edges,
+            report.relationships.len()
+        );
         Ok(tool_result(text, serde_json::to_value(report)?))
     }
 
     fn tool_recall_feedback(&self, args: Value) -> Result<Value> {
-        let namespace = self.namespace_arg(&args); let outcome = match required_string(&args, "outcome")?.as_str() { "successful" => RecallEventOutcome::Successful, "corrected" => RecallEventOutcome::Corrected, "ignored" => RecallEventOutcome::Ignored, _ => bail!("unsupported recall outcome") }; let ids = optional_string_array(&args, "record_ids")?.unwrap_or_default(); if ids.is_empty() { bail!("record_ids must not be empty"); }
-        let recorded = record_recall_event_with_details(self.engine.store(), &namespace, RecallEventClient::Mcp, RecallEventOperation::Feedback, "", ids, std::collections::BTreeMap::new(), Some(outcome), 0, 0)?;
-        Ok(tool_result(format!("Recall feedback recorded={recorded}"), json!({"recorded":recorded})))
+        let namespace = self.namespace_arg(&args);
+        let outcome = match required_string(&args, "outcome")?.as_str() {
+            "successful" => RecallEventOutcome::Successful,
+            "corrected" => RecallEventOutcome::Corrected,
+            "ignored" => RecallEventOutcome::Ignored,
+            _ => bail!("unsupported recall outcome"),
+        };
+        let ids = optional_string_array(&args, "record_ids")?.unwrap_or_default();
+        if ids.is_empty() {
+            bail!("record_ids must not be empty");
+        }
+        let recorded = record_recall_event_with_details(
+            self.engine.store(),
+            &namespace,
+            RecallEventClient::Mcp,
+            RecallEventOperation::Feedback,
+            "",
+            ids,
+            std::collections::BTreeMap::new(),
+            Some(outcome),
+            0,
+            0,
+        )?;
+        Ok(tool_result(
+            format!("Recall feedback recorded={recorded}"),
+            json!({"recorded":recorded}),
+        ))
     }
 
     fn tool_procedure_candidates(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
-        let mut report = generate_procedure_candidates(&self.engine.store().load_records()?, &namespace, optional_usize(&args, "min_source_records").unwrap_or(2), chrono::Utc::now());
-        let max_steps = optional_usize(&args, "max_steps").unwrap_or(100).min(1000).max(1);
-        for candidate in &mut report.candidates { candidate.steps.truncate(max_steps); candidate.verification_steps.truncate(max_steps); candidate.source_record_ids.truncate(max_steps); }
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        let mut report = generate_procedure_candidates(
+            &self.engine.store().load_records()?,
+            &namespace,
+            optional_usize(&args, "min_source_records").unwrap_or(2),
+            chrono::Utc::now(),
+        );
+        let max_steps = optional_usize(&args, "max_steps")
+            .unwrap_or(100)
+            .clamp(1, 1000);
+        for candidate in &mut report.candidates {
+            candidate.steps.truncate(max_steps);
+            candidate.verification_steps.truncate(max_steps);
+            candidate.source_record_ids.truncate(max_steps);
+        }
+        Ok(tool_result(
+            serde_json::to_string_pretty(&report)?,
+            serde_json::to_value(report)?,
+        ))
     }
 
     fn tool_failure_analysis(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
         let stale_days = args.get("stale_days").and_then(Value::as_i64).unwrap_or(30);
-        let mut report = analyze_failure_patterns(&self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, stale_days, chrono::Utc::now());
-        let limit = optional_usize(&args, "limit").unwrap_or(100).min(1000).max(1);
-        report.patterns.truncate(limit); for pattern in &mut report.patterns { pattern.affected_object_ids.truncate(limit); }
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        let mut report = analyze_failure_patterns(
+            &self.engine.store().load_patches()?,
+            &self.engine.store().load_events()?,
+            &namespace,
+            stale_days,
+            chrono::Utc::now(),
+        );
+        let limit = optional_usize(&args, "limit").unwrap_or(100).clamp(1, 1000);
+        report.patterns.truncate(limit);
+        for pattern in &mut report.patterns {
+            pattern.affected_object_ids.truncate(limit);
+        }
+        Ok(tool_result(
+            serde_json::to_string_pretty(&report)?,
+            serde_json::to_value(report)?,
+        ))
     }
 
     fn tool_simulate_patch(&self, args: Value) -> Result<Value> {
-        let report = self.engine.simulate_patch(&required_string(&args, "patch_id")?)?;
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        let report = self
+            .engine
+            .simulate_patch(&required_string(&args, "patch_id")?)?;
+        Ok(tool_result(
+            serde_json::to_string_pretty(&report)?,
+            serde_json::to_value(report)?,
+        ))
     }
 
     fn tool_recall_effectiveness(&self, args: Value) -> Result<Value> {
         let namespace = self.namespace_arg(&args);
-        let mut report = analyze_recall_effectiveness(&self.engine.store().load_records()?, &self.engine.store().load_recall_events()?, &namespace, chrono::Utc::now());
-        let limit = optional_usize(&args, "limit").unwrap_or(50).min(1000).max(1);
-        report.memory_stats.truncate(limit); report.recommendations.truncate(limit);
-        let text = format!("PI Recall Effectiveness: average={}/100, events={}, returned={}", report.summary.average_effectiveness, report.summary.total_events, report.memory_stats.len());
+        let mut report = analyze_recall_effectiveness(
+            &self.engine.store().load_records()?,
+            &self.engine.store().load_recall_events()?,
+            &namespace,
+            chrono::Utc::now(),
+        );
+        let limit = optional_usize(&args, "limit").unwrap_or(50).clamp(1, 1000);
+        report.memory_stats.truncate(limit);
+        report.recommendations.truncate(limit);
+        let text = format!(
+            "PI Recall Effectiveness: average={}/100, events={}, returned={}",
+            report.summary.average_effectiveness,
+            report.summary.total_events,
+            report.memory_stats.len()
+        );
         Ok(tool_result(text, serde_json::to_value(report)?))
     }
 
     fn tool_store_quality(&self, args: Value) -> Result<Value> {
-        let namespace = self.namespace_arg(&args); let now = chrono::Utc::now(); let records = self.engine.store().load_records()?;
+        let namespace = self.namespace_arg(&args);
+        let now = chrono::Utc::now();
+        let records = self.engine.store().load_records()?;
         let memory = analyze_memory_quality(&records, &namespace, now);
-        let graph = build_memory_graph(&records, &self.engine.store().load_patches()?, &self.engine.store().load_events()?, &namespace, 5000, 10000, now);
+        let graph = build_memory_graph(
+            &records,
+            &self.engine.store().load_patches()?,
+            &self.engine.store().load_events()?,
+            &namespace,
+            5000,
+            10000,
+            now,
+        );
         let relationships = analyze_relationship_quality(&graph, &records, now);
-        let recall = analyze_recall_effectiveness(&records, &self.engine.store().load_recall_events()?, &namespace, now);
-        let pending = self.engine.list_patches(10000)?.iter().filter(|patch| matches!(patch.latest_status, PatchStatus::Proposed | PatchStatus::Deferred)).count();
-        let warnings = self.engine.store().load_events()?.iter().filter(|event| event.namespace == namespace && event.severity != "info").count();
-        let report = build_store_quality(&memory, &relationships, Some(&recall), pending, warnings, now);
-        Ok(tool_result(serde_json::to_string_pretty(&report)?, serde_json::to_value(report)?))
+        let recall = analyze_recall_effectiveness(
+            &records,
+            &self.engine.store().load_recall_events()?,
+            &namespace,
+            now,
+        );
+        let pending = self
+            .engine
+            .list_patches(10000)?
+            .iter()
+            .filter(|patch| {
+                matches!(
+                    patch.latest_status,
+                    PatchStatus::Proposed | PatchStatus::Deferred
+                )
+            })
+            .count();
+        let warnings = self
+            .engine
+            .store()
+            .load_events()?
+            .iter()
+            .filter(|event| event.namespace == namespace && event.severity != "info")
+            .count();
+        let report = build_store_quality(
+            &memory,
+            &relationships,
+            Some(&recall),
+            pending,
+            warnings,
+            now,
+        );
+        Ok(tool_result(
+            serde_json::to_string_pretty(&report)?,
+            serde_json::to_value(report)?,
+        ))
     }
 
     fn tool_doctor(&self) -> Result<Value> {
@@ -1552,7 +1921,10 @@ impl McpStdioServer {
         let text = serde_json::to_string_pretty(&records)?;
         let count = records.len();
 
-        Ok(tool_result(text, json!({ "records": records, "count": count })))
+        Ok(tool_result(
+            text,
+            json!({ "records": records, "count": count }),
+        ))
     }
 }
 

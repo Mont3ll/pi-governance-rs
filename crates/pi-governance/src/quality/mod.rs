@@ -11,4 +11,10 @@ pub use store::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QualityRecommendation { pub id: String, pub summary: String, pub reason: String, pub review_required: bool, pub mutation_performed: bool }
+pub struct QualityRecommendation {
+    pub id: String,
+    pub summary: String,
+    pub reason: String,
+    pub review_required: bool,
+    pub mutation_performed: bool,
+}

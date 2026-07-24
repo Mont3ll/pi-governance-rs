@@ -51,7 +51,12 @@ impl JsonlStore {
         fs::create_dir_all(&self.root)
             .with_context(|| format!("failed to create store dir {:?}", self.root))?;
 
-        for path in [&self.records_path, &self.patches_path, &self.events_path, &self.recall_events_path] {
+        for path in [
+            &self.records_path,
+            &self.patches_path,
+            &self.events_path,
+            &self.recall_events_path,
+        ] {
             if !path.exists() {
                 File::create(path).with_context(|| format!("failed to create {:?}", path))?;
             }
@@ -103,18 +108,28 @@ impl JsonlStore {
 
     pub fn append_recall_event(&self, event: &RecallEvent) -> Result<()> {
         let session = self.write_session()?;
-        session.store.append_jsonl(&session.store.recall_events_path, event)
+        session
+            .store
+            .append_jsonl(&session.store.recall_events_path, event)
     }
 
     pub fn record_recall_event(&self, event: &RecallEvent) -> Result<bool> {
         let config = self.load_config()?;
-        if !config.recall_telemetry.enabled { return Ok(false); }
+        if !config.recall_telemetry.enabled {
+            return Ok(false);
+        }
         let session = self.write_session()?;
-        let mut events: Vec<RecallEvent> = session.store.read_jsonl(&session.store.recall_events_path)?;
+        let mut events: Vec<RecallEvent> = session
+            .store
+            .read_jsonl(&session.store.recall_events_path)?;
         events.push(event.clone());
         let max_events = config.recall_telemetry.max_events.max(1);
-        if events.len() > max_events { events.drain(0..events.len() - max_events); }
-        session.store.write_jsonl_atomic(&session.store.recall_events_path, &events)?;
+        if events.len() > max_events {
+            events.drain(0..events.len() - max_events);
+        }
+        session
+            .store
+            .write_jsonl_atomic(&session.store.recall_events_path, &events)?;
         Ok(true)
     }
 
@@ -123,7 +138,10 @@ impl JsonlStore {
         session.overwrite_records_atomic(records)
     }
 
-    pub fn audit_schema_versions(&self, current_schema_version: u32) -> Result<Vec<SchemaFileAudit>> {
+    pub fn audit_schema_versions(
+        &self,
+        current_schema_version: u32,
+    ) -> Result<Vec<SchemaFileAudit>> {
         Ok(vec![
             self.audit_jsonl_schema("records.jsonl", &self.records_path, current_schema_version)?,
             self.audit_jsonl_schema("patches.jsonl", &self.patches_path, current_schema_version)?,

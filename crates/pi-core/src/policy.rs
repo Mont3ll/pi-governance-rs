@@ -17,8 +17,21 @@ pub fn validate_record(record: &Record, existing: &[Record]) -> GovernanceDecisi
     }
 
     let lower_claim = claim.to_lowercase();
-    if ["api_key", "apikey", "secret=", "password", "private key", "begin rsa", "begin openssh"].iter().any(|needle| lower_claim.contains(needle)) {
-        return GovernanceDecision::reject("secret-like content must not be stored as durable memory");
+    if [
+        "api_key",
+        "apikey",
+        "secret=",
+        "password",
+        "private key",
+        "begin rsa",
+        "begin openssh",
+    ]
+    .iter()
+    .any(|needle| lower_claim.contains(needle))
+    {
+        return GovernanceDecision::reject(
+            "secret-like content must not be stored as durable memory",
+        );
     }
 
     if !(0.0..=1.0).contains(&record.confidence) {
@@ -28,7 +41,8 @@ pub fn validate_record(record: &Record, existing: &[Record]) -> GovernanceDecisi
     let mut decision = GovernanceDecision::allow();
 
     if record.class.requires_evidence() && record.evidence.is_empty() {
-        decision.escalate_to_manual("durable record class requires at least one evidence reference");
+        decision
+            .escalate_to_manual("durable record class requires at least one evidence reference");
     }
 
     if record.class.is_high_sensitivity() || record.layer == MemoryLayer::L1Identity {
@@ -36,16 +50,31 @@ pub fn validate_record(record: &Record, existing: &[Record]) -> GovernanceDecisi
     }
 
     match record.trust_class {
-        TrustClass::RepositoryText => decision.escalate_to_manual("repository text cannot auto-apply as durable memory"),
-        TrustClass::GeneratedContent => decision.escalate_to_manual("generated content cannot auto-apply as durable memory"),
-        TrustClass::ThirdPartyDocumentation => decision.escalate_to_manual("third-party documentation requires manual review"),
-        TrustClass::CodebaseAnalysis => decision.escalate_to_manual("codebase analysis is supporting evidence only until confirmed"),
-        TrustClass::AgentInference | TrustClass::Unknown => decision.escalate_to_manual("low-trust or unknown source requires manual review"),
-        TrustClass::DirectUserInstruction | TrustClass::UserCorrection | TrustClass::HumanReview => {}
+        TrustClass::RepositoryText => {
+            decision.escalate_to_manual("repository text cannot auto-apply as durable memory")
+        }
+        TrustClass::GeneratedContent => {
+            decision.escalate_to_manual("generated content cannot auto-apply as durable memory")
+        }
+        TrustClass::ThirdPartyDocumentation => {
+            decision.escalate_to_manual("third-party documentation requires manual review")
+        }
+        TrustClass::CodebaseAnalysis => decision
+            .escalate_to_manual("codebase analysis is supporting evidence only until confirmed"),
+        TrustClass::AgentInference | TrustClass::Unknown => {
+            decision.escalate_to_manual("low-trust or unknown source requires manual review")
+        }
+        TrustClass::DirectUserInstruction
+        | TrustClass::UserCorrection
+        | TrustClass::HumanReview => {}
     }
 
-    if matches!(record.durability, Durability::Temporary | Durability::Task) && record.layer != MemoryLayer::L3Session {
-        decision.escalate_to_manual("temporary or task durability should remain L3/session unless explicitly reviewed");
+    if matches!(record.durability, Durability::Temporary | Durability::Task)
+        && record.layer != MemoryLayer::L3Session
+    {
+        decision.escalate_to_manual(
+            "temporary or task durability should remain L3/session unless explicitly reviewed",
+        );
     }
 
     let normalized = normalize_claim(&record.claim);
@@ -57,7 +86,9 @@ pub fn validate_record(record: &Record, existing: &[Record]) -> GovernanceDecisi
     });
 
     if duplicate {
-        decision.escalate_to_manual("possible duplicate active record with same class and normalized claim");
+        decision.escalate_to_manual(
+            "possible duplicate active record with same class and normalized claim",
+        );
     }
 
     if record.confidence < 0.35 {
@@ -87,7 +118,9 @@ pub fn validate_patch(patch: &Patch, existing: &[Record]) -> GovernanceDecision 
                 .any(|record| record.id == *target_id && record.status == RecordStatus::Active);
 
             if !target_exists {
-                return GovernanceDecision::reject("supersede target does not exist or is not active");
+                return GovernanceDecision::reject(
+                    "supersede target does not exist or is not active",
+                );
             }
 
             let Some(record) = patch.proposed_record.as_ref() else {
@@ -111,7 +144,9 @@ pub fn validate_patch(patch: &Patch, existing: &[Record]) -> GovernanceDecision 
                 .any(|record| record.id == *target_id && record.status == RecordStatus::Active);
 
             if !target_exists {
-                return GovernanceDecision::reject("tombstone target does not exist or is not active");
+                return GovernanceDecision::reject(
+                    "tombstone target does not exist or is not active",
+                );
             }
 
             if patch.reason.trim().len() < 8 {
@@ -131,7 +166,9 @@ pub fn validate_patch(patch: &Patch, existing: &[Record]) -> GovernanceDecision 
                 .any(|record| record.id == *target_id && record.status == RecordStatus::Active);
 
             if !target_exists {
-                return GovernanceDecision::reject("reinforcement target does not exist or is not active");
+                return GovernanceDecision::reject(
+                    "reinforcement target does not exist or is not active",
+                );
             }
 
             if patch.evidence.is_empty() {
@@ -150,7 +187,10 @@ pub fn validate_patch(patch: &Patch, existing: &[Record]) -> GovernanceDecision 
 
             let target_exists = existing.iter().any(|record| {
                 record.id == *target_id
-                    && matches!(record.status, RecordStatus::Active | RecordStatus::Contested)
+                    && matches!(
+                        record.status,
+                        RecordStatus::Active | RecordStatus::Contested
+                    )
             });
 
             if !target_exists {
@@ -179,7 +219,10 @@ pub fn validate_patch(patch: &Patch, existing: &[Record]) -> GovernanceDecision 
 
             let target_exists = existing.iter().any(|record| {
                 record.id == *target_id
-                    && matches!(record.status, RecordStatus::Active | RecordStatus::Contested)
+                    && matches!(
+                        record.status,
+                        RecordStatus::Active | RecordStatus::Contested
+                    )
             });
 
             if !target_exists {
@@ -189,11 +232,15 @@ pub fn validate_patch(patch: &Patch, existing: &[Record]) -> GovernanceDecision 
             }
 
             if patch.reason.trim().len() < 8 {
-                return GovernanceDecision::reject("contest resolution requires a meaningful reason");
+                return GovernanceDecision::reject(
+                    "contest resolution requires a meaningful reason",
+                );
             }
 
             let Some(resolution) = patch.contest_resolution.as_ref() else {
-                return GovernanceDecision::reject("resolve_contest patch requires contest_resolution");
+                return GovernanceDecision::reject(
+                    "resolve_contest patch requires contest_resolution",
+                );
             };
 
             match resolution {

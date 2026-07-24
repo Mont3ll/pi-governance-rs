@@ -17,10 +17,9 @@ fn bundle(name: &str) -> StoreExportBundle {
 #[test]
 fn reconciliation_fixture_report_matches_shared_contract() {
     let report = reconcile_bundles(&bundle("full-bundle.json"), &bundle("filtered-bundle.json"));
-    let expected: Value = serde_json::from_slice(
-        &fs::read(fixture_path("reconciliation-expected.json")).unwrap(),
-    )
-    .unwrap();
+    let expected: Value =
+        serde_json::from_slice(&fs::read(fixture_path("reconciliation-expected.json")).unwrap())
+            .unwrap();
 
     assert_eq!(serde_json::to_value(report).unwrap(), expected);
 }
@@ -36,11 +35,15 @@ fn reconciliation_fixture_normalizes_sets_and_envelope_fields_only() {
 
     let normalized = reconcile_bundles(&source, &destination);
     assert!(normalized.sections["records"].divergent_ids.is_empty());
-    assert!(normalized.sections["records"].matching_ids.contains(&"rec_match".to_string()));
+    assert!(normalized.sections["records"]
+        .matching_ids
+        .contains(&"rec_match".to_string()));
 
     destination.records[0].status = RecordStatus::Contested;
     let substantive = reconcile_bundles(&source, &destination);
-    assert!(substantive.sections["records"].divergent_ids.contains(&"rec_match".to_string()));
+    assert!(substantive.sections["records"]
+        .divergent_ids
+        .contains(&"rec_match".to_string()));
 }
 
 #[test]

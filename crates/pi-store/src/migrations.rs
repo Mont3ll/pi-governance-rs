@@ -46,13 +46,29 @@ impl JsonlStore {
         &self,
         options: SchemaMigrationOptions,
     ) -> Result<SchemaMigrationReport> {
-        let _session = if options.dry_run { None } else { Some(self.write_session()?) };
+        let _session = if options.dry_run {
+            None
+        } else {
+            Some(self.write_session()?)
+        };
 
         let mut files = Vec::new();
         let targets = [
-            ("records.jsonl", self.records_path.as_path(), JsonlKind::Records),
-            ("patches.jsonl", self.patches_path.as_path(), JsonlKind::Patches),
-            ("events.jsonl", self.events_path.as_path(), JsonlKind::Events),
+            (
+                "records.jsonl",
+                self.records_path.as_path(),
+                JsonlKind::Records,
+            ),
+            (
+                "patches.jsonl",
+                self.patches_path.as_path(),
+                JsonlKind::Patches,
+            ),
+            (
+                "events.jsonl",
+                self.events_path.as_path(),
+                JsonlKind::Events,
+            ),
         ];
 
         for (file_name, path, kind) in targets {
@@ -84,12 +100,7 @@ impl JsonlStore {
             }
 
             for (file_name, path, kind) in targets {
-                rewrite_file_with_schema_version(
-                    file_name,
-                    path,
-                    kind,
-                    CURRENT_SCHEMA_VERSION,
-                )?;
+                rewrite_file_with_schema_version(file_name, path, kind, CURRENT_SCHEMA_VERSION)?;
             }
 
             for file in &mut files {
@@ -248,7 +259,12 @@ fn migrate_value(
     schema_version: u32,
     counter: &mut ChangeCounter,
 ) {
-    ensure_schema_version(value, schema_version, &mut counter.root_added, &mut counter.root_updated);
+    ensure_schema_version(
+        value,
+        schema_version,
+        &mut counter.root_added,
+        &mut counter.root_updated,
+    );
 
     match kind {
         JsonlKind::Records => {

@@ -84,10 +84,7 @@ fn normalize_value(value: Value, key: Option<&str>) -> Value {
             let mut normalized = Map::new();
             let sorted: BTreeMap<String, Value> = values.into_iter().collect();
             for (child_key, child) in sorted {
-                normalized.insert(
-                    child_key.clone(),
-                    normalize_value(child, Some(&child_key)),
-                );
+                normalized.insert(child_key.clone(), normalize_value(child, Some(&child_key)));
             }
             Value::Object(normalized)
         }
@@ -119,14 +116,23 @@ fn group_artifacts(values: Vec<Value>) -> GroupedArtifacts {
             continue;
         }
         grouped.duplicate_ids.push(id.clone());
-        if group.iter().map(stable_string).collect::<BTreeSet<_>>().len() > 1 {
+        if group
+            .iter()
+            .map(stable_string)
+            .collect::<BTreeSet<_>>()
+            .len()
+            > 1
+        {
             grouped.conflicting_ids.push(id.clone());
         }
     }
     grouped
 }
 
-fn compare_section(source_values: Vec<Value>, destination_values: Vec<Value>) -> ReconciliationSection {
+fn compare_section(
+    source_values: Vec<Value>,
+    destination_values: Vec<Value>,
+) -> ReconciliationSection {
     let source = group_artifacts(source_values);
     let destination = group_artifacts(destination_values);
     let source_ids: BTreeSet<String> = source.groups.keys().cloned().collect();
@@ -135,7 +141,8 @@ fn compare_section(source_values: Vec<Value>, destination_values: Vec<Value>) ->
     let mut divergent_ids = Vec::new();
     for id in source_ids.intersection(&destination_ids) {
         let source_forms: BTreeSet<String> = source.groups[id].iter().map(stable_string).collect();
-        let destination_forms: BTreeSet<String> = destination.groups[id].iter().map(stable_string).collect();
+        let destination_forms: BTreeSet<String> =
+            destination.groups[id].iter().map(stable_string).collect();
         if source_forms == destination_forms {
             matching_ids.push(id.clone());
         } else {
@@ -182,19 +189,34 @@ fn identity(bundle: &StoreExportBundle) -> BTreeMap<String, Value> {
 
 fn section_values(bundle: &StoreExportBundle, section: &str) -> Vec<Value> {
     match section {
-        "records" => bundle.records.iter().map(|value| serde_json::to_value(value).unwrap()).collect(),
-        "patches" => bundle.patches.iter().map(|value| serde_json::to_value(value).unwrap()).collect(),
+        "records" => bundle
+            .records
+            .iter()
+            .map(|value| serde_json::to_value(value).unwrap())
+            .collect(),
+        "patches" => bundle
+            .patches
+            .iter()
+            .map(|value| serde_json::to_value(value).unwrap())
+            .collect(),
         "evidence" => bundle.evidence.clone(),
         "inquiries" => bundle.inquiries.clone(),
         "sessions" => bundle.sessions.clone(),
         "reinforcement" => bundle.reinforcement.clone(),
-        "events" => bundle.events.iter().map(|value| serde_json::to_value(value).unwrap()).collect(),
+        "events" => bundle
+            .events
+            .iter()
+            .map(|value| serde_json::to_value(value).unwrap())
+            .collect(),
         "tombstones" => bundle.tombstones.clone(),
         _ => Vec::new(),
     }
 }
 
-pub fn reconcile_bundles(source: &StoreExportBundle, destination: &StoreExportBundle) -> ReconciliationReport {
+pub fn reconcile_bundles(
+    source: &StoreExportBundle,
+    destination: &StoreExportBundle,
+) -> ReconciliationReport {
     let mut sections = BTreeMap::new();
     let mut artifact_counts = BTreeMap::new();
     for section in SECTION_NAMES {

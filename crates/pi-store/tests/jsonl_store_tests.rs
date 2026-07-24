@@ -1,4 +1,6 @@
-use pi_governance_core::{RecallEvent, RecallEventClient, RecallEventOperation, ScopeLevel, CURRENT_SCHEMA_VERSION};
+use pi_governance_core::{
+    RecallEvent, RecallEventClient, RecallEventOperation, ScopeLevel, CURRENT_SCHEMA_VERSION,
+};
 use pi_governance_store::{JsonlStore, SchemaMigrationOptions};
 use std::fs;
 use std::path::PathBuf;
@@ -12,7 +14,15 @@ fn recall_telemetry_is_disabled_by_default_and_uses_a_separate_jsonl_stream() {
     assert!(!store.load_config().unwrap().recall_telemetry.enabled);
     assert!(store.load_recall_events().unwrap().is_empty());
 
-    let event = RecallEvent::new("default", RecallEventClient::Cli, RecallEventOperation::Retrieve, "query-hash", vec!["rec_1".into()], 1200, 80);
+    let event = RecallEvent::new(
+        "default",
+        RecallEventClient::Cli,
+        RecallEventOperation::Retrieve,
+        "query-hash",
+        vec!["rec_1".into()],
+        1200,
+        80,
+    );
     assert!(!store.record_recall_event(&event).unwrap());
     assert!(store.load_recall_events().unwrap().is_empty());
 
@@ -21,14 +31,31 @@ fn recall_telemetry_is_disabled_by_default_and_uses_a_separate_jsonl_stream() {
     config.recall_telemetry.max_events = 1;
     store.save_config(&config).unwrap();
     assert!(store.record_recall_event(&event).unwrap());
-    let second = RecallEvent::new("default", RecallEventClient::Cli, RecallEventOperation::RecallXray, "second-hash", vec!["rec_2".into()], 1200, 90);
+    let second = RecallEvent::new(
+        "default",
+        RecallEventClient::Cli,
+        RecallEventOperation::RecallXray,
+        "second-hash",
+        vec!["rec_2".into()],
+        1200,
+        90,
+    );
     assert!(store.record_recall_event(&second).unwrap());
     let events = store.load_recall_events().unwrap();
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].query_hash, "second-hash");
     assert!(root.join("recall-events.jsonl").exists());
-    let export = store.export_bundle(pi_governance_store::StoreExportOptions { namespace: Some("default".into()), all_namespaces: false, project: None, redacted: false }).unwrap();
-    assert!(!serde_json::to_string(&export).unwrap().contains("second-hash"));
+    let export = store
+        .export_bundle(pi_governance_store::StoreExportOptions {
+            namespace: Some("default".into()),
+            all_namespaces: false,
+            project: None,
+            redacted: false,
+        })
+        .unwrap();
+    assert!(!serde_json::to_string(&export)
+        .unwrap()
+        .contains("second-hash"));
 }
 
 fn temp_store_dir(test_name: &str) -> PathBuf {
@@ -88,7 +115,9 @@ fn migrates_legacy_jsonl_schema_versions_with_backup() -> anyhow::Result<()> {
 
     let audits = store.audit_schema_versions(CURRENT_SCHEMA_VERSION)?;
     assert!(audits.iter().all(|audit| audit.missing_schema_version == 0));
-    assert!(audits.iter().all(|audit| audit.mismatched_schema_version == 0));
+    assert!(audits
+        .iter()
+        .all(|audit| audit.mismatched_schema_version == 0));
 
     fs::remove_dir_all(root)?;
     Ok(())
@@ -123,24 +152,64 @@ fn imports_javascript_bundle_and_preserves_auxiliary_sections() -> anyhow::Resul
         "events":[]
     });
     fs::write(&path, serde_json::to_vec_pretty(&bundle)?)?;
-    let report = store.import_bundle_from_path(&path, StoreImportOptions { namespace:"interop-test".into(), preserve_namespaces:true, dry_run:false, backup:true })?;
+    let report = store.import_bundle_from_path(
+        &path,
+        StoreImportOptions {
+            namespace: "interop-test".into(),
+            preserve_namespaces: true,
+            dry_run: false,
+            backup: true,
+        },
+    )?;
     assert_eq!(report.imported_records, 2);
-    let domain = store.load_records()?.into_iter().find(|record| record.id == "mem_domain").unwrap();
+    let domain = store
+        .load_records()?
+        .into_iter()
+        .find(|record| record.id == "mem_domain")
+        .unwrap();
     assert_eq!(domain.scope.level, ScopeLevel::Domain);
     assert_eq!(domain.scope.key.as_deref(), Some("release"));
     assert_eq!(report.imported_patches, 2);
     assert_eq!(report.imported_events, 5);
-    let exported = store.export_bundle(StoreExportOptions { namespace:Some("interop-test".into()), all_namespaces:false, project:None, redacted:false })?;
-    assert!(exported.records.iter().any(|record| record.id == "mem_domain" && record.scope.level == ScopeLevel::Domain && record.scope.key.as_deref() == Some("release")));
+    let exported = store.export_bundle(StoreExportOptions {
+        namespace: Some("interop-test".into()),
+        all_namespaces: false,
+        project: None,
+        redacted: false,
+    })?;
+    assert!(exported
+        .records
+        .iter()
+        .any(|record| record.id == "mem_domain"
+            && record.scope.level == ScopeLevel::Domain
+            && record.scope.key.as_deref() == Some("release")));
     assert_eq!(exported.evidence.len(), 1);
     assert_eq!(exported.sessions.len(), 1);
     assert_eq!(exported.inquiries.len(), 1);
     assert_eq!(exported.reinforcement.len(), 1);
     assert_eq!(exported.tombstones.len(), 1);
-    let redacted = store.export_bundle(StoreExportOptions { namespace:Some("interop-test".into()), all_namespaces:false, project:None, redacted:true })?;
+    let redacted = store.export_bundle(StoreExportOptions {
+        namespace: Some("interop-test".into()),
+        all_namespaces: false,
+        project: None,
+        redacted: true,
+    })?;
     assert!(redacted.sessions.is_empty());
-    assert_eq!(redacted.evidence[0].get("source_summary").and_then(serde_json::Value::as_str), Some("redacted"));
-    let duplicate = store.import_bundle_from_path(&path, StoreImportOptions { namespace:"interop-test".into(), preserve_namespaces:true, dry_run:false, backup:true })?;
+    assert_eq!(
+        redacted.evidence[0]
+            .get("source_summary")
+            .and_then(serde_json::Value::as_str),
+        Some("redacted")
+    );
+    let duplicate = store.import_bundle_from_path(
+        &path,
+        StoreImportOptions {
+            namespace: "interop-test".into(),
+            preserve_namespaces: true,
+            dry_run: false,
+            backup: true,
+        },
+    )?;
     assert_eq!(duplicate.imported_records, 0);
     assert_eq!(duplicate.imported_patches, 0);
     assert_eq!(duplicate.imported_events, 0);
@@ -157,12 +226,15 @@ fn project_filter_preserves_related_compatibility_artifacts() -> anyhow::Result<
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/pi-governance-conformance/full-bundle.json");
     let bundle: StoreExportBundle = serde_json::from_slice(&fs::read(fixture)?)?;
-    store.import_bundle(bundle, StoreImportOptions {
-        namespace: "persistent-intelligence".into(),
-        preserve_namespaces: true,
-        dry_run: false,
-        backup: false,
-    })?;
+    store.import_bundle(
+        bundle,
+        StoreImportOptions {
+            namespace: "persistent-intelligence".into(),
+            preserve_namespaces: true,
+            dry_run: false,
+            backup: false,
+        },
+    )?;
 
     let exported = store.export_bundle(StoreExportOptions {
         namespace: Some("persistent-intelligence".into()),
@@ -171,14 +243,66 @@ fn project_filter_preserves_related_compatibility_artifacts() -> anyhow::Result<
         redacted: false,
     })?;
 
-    assert_eq!(exported.records.iter().map(|item| item.id.as_str()).collect::<Vec<_>>(), vec!["rec_divergent", "rec_match"]);
-    assert_eq!(exported.evidence.iter().filter_map(|item| item.get("id")?.as_str()).collect::<Vec<_>>(), vec!["evidence_match"]);
-    assert_eq!(exported.inquiries.iter().filter_map(|item| item.get("id")?.as_str()).collect::<Vec<_>>(), vec!["inquiry_match"]);
-    assert_eq!(exported.sessions.iter().filter_map(|item| item.get("id")?.as_str()).collect::<Vec<_>>(), vec!["session_match"]);
-    assert_eq!(exported.reinforcement.iter().filter_map(|item| item.get("id")?.as_str()).collect::<Vec<_>>(), vec!["reinforcement_match"]);
-    assert_eq!(exported.tombstones.iter().filter_map(|item| item.get("id")?.as_str()).collect::<Vec<_>>(), vec!["tombstone_match"]);
-    assert_eq!(exported.events.iter().map(|item| item.id.as_str()).collect::<Vec<_>>(), vec!["event_match"]);
-    assert!(exported.warnings.iter().any(|warning| warning.contains("session") && warning.contains("omitted")));
+    assert_eq!(
+        exported
+            .records
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["rec_divergent", "rec_match"]
+    );
+    assert_eq!(
+        exported
+            .evidence
+            .iter()
+            .filter_map(|item| item.get("id")?.as_str())
+            .collect::<Vec<_>>(),
+        vec!["evidence_match"]
+    );
+    assert_eq!(
+        exported
+            .inquiries
+            .iter()
+            .filter_map(|item| item.get("id")?.as_str())
+            .collect::<Vec<_>>(),
+        vec!["inquiry_match"]
+    );
+    assert_eq!(
+        exported
+            .sessions
+            .iter()
+            .filter_map(|item| item.get("id")?.as_str())
+            .collect::<Vec<_>>(),
+        vec!["session_match"]
+    );
+    assert_eq!(
+        exported
+            .reinforcement
+            .iter()
+            .filter_map(|item| item.get("id")?.as_str())
+            .collect::<Vec<_>>(),
+        vec!["reinforcement_match"]
+    );
+    assert_eq!(
+        exported
+            .tombstones
+            .iter()
+            .filter_map(|item| item.get("id")?.as_str())
+            .collect::<Vec<_>>(),
+        vec!["tombstone_match"]
+    );
+    assert_eq!(
+        exported
+            .events
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["event_match"]
+    );
+    assert!(exported
+        .warnings
+        .iter()
+        .any(|warning| warning.contains("session") && warning.contains("omitted")));
 
     fs::remove_dir_all(root)?;
     Ok(())

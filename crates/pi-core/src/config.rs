@@ -20,7 +20,12 @@ pub struct RecallTelemetryConfig {
 }
 
 impl Default for RecallTelemetryConfig {
-    fn default() -> Self { Self { enabled: false, max_events: 1_000 } }
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_events: 1_000,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,16 +35,25 @@ pub struct NamespacePolicyConfig {
 
 impl Default for PiConfig {
     fn default() -> Self {
-        Self { schema_version: CURRENT_SCHEMA_VERSION, default_policy: PolicyProfile::Standard, namespaces: BTreeMap::new(), recall_telemetry: RecallTelemetryConfig::default() }
+        Self {
+            schema_version: CURRENT_SCHEMA_VERSION,
+            default_policy: PolicyProfile::Standard,
+            namespaces: BTreeMap::new(),
+            recall_telemetry: RecallTelemetryConfig::default(),
+        }
     }
 }
 
 impl PiConfig {
     pub fn effective_policy(&self, namespace: &str) -> PolicyProfile {
-        self.namespaces.get(namespace).map(|cfg| cfg.policy).unwrap_or(self.default_policy)
+        self.namespaces
+            .get(namespace)
+            .map(|cfg| cfg.policy)
+            .unwrap_or(self.default_policy)
     }
 
     pub fn set_policy(&mut self, namespace: impl Into<String>, policy: PolicyProfile) {
-        self.namespaces.insert(namespace.into(), NamespacePolicyConfig { policy });
+        self.namespaces
+            .insert(namespace.into(), NamespacePolicyConfig { policy });
     }
 }

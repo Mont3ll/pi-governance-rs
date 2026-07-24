@@ -1,20 +1,31 @@
-use pi_governance_core::{ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryLayer, MemoryKind, RecordClass, RuleType, Scope, RecordStatus, SourceKind, TrustClass};
+use pi_governance_core::{
+    ContestResolution, Durability, EvidenceKind, EvidenceRef, MemoryKind, MemoryLayer, RecordClass,
+    RecordStatus, RuleType, Scope, SourceKind, TrustClass,
+};
 use pi_governance_engine::{
-    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput, ReinforceInput, ResolveContestInput, SupersedeInput, TombstoneInput,
+    ContestInput, ExportInput, GovernanceEngine, ImportInput, MigrationInput, ProposalInput,
+    ReinforceInput, ResolveContestInput, SupersedeInput, TombstoneInput,
 };
 use pi_governance_store::JsonlStore;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn integrity_record(namespace: &str, id: &str, supersedes: Vec<&str>) -> pi_governance_core::Record {
+fn integrity_record(
+    namespace: &str,
+    id: &str,
+    supersedes: Vec<&str>,
+) -> pi_governance_core::Record {
     let mut record = pi_governance_core::Record::new(
         RecordClass::Requirement,
         format!("{id} integrity fixture"),
         0.9,
         Scope::project("demo"),
         vec!["integrity".into()],
-        vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:integrity")],
+        vec![EvidenceRef::new(
+            EvidenceKind::Conversation,
+            "conversation:integrity",
+        )],
     );
     record.namespace = namespace.into();
     record.id = id.into();
@@ -46,7 +57,11 @@ fn doctor_reports_unique_keys_duplicate_groups_and_self_edges_once() -> anyhow::
     ];
     fs::write(
         root.join("records.jsonl"),
-        rows.iter().map(serde_json::to_string).collect::<Result<Vec<_>, _>>()?.join("\n") + "\n",
+        rows.iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()?
+            .join("\n")
+            + "\n",
     )?;
 
     let report = engine.doctor_in_namespace("alpha")?;
@@ -55,8 +70,22 @@ fn doctor_reports_unique_keys_duplicate_groups_and_self_edges_once() -> anyhow::
     assert_eq!(report.unique_record_keys, 2);
     assert_eq!(report.duplicate_record_groups, 1);
     assert_eq!(report.self_supersession_groups, 1);
-    assert_eq!(report.errors.iter().filter(|error| error.contains("duplicate stable record key alpha/rec_dup")).count(), 1);
-    assert_eq!(report.errors.iter().filter(|error| error.contains("self-supersession alpha/rec_dup")).count(), 1);
+    assert_eq!(
+        report
+            .errors
+            .iter()
+            .filter(|error| error.contains("duplicate stable record key alpha/rec_dup"))
+            .count(),
+        1
+    );
+    assert_eq!(
+        report
+            .errors
+            .iter()
+            .filter(|error| error.contains("self-supersession alpha/rec_dup"))
+            .count(),
+        1
+    );
 
     fs::remove_dir_all(root)?;
     Ok(())
@@ -76,7 +105,10 @@ fn proposes_inspects_and_applies_patch() -> anyhow::Result<()> {
             confidence: 0.85,
             scope: Scope::project("pi-governance-rs"),
             tags: vec!["testing".to_string()],
-            evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:test")],
+            evidence_refs: vec![EvidenceRef::new(
+                EvidenceKind::Conversation,
+                "conversation:test",
+            )],
             reason: Some("engine test".to_string()),
             layer: Some(MemoryLayer::L2Playbook),
             memory_kind: Some(MemoryKind::Instruction),
@@ -140,7 +172,10 @@ fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Res
             confidence: 0.70,
             scope: Scope::project("pi-governance-rs"),
             tags: vec!["belief-revision".to_string()],
-            evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:original")],
+            evidence_refs: vec![EvidenceRef::new(
+                EvidenceKind::Conversation,
+                "conversation:original",
+            )],
             reason: Some("original claim".to_string()),
             layer: Some(MemoryLayer::L2Playbook),
             memory_kind: Some(MemoryKind::Instruction),
@@ -187,7 +222,10 @@ fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Res
             confidence: 0.82,
             scope: Scope::project("pi-governance-rs"),
             tags: vec!["belief-revision".to_string(), "supersession".to_string()],
-            evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:supersede")],
+            evidence_refs: vec![EvidenceRef::new(
+                EvidenceKind::Conversation,
+                "conversation:supersede",
+            )],
             reason: "the claim has been refined after implementation".to_string(),
         },
         true,
@@ -207,14 +245,20 @@ fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Res
         .find(|record| record.id == replacement_id)
         .expect("replacement record should exist");
 
-    assert!(matches!(old.status, pi_governance_core::RecordStatus::Superseded));
+    assert!(matches!(
+        old.status,
+        pi_governance_core::RecordStatus::Superseded
+    ));
     assert!(replacement.supersedes.contains(&original_id));
 
     let tombstone = engine.tombstone_record(
         TombstoneInput {
             namespace: "default".to_string(),
             target_id: replacement_id.clone(),
-            evidence_refs: vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:tombstone")],
+            evidence_refs: vec![EvidenceRef::new(
+                EvidenceKind::HumanReview,
+                "review:tombstone",
+            )],
             reason: "remove refined test record after validating tombstone flow".to_string(),
         },
         true,
@@ -229,12 +273,14 @@ fn belief_revision_supersedes_reinforces_and_tombstones_records() -> anyhow::Res
         .find(|record| record.id == replacement_id)
         .expect("replacement should remain in audit history");
 
-    assert!(matches!(tombstoned.status, pi_governance_core::RecordStatus::Tombstoned));
+    assert!(matches!(
+        tombstoned.status,
+        pi_governance_core::RecordStatus::Tombstoned
+    ));
 
     fs::remove_dir_all(root)?;
     Ok(())
 }
-
 
 #[test]
 fn contest_and_resolve_belief_revision_flow() -> anyhow::Result<()> {
@@ -251,7 +297,10 @@ fn contest_and_resolve_belief_revision_flow() -> anyhow::Result<()> {
             confidence: 0.70,
             scope: Scope::project("pi-governance-rs"),
             tags: vec!["contest".to_string()],
-            evidence_refs: vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:contest")],
+            evidence_refs: vec![EvidenceRef::new(
+                EvidenceKind::Conversation,
+                "conversation:contest",
+            )],
             reason: Some("original contested claim".to_string()),
             layer: Some(MemoryLayer::L2Playbook),
             memory_kind: Some(MemoryKind::Instruction),
@@ -270,7 +319,10 @@ fn contest_and_resolve_belief_revision_flow() -> anyhow::Result<()> {
         ContestInput {
             namespace: "default".to_string(),
             target_id: record_id.clone(),
-            evidence_refs: vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:contest")],
+            evidence_refs: vec![EvidenceRef::new(
+                EvidenceKind::HumanReview,
+                "review:contest",
+            )],
             reason: "reviewer found evidence that disputes this record".to_string(),
         },
         true,
@@ -317,7 +369,6 @@ fn contest_and_resolve_belief_revision_flow() -> anyhow::Result<()> {
     fs::remove_dir_all(root)?;
     Ok(())
 }
-
 
 #[test]
 fn engine_exports_and_imports_portable_bundle() -> anyhow::Result<()> {
@@ -388,7 +439,10 @@ fn engine_exports_and_imports_portable_bundle() -> anyhow::Result<()> {
     assert!(imported.changed);
     assert_eq!(imported.imported_records, 1);
     assert_eq!(target.list_records(20)?.len(), 1);
-    assert_eq!(target.list_records(20)?[0].id, proposal.record_id.expect("record id"));
+    assert_eq!(
+        target.list_records(20)?[0].id,
+        proposal.record_id.expect("record id")
+    );
 
     fs::remove_dir_all(source_root)?;
     fs::remove_dir_all(target_root)?;

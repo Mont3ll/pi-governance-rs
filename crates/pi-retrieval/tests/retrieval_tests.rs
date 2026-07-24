@@ -1,14 +1,27 @@
-use pi_governance_core::{EvidenceKind, EvidenceRef, Record, RecordClass, RecordStatus, RetrievalFormat, RetrievalOptions, Scope};
+use pi_governance_core::{
+    EvidenceKind, EvidenceRef, Record, RecordClass, RecordStatus, RetrievalFormat,
+    RetrievalOptions, Scope,
+};
 use pi_governance_retrieval::retrieve_with_options;
 
-fn rec(class: RecordClass, claim: &str, project: Option<&str>, tags: Vec<&str>, confidence: f32, status: RecordStatus) -> Record {
+fn rec(
+    class: RecordClass,
+    claim: &str,
+    project: Option<&str>,
+    tags: Vec<&str>,
+    confidence: f32,
+    status: RecordStatus,
+) -> Record {
     let mut record = Record::new(
         class,
         claim,
         confidence,
         project.map(Scope::project).unwrap_or_else(Scope::global),
         tags.into_iter().map(str::to_string).collect(),
-        vec![EvidenceRef::new(EvidenceKind::Conversation, "test:evidence")],
+        vec![EvidenceRef::new(
+            EvidenceKind::Conversation,
+            "test:evidence",
+        )],
     );
     record.status = status;
     record
@@ -33,10 +46,38 @@ fn opts(query: &str) -> RetrievalOptions {
 #[test]
 fn retrieval_excludes_non_active_records_by_default() {
     let records = vec![
-        rec(RecordClass::Requirement, "belief revision active", Some("pi-governance-rs"), vec!["belief"], 0.8, RecordStatus::Active),
-        rec(RecordClass::Requirement, "belief revision tombstoned", Some("pi-governance-rs"), vec!["belief"], 0.8, RecordStatus::Tombstoned),
-        rec(RecordClass::Requirement, "belief revision superseded", Some("pi-governance-rs"), vec!["belief"], 0.8, RecordStatus::Superseded),
-        rec(RecordClass::Requirement, "belief revision contested", Some("pi-governance-rs"), vec!["belief"], 0.8, RecordStatus::Contested),
+        rec(
+            RecordClass::Requirement,
+            "belief revision active",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.8,
+            RecordStatus::Active,
+        ),
+        rec(
+            RecordClass::Requirement,
+            "belief revision tombstoned",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.8,
+            RecordStatus::Tombstoned,
+        ),
+        rec(
+            RecordClass::Requirement,
+            "belief revision superseded",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.8,
+            RecordStatus::Superseded,
+        ),
+        rec(
+            RecordClass::Requirement,
+            "belief revision contested",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.8,
+            RecordStatus::Contested,
+        ),
     ];
     let bundle = retrieve_with_options(&records, opts("belief revision"));
     assert_eq!(bundle.records.len(), 1);
@@ -45,7 +86,14 @@ fn retrieval_excludes_non_active_records_by_default() {
 
 #[test]
 fn retrieval_includes_contested_when_requested() {
-    let records = vec![rec(RecordClass::Requirement, "belief revision contested", Some("pi-governance-rs"), vec!["belief"], 0.8, RecordStatus::Contested)];
+    let records = vec![rec(
+        RecordClass::Requirement,
+        "belief revision contested",
+        Some("pi-governance-rs"),
+        vec!["belief"],
+        0.8,
+        RecordStatus::Contested,
+    )];
     let mut options = opts("belief revision");
     options.include_contested = true;
     let bundle = retrieve_with_options(&records, options);
@@ -56,9 +104,30 @@ fn retrieval_includes_contested_when_requested() {
 #[test]
 fn class_and_confidence_filters_limit_results() {
     let records = vec![
-        rec(RecordClass::Requirement, "belief revision strong", Some("pi-governance-rs"), vec!["belief"], 0.9, RecordStatus::Active),
-        rec(RecordClass::Workflow, "belief revision workflow", Some("pi-governance-rs"), vec!["belief"], 0.9, RecordStatus::Active),
-        rec(RecordClass::Requirement, "belief revision weak", Some("pi-governance-rs"), vec!["belief"], 0.4, RecordStatus::Active),
+        rec(
+            RecordClass::Requirement,
+            "belief revision strong",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.9,
+            RecordStatus::Active,
+        ),
+        rec(
+            RecordClass::Workflow,
+            "belief revision workflow",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.9,
+            RecordStatus::Active,
+        ),
+        rec(
+            RecordClass::Requirement,
+            "belief revision weak",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.4,
+            RecordStatus::Active,
+        ),
     ];
     let mut options = opts("belief revision");
     options.classes = vec![RecordClass::Requirement];
@@ -71,27 +140,75 @@ fn class_and_confidence_filters_limit_results() {
 #[test]
 fn higher_query_tag_project_match_ranks_above_lower_match() {
     let records = vec![
-        rec(RecordClass::Observation, "unrelated note", None, vec![], 0.9, RecordStatus::Active),
-        rec(RecordClass::Requirement, "belief revision workflow for deterministic retrieval", Some("pi-governance-rs"), vec!["belief", "revision"], 0.7, RecordStatus::Active),
+        rec(
+            RecordClass::Observation,
+            "unrelated note",
+            None,
+            vec![],
+            0.9,
+            RecordStatus::Active,
+        ),
+        rec(
+            RecordClass::Requirement,
+            "belief revision workflow for deterministic retrieval",
+            Some("pi-governance-rs"),
+            vec!["belief", "revision"],
+            0.7,
+            RecordStatus::Active,
+        ),
     ];
     let bundle = retrieve_with_options(&records, opts("belief revision"));
-    assert_eq!(bundle.records[0].record.claim, "belief revision workflow for deterministic retrieval");
+    assert_eq!(
+        bundle.records[0].record.claim,
+        "belief revision workflow for deterministic retrieval"
+    );
 }
 
 #[test]
 fn json_explain_output_includes_score_breakdown() {
-    let records = vec![rec(RecordClass::Requirement, "belief revision active", Some("pi-governance-rs"), vec!["belief"], 0.8, RecordStatus::Active)];
+    let records = vec![rec(
+        RecordClass::Requirement,
+        "belief revision active",
+        Some("pi-governance-rs"),
+        vec!["belief"],
+        0.8,
+        RecordStatus::Active,
+    )];
     let bundle = retrieve_with_options(&records, opts("belief revision"));
     let json = serde_json::to_value(&bundle).unwrap();
-    assert!(json["records"][0]["score_breakdown"].is_object() || json["records"][0]["breakdown"].is_object());
+    assert!(
+        json["records"][0]["score_breakdown"].is_object()
+            || json["records"][0]["breakdown"].is_object()
+    );
 }
 
 #[test]
 fn retrieval_reports_records_omitted_by_budget() {
     let records = vec![
-        rec(RecordClass::Requirement, "belief revision first record with enough text to consume a meaningful budget", Some("pi-governance-rs"), vec!["belief"], 0.9, RecordStatus::Active),
-        rec(RecordClass::Requirement, "belief revision second record with enough text to exceed the remaining budget", Some("pi-governance-rs"), vec!["belief"], 0.8, RecordStatus::Active),
-        rec(RecordClass::Requirement, "belief revision third record that is also omitted after the budget is reached", Some("pi-governance-rs"), vec!["belief"], 0.7, RecordStatus::Active),
+        rec(
+            RecordClass::Requirement,
+            "belief revision first record with enough text to consume a meaningful budget",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.9,
+            RecordStatus::Active,
+        ),
+        rec(
+            RecordClass::Requirement,
+            "belief revision second record with enough text to exceed the remaining budget",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.8,
+            RecordStatus::Active,
+        ),
+        rec(
+            RecordClass::Requirement,
+            "belief revision third record that is also omitted after the budget is reached",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.7,
+            RecordStatus::Active,
+        ),
     ];
     let mut options = opts("belief revision");
     options.budget = 50;
@@ -105,8 +222,22 @@ fn retrieval_reports_records_omitted_by_budget() {
 #[test]
 fn retrieval_reports_zero_omissions_when_budget_fits() {
     let records = vec![
-        rec(RecordClass::Requirement, "belief revision first", Some("pi-governance-rs"), vec!["belief"], 0.9, RecordStatus::Active),
-        rec(RecordClass::Requirement, "belief revision second", Some("pi-governance-rs"), vec!["belief"], 0.8, RecordStatus::Active),
+        rec(
+            RecordClass::Requirement,
+            "belief revision first",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.9,
+            RecordStatus::Active,
+        ),
+        rec(
+            RecordClass::Requirement,
+            "belief revision second",
+            Some("pi-governance-rs"),
+            vec!["belief"],
+            0.8,
+            RecordStatus::Active,
+        ),
     ];
 
     let bundle = retrieve_with_options(&records, opts("belief revision"));

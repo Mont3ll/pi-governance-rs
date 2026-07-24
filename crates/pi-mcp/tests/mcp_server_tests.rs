@@ -10,10 +10,7 @@ fn temp_store_dir(test_name: &str) -> PathBuf {
         .expect("clock should be after unix epoch")
         .as_nanos();
 
-    std::env::temp_dir().join(format!(
-        "pi-mcp-{test_name}-{}-{nonce}",
-        std::process::id()
-    ))
+    std::env::temp_dir().join(format!("pi-mcp-{test_name}-{}-{nonce}", std::process::id()))
 }
 
 #[test]
@@ -41,9 +38,15 @@ fn initialize_exposes_distinct_resolved_and_configured_store_identities() {
     let configured = missing_server.initialize_result(serde_json::json!({}));
 
     assert_eq!(resolved["piStoreIdentity"]["resolved"], true);
-    assert_eq!(resolved["piStoreIdentity"]["namespace"], "persistent-intelligence");
+    assert_eq!(
+        resolved["piStoreIdentity"]["namespace"],
+        "persistent-intelligence"
+    );
     assert_eq!(configured["piStoreIdentity"]["resolved"], false);
-    assert_ne!(resolved["piStoreIdentity"]["store"], configured["piStoreIdentity"]["store"]);
+    assert_ne!(
+        resolved["piStoreIdentity"]["store"],
+        configured["piStoreIdentity"]["store"]
+    );
     std::fs::remove_dir_all(existing).unwrap();
 }
 
@@ -58,8 +61,21 @@ fn registered_tool_names_come_from_the_canonical_registry() {
 #[test]
 fn observability_tools_are_registered() {
     let names = registered_tool_names();
-    for expected in ["pi.memory_graph", "pi.memory_quality", "pi.relationship_quality", "pi.recall_effectiveness", "pi.store_quality", "pi.simulate_patch", "pi.procedure_candidates", "pi.failure_analysis", "pi.recall_feedback"] {
-        assert!(names.iter().any(|name| name == expected), "missing {expected}");
+    for expected in [
+        "pi.memory_graph",
+        "pi.memory_quality",
+        "pi.relationship_quality",
+        "pi.recall_effectiveness",
+        "pi.store_quality",
+        "pi.simulate_patch",
+        "pi.procedure_candidates",
+        "pi.failure_analysis",
+        "pi.recall_feedback",
+    ] {
+        assert!(
+            names.iter().any(|name| name == expected),
+            "missing {expected}"
+        );
     }
 }
 
@@ -69,7 +85,10 @@ fn retrieve_context_schema_includes_deterministic_retrieval_fields() {
     let engine = GovernanceEngine::new(JsonlStore::new(root));
     let server = McpStdioServer::new(engine);
     let tools = server.tool_definitions();
-    let retrieve = tools.as_array().unwrap().iter()
+    let retrieve = tools
+        .as_array()
+        .unwrap()
+        .iter()
         .find(|tool| tool["name"] == "pi.retrieve_context")
         .expect("retrieve tool exists");
     let props = &retrieve["inputSchema"]["properties"];

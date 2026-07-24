@@ -163,7 +163,10 @@ impl JsonlStore {
         Ok(plan_record_integrity(&self.load_records()?))
     }
 
-    pub fn apply_record_integrity(&self, expected_fingerprint: &str) -> Result<RecordIntegrityApplyReport> {
+    pub fn apply_record_integrity(
+        &self,
+        expected_fingerprint: &str,
+    ) -> Result<RecordIntegrityApplyReport> {
         let session = self.write_session()?;
         let records = session.load_records()?;
         let plan = plan_record_integrity(&records);
@@ -199,13 +202,20 @@ impl JsonlStore {
         session.overwrite_records_atomic(&plan.records)?;
 
         let reports_dir = self.root().join("reports");
-        fs::create_dir_all(&reports_dir)
-            .with_context(|| format!("failed to create integrity report directory {:?}", reports_dir))?;
+        fs::create_dir_all(&reports_dir).with_context(|| {
+            format!(
+                "failed to create integrity report directory {:?}",
+                reports_dir
+            )
+        })?;
         let report_path = reports_dir.join(format!("store-integrity-{}.json", std::process::id()));
         report.mutation_performed = true;
         report.report_path = Some(report_path.display().to_string());
-        fs::write(&report_path, format!("{}\n", serde_json::to_string_pretty(&report)?))
-            .with_context(|| format!("failed to write integrity report {:?}", report_path))?;
+        fs::write(
+            &report_path,
+            format!("{}\n", serde_json::to_string_pretty(&report)?),
+        )
+        .with_context(|| format!("failed to write integrity report {:?}", report_path))?;
         Ok(report)
     }
 }

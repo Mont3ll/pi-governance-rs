@@ -6,10 +6,10 @@ pub mod workflow;
 pub mod workflow_intelligence;
 
 pub use engine::{
-    ApplyPatchResult, ContestInput, DoctorReport, ExportInput, GovernanceEngine, ImportInput, MigrationInput, PatchInspection,
-    ReconcileInput, RecordInspection, RecordRevisionInfo, SmokeTestCheck, SmokeTestReport,
-    PatchSummary, ProposalInput, ProposalResult, ReinforceInput, ResolveContestInput,
-    SupersedeInput, TombstoneInput,
+    ApplyPatchResult, ContestInput, DoctorReport, ExportInput, GovernanceEngine, ImportInput,
+    MigrationInput, PatchInspection, PatchSummary, ProposalInput, ProposalResult, ReconcileInput,
+    RecordInspection, RecordRevisionInfo, ReinforceInput, ResolveContestInput, SmokeTestCheck,
+    SmokeTestReport, SupersedeInput, TombstoneInput,
 };
 pub use graph::*;
 pub use quality::*;

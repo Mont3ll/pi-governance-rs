@@ -17,24 +17,28 @@ pub struct NamespaceId(pub String);
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum PolicyProfile {
     Permissive,
+    #[default]
     Standard,
     Strict,
 }
 
-impl Default for PolicyProfile {
-    fn default() -> Self { Self::Standard }
-}
-
 impl PolicyProfile {
     pub fn as_str(&self) -> &'static str {
-        match self { Self::Permissive => "permissive", Self::Standard => "standard", Self::Strict => "strict" }
+        match self {
+            Self::Permissive => "permissive",
+            Self::Standard => "standard",
+            Self::Strict => "strict",
+        }
     }
 }
 
 impl fmt::Display for PolicyProfile {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.as_str()) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
 }
 
 impl FromStr for PolicyProfile {
@@ -51,8 +55,10 @@ impl FromStr for PolicyProfile {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum MemoryLayer {
     L1Identity,
+    #[default]
     L2Playbook,
     L3Session,
 }
@@ -67,10 +73,10 @@ impl MemoryLayer {
     }
 }
 
-impl Default for MemoryLayer { fn default() -> Self { Self::L2Playbook } }
-
 impl fmt::Display for MemoryLayer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.as_str()) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
 }
 
 impl FromStr for MemoryLayer {
@@ -87,17 +93,43 @@ impl FromStr for MemoryLayer {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum MemoryKind { Fact, Event, Instruction, Task }
+pub enum MemoryKind {
+    Fact,
+    Event,
+    Instruction,
+    Task,
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum RuleType { AvoidPattern, PreferPattern, Convention, Architecture, Workflow, Preference, Testing, Correction, Tool }
+pub enum RuleType {
+    AvoidPattern,
+    PreferPattern,
+    Convention,
+    Architecture,
+    Workflow,
+    Preference,
+    Testing,
+    Correction,
+    Tool,
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum TrustClass { DirectUserInstruction, UserCorrection, AgentInference, RepositoryText, GeneratedContent, ThirdPartyDocumentation, CodebaseAnalysis, HumanReview, Unknown }
+#[derive(Default)]
+pub enum TrustClass {
+    DirectUserInstruction,
+    UserCorrection,
+    AgentInference,
+    RepositoryText,
+    GeneratedContent,
+    ThirdPartyDocumentation,
+    CodebaseAnalysis,
+    HumanReview,
+    #[default]
+    Unknown,
+}
 
-impl Default for TrustClass { fn default() -> Self { Self::Unknown } }
 impl fmt::Display for TrustClass {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = match self {
@@ -134,9 +166,16 @@ impl FromStr for TrustClass {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum Durability { Temporary, Task, Project, LongTerm, Unknown }
+#[derive(Default)]
+pub enum Durability {
+    Temporary,
+    Task,
+    Project,
+    LongTerm,
+    #[default]
+    Unknown,
+}
 
-impl Default for Durability { fn default() -> Self { Self::Unknown } }
 impl FromStr for Durability {
     type Err = String;
     fn from_str(input: &str) -> Result<Self, Self::Err> {
@@ -153,9 +192,20 @@ impl FromStr for Durability {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum SourceKind { ManualCli, ManualMcp, SessionText, TranscriptFile, Stdin, AgentObservation, CodebaseAnalysis, ImportedBundle, Unknown }
+#[derive(Default)]
+pub enum SourceKind {
+    ManualCli,
+    ManualMcp,
+    SessionText,
+    TranscriptFile,
+    Stdin,
+    AgentObservation,
+    CodebaseAnalysis,
+    ImportedBundle,
+    #[default]
+    Unknown,
+}
 
-impl Default for SourceKind { fn default() -> Self { Self::Unknown } }
 impl FromStr for SourceKind {
     type Err = String;
     fn from_str(input: &str) -> Result<Self, Self::Err> {
@@ -219,7 +269,10 @@ impl RecordClass {
 
     pub fn inferred_memory_kind(&self) -> MemoryKind {
         match self {
-            RecordClass::Workflow | RecordClass::Preference | RecordClass::Correction | RecordClass::Requirement => MemoryKind::Instruction,
+            RecordClass::Workflow
+            | RecordClass::Preference
+            | RecordClass::Correction
+            | RecordClass::Requirement => MemoryKind::Instruction,
             RecordClass::Observation | RecordClass::EvidenceNote => MemoryKind::Event,
             _ => MemoryKind::Fact,
         }
@@ -246,11 +299,7 @@ impl FromStr for RecordClass {
     type Err = String;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let key = input
-            .trim()
-            .to_lowercase()
-            .replace('_', "-")
-            .replace(' ', "-");
+        let key = input.trim().to_lowercase().replace(['_', ' '], "-");
 
         match key.as_str() {
             "identity" | "identity-rule" | "hard-rule" => Ok(Self::IdentityRule),
@@ -347,11 +396,7 @@ impl FromStr for EvidenceKind {
     type Err = String;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let key = input
-            .trim()
-            .to_lowercase()
-            .replace('_', "-")
-            .replace(' ', "-");
+        let key = input.trim().to_lowercase().replace(['_', ' '], "-");
 
         match key.as_str() {
             "conversation" | "chat" => Ok(Self::Conversation),
@@ -499,11 +544,7 @@ impl FromStr for ContestResolution {
     type Err = String;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let key = input
-            .trim()
-            .to_lowercase()
-            .replace('_', "-")
-            .replace(' ', "-");
+        let key = input.trim().to_lowercase().replace(['_', ' '], "-");
 
         match key.as_str() {
             "uphold" | "keep" | "restore" => Ok(Self::Uphold),
@@ -772,7 +813,9 @@ pub enum RetrievalFormat {
     Json,
 }
 
-pub fn default_retriever() -> String { "deterministic".to_string() }
+pub fn default_retriever() -> String {
+    "deterministic".to_string()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrievalOptions {
@@ -854,15 +897,27 @@ pub struct ContextBundle {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum RecallEventClient { Cli, Mcp }
+pub enum RecallEventClient {
+    Cli,
+    Mcp,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum RecallEventOperation { Retrieve, BuildContext, RecallXray, Feedback }
+pub enum RecallEventOperation {
+    Retrieve,
+    BuildContext,
+    RecallXray,
+    Feedback,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum RecallEventOutcome { Successful, Corrected, Ignored }
+pub enum RecallEventOutcome {
+    Successful,
+    Corrected,
+    Ignored,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecallEvent {
@@ -885,12 +940,35 @@ pub struct RecallEvent {
 }
 
 impl RecallEvent {
-    pub fn new(namespace: impl Into<String>, client: RecallEventClient, operation: RecallEventOperation, query_hash: impl Into<String>, selected_record_ids: Vec<String>, budget_requested: usize, budget_used: usize) -> Self {
-        Self { schema_version: current_schema_version(), namespace: namespace.into(), id: format!("recall_{}", Uuid::new_v4()), timestamp: Utc::now(), client, operation, query_hash: query_hash.into(), selected_record_ids, excluded_reason_counts: BTreeMap::new(), outcome: None, budget_requested, budget_used }
+    pub fn new(
+        namespace: impl Into<String>,
+        client: RecallEventClient,
+        operation: RecallEventOperation,
+        query_hash: impl Into<String>,
+        selected_record_ids: Vec<String>,
+        budget_requested: usize,
+        budget_used: usize,
+    ) -> Self {
+        Self {
+            schema_version: current_schema_version(),
+            namespace: namespace.into(),
+            id: format!("recall_{}", Uuid::new_v4()),
+            timestamp: Utc::now(),
+            client,
+            operation,
+            query_hash: query_hash.into(),
+            selected_record_ids,
+            excluded_reason_counts: BTreeMap::new(),
+            outcome: None,
+            budget_requested,
+            budget_used,
+        }
     }
 }
 
-fn default_event_category() -> String { "general".to_string() }
+fn default_event_category() -> String {
+    "general".to_string()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreEvent {
@@ -921,7 +999,10 @@ impl StoreEvent {
         }
     }
 
-    pub fn with_category(mut self, category: impl Into<String>) -> Self { self.category = category.into(); self }
+    pub fn with_category(mut self, category: impl Into<String>) -> Self {
+        self.category = category.into();
+        self
+    }
 
     pub fn warning(message: impl Into<String>, object_id: Option<String>) -> Self {
         Self {

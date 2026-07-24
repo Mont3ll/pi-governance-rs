@@ -35,13 +35,18 @@ pub struct RedactionMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BundleProducer { pub name: String, pub version: String }
+pub struct BundleProducer {
+    pub name: String,
+    pub version: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreExportBundle {
     pub schema_version: u32,
-    #[serde(default)] pub format: Option<String>,
-    #[serde(default)] pub producer: Option<BundleProducer>,
+    #[serde(default)]
+    pub format: Option<String>,
+    #[serde(default)]
+    pub producer: Option<BundleProducer>,
     pub exported_at: DateTime<Utc>,
     pub redacted: bool,
     pub redaction: RedactionMetadata,
@@ -51,12 +56,18 @@ pub struct StoreExportBundle {
     pub records: Vec<Record>,
     pub patches: Vec<Patch>,
     pub events: Vec<StoreEvent>,
-    #[serde(default)] pub evidence: Vec<Value>,
-    #[serde(default)] pub inquiries: Vec<Value>,
-    #[serde(default)] pub sessions: Vec<Value>,
-    #[serde(default)] pub reinforcement: Vec<Value>,
-    #[serde(default)] pub tombstones: Vec<Value>,
-    #[serde(default)] pub warnings: Vec<String>,
+    #[serde(default)]
+    pub evidence: Vec<Value>,
+    #[serde(default)]
+    pub inquiries: Vec<Value>,
+    #[serde(default)]
+    pub sessions: Vec<Value>,
+    #[serde(default)]
+    pub reinforcement: Vec<Value>,
+    #[serde(default)]
+    pub tombstones: Vec<Value>,
+    #[serde(default)]
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,11 +95,25 @@ impl JsonlStore {
         let patches = self.load_patches()?;
         let events = self.load_events()?;
 
-        let namespace_filter = if options.all_namespaces { None } else { options.namespace.as_deref() };
+        let namespace_filter = if options.all_namespaces {
+            None
+        } else {
+            options.namespace.as_deref()
+        };
         let mut selected_records: Vec<Record> = records
             .into_iter()
-            .filter(|record| namespace_filter.map(|namespace| record.namespace == namespace).unwrap_or(true))
-            .filter(|record| options.project.as_deref().map(|project| record.scope.matches_project_filter(Some(project))).unwrap_or(true))
+            .filter(|record| {
+                namespace_filter
+                    .map(|namespace| record.namespace == namespace)
+                    .unwrap_or(true)
+            })
+            .filter(|record| {
+                options
+                    .project
+                    .as_deref()
+                    .map(|project| record.scope.matches_project_filter(Some(project)))
+                    .unwrap_or(true)
+            })
             .collect();
 
         let selected_record_ids: HashSet<String> = selected_records
@@ -98,7 +123,11 @@ impl JsonlStore {
 
         let mut selected_patches: Vec<Patch> = patches
             .into_iter()
-            .filter(|patch| namespace_filter.map(|namespace| patch.namespace == namespace).unwrap_or(true))
+            .filter(|patch| {
+                namespace_filter
+                    .map(|namespace| patch.namespace == namespace)
+                    .unwrap_or(true)
+            })
             .filter(|patch| {
                 patch
                     .target_id
@@ -110,7 +139,13 @@ impl JsonlStore {
                         .as_ref()
                         .map(|record| {
                             selected_record_ids.contains(&record.id)
-                                || options.project.as_deref().map(|project| record.scope.matches_project_filter(Some(project))).unwrap_or(true)
+                                || options
+                                    .project
+                                    .as_deref()
+                                    .map(|project| {
+                                        record.scope.matches_project_filter(Some(project))
+                                    })
+                                    .unwrap_or(true)
                         })
                         .unwrap_or(false)
                     || options.project.is_none()
@@ -124,7 +159,11 @@ impl JsonlStore {
 
         let mut namespace_events: Vec<StoreEvent> = events
             .into_iter()
-            .filter(|event| namespace_filter.map(|namespace| event.namespace == namespace).unwrap_or(true))
+            .filter(|event| {
+                namespace_filter
+                    .map(|namespace| event.namespace == namespace)
+                    .unwrap_or(true)
+            })
             .collect();
         let mut evidence = take_compatibility_events(&mut namespace_events, "evidence");
         let mut inquiries = take_compatibility_events(&mut namespace_events, "inquiry");
@@ -133,11 +172,46 @@ impl JsonlStore {
         let mut tombstones = take_compatibility_events(&mut namespace_events, "tombstone");
         let mut warnings = Vec::new();
         if let Some(project) = options.project.as_deref() {
-            evidence = filter_compatibility_values(evidence, "evidence", project, &["record_id", "related_memory_ids"], &selected_record_ids, &mut warnings);
-            inquiries = filter_compatibility_values(inquiries, "inquiry", project, &["record_ids", "related_memory_ids", "answer_memory_id"], &selected_record_ids, &mut warnings);
-            sessions = filter_compatibility_values(sessions, "session", project, &[], &selected_record_ids, &mut warnings);
-            reinforcement = filter_compatibility_values(reinforcement, "reinforcement", project, &["memory_id"], &selected_record_ids, &mut warnings);
-            tombstones = filter_compatibility_values(tombstones, "tombstone", project, &["memory_id", "deleted_record_id"], &selected_record_ids, &mut warnings);
+            evidence = filter_compatibility_values(
+                evidence,
+                "evidence",
+                project,
+                &["record_id", "related_memory_ids"],
+                &selected_record_ids,
+                &mut warnings,
+            );
+            inquiries = filter_compatibility_values(
+                inquiries,
+                "inquiry",
+                project,
+                &["record_ids", "related_memory_ids", "answer_memory_id"],
+                &selected_record_ids,
+                &mut warnings,
+            );
+            sessions = filter_compatibility_values(
+                sessions,
+                "session",
+                project,
+                &[],
+                &selected_record_ids,
+                &mut warnings,
+            );
+            reinforcement = filter_compatibility_values(
+                reinforcement,
+                "reinforcement",
+                project,
+                &["memory_id"],
+                &selected_record_ids,
+                &mut warnings,
+            );
+            tombstones = filter_compatibility_values(
+                tombstones,
+                "tombstone",
+                project,
+                &["memory_id", "deleted_record_id"],
+                &selected_record_ids,
+                &mut warnings,
+            );
         }
         let mut selected_events: Vec<StoreEvent> = namespace_events
             .into_iter()
@@ -146,7 +220,10 @@ impl JsonlStore {
                     || event
                         .object_id
                         .as_ref()
-                        .map(|object_id| selected_record_ids.contains(object_id) || selected_patch_ids.contains(object_id))
+                        .map(|object_id| {
+                            selected_record_ids.contains(object_id)
+                                || selected_patch_ids.contains(object_id)
+                        })
                         .unwrap_or(false)
             })
             .collect();
@@ -163,14 +240,31 @@ impl JsonlStore {
         Ok(StoreExportBundle {
             schema_version: CURRENT_SCHEMA_VERSION,
             format: Some("pi-governance".to_string()),
-            producer: Some(BundleProducer { name: "pi-governance-rs".to_string(), version: env!("CARGO_PKG_VERSION").to_string() }),
+            producer: Some(BundleProducer {
+                name: "pi-governance-rs".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+            }),
             exported_at: Utc::now(),
             redacted: options.redacted,
             redaction: RedactionMetadata {
                 enabled: options.redacted,
-                fields_checked: vec!["records.evidence.uri".to_string(), "patches.evidence.uri".to_string(), "events.message".to_string()],
-                fields_redacted: if options.redacted { vec!["records.evidence.uri".to_string(), "patches.evidence.uri".to_string(), "events.message".to_string()] } else { Vec::new() },
-                notes: vec!["Redaction is best-effort and does not replace user review.".to_string()],
+                fields_checked: vec![
+                    "records.evidence.uri".to_string(),
+                    "patches.evidence.uri".to_string(),
+                    "events.message".to_string(),
+                ],
+                fields_redacted: if options.redacted {
+                    vec![
+                        "records.evidence.uri".to_string(),
+                        "patches.evidence.uri".to_string(),
+                        "events.message".to_string(),
+                    ]
+                } else {
+                    Vec::new()
+                },
+                notes: vec![
+                    "Redaction is best-effort and does not replace user review.".to_string()
+                ],
             },
             namespace: options.namespace,
             all_namespaces: options.all_namespaces,
@@ -243,7 +337,10 @@ impl JsonlStore {
         let mut warnings = Vec::new();
 
         if bundle.redacted {
-            warnings.push("imported bundle is redacted; evidence URIs and event messages may be placeholders".to_string());
+            warnings.push(
+                "imported bundle is redacted; evidence URIs and event messages may be placeholders"
+                    .to_string(),
+            );
         }
 
         if bundle.schema_version != CURRENT_SCHEMA_VERSION {
@@ -257,9 +354,14 @@ impl JsonlStore {
         let mut patches = session.load_patches()?;
         let mut events = session.load_events()?;
 
-        let existing_record_ids: HashSet<(String, String)> = records.iter().map(|record| (record.namespace.clone(), record.id.clone())).collect();
-        let existing_patch_ids: HashSet<String> = patches.iter().map(|patch| patch.id.clone()).collect();
-        let existing_event_ids: HashSet<String> = events.iter().map(|event| event.id.clone()).collect();
+        let existing_record_ids: HashSet<(String, String)> = records
+            .iter()
+            .map(|record| (record.namespace.clone(), record.id.clone()))
+            .collect();
+        let existing_patch_ids: HashSet<String> =
+            patches.iter().map(|patch| patch.id.clone()).collect();
+        let existing_event_ids: HashSet<String> =
+            events.iter().map(|event| event.id.clone()).collect();
 
         let mut incoming_record_groups: BTreeMap<(String, String), Vec<Record>> = BTreeMap::new();
         for mut record in bundle.records.iter().cloned() {
@@ -281,8 +383,14 @@ impl JsonlStore {
                 continue;
             }
             let first = serde_json::to_value(&group[0])?;
-            if group.iter().skip(1).all(|record| serde_json::to_value(record).ok().as_ref() == Some(&first)) {
-                warnings.push(format!("collapsed exact duplicate record {namespace}/{id} during import"));
+            if group
+                .iter()
+                .skip(1)
+                .all(|record| serde_json::to_value(record).ok().as_ref() == Some(&first))
+            {
+                warnings.push(format!(
+                    "collapsed exact duplicate record {namespace}/{id} during import"
+                ));
                 import_records.push(group.into_iter().next().expect("duplicate record group"));
             } else {
                 warnings.push(format!("quarantined divergent duplicate record {namespace}/{id}; no row from this group was imported"));
@@ -319,7 +427,8 @@ impl JsonlStore {
         let skipped_records = bundle.records.len().saturating_sub(import_records.len());
         let skipped_patches = bundle.patches.len().saturating_sub(import_patches.len());
         let skipped_events = bundle.events.len().saturating_sub(import_events.len());
-        let changed = !import_records.is_empty() || !import_patches.is_empty() || !import_events.is_empty();
+        let changed =
+            !import_records.is_empty() || !import_patches.is_empty() || !import_events.is_empty();
 
         let mut backup = None;
 
@@ -375,65 +484,153 @@ fn normalize_timestamp(value: Option<&str>, fallback: DateTime<Utc>) -> Result<D
     }
 }
 
-fn set_timestamp(object: &mut serde_json::Map<String, Value>, key: &str, fallback: DateTime<Utc>) -> Result<()> {
+fn set_timestamp(
+    object: &mut serde_json::Map<String, Value>,
+    key: &str,
+    fallback: DateTime<Utc>,
+) -> Result<()> {
     let parsed = normalize_timestamp(object.get(key).and_then(Value::as_str), fallback)?;
     object.insert(key.to_string(), Value::String(parsed.to_rfc3339()));
     Ok(())
 }
 
 fn normalize_evidence_value(value: &mut Value) {
-    let Some(object) = value.as_object_mut() else { return; };
+    let Some(object) = value.as_object_mut() else {
+        return;
+    };
     object.entry("schema_version").or_insert(json!(1));
     object.entry("kind").or_insert(json!("conversation"));
-    object.entry("uri").or_insert(json!("imported:portable-evidence"));
+    object
+        .entry("uri")
+        .or_insert(json!("imported:portable-evidence"));
     object.entry("note").or_insert(Value::Null);
     for (key, allowed) in [
-        ("trust_class", &["direct_user_instruction","user_correction","agent_inference","repository_text","generated_content","third_party_documentation","codebase_analysis","human_review","unknown"][..]),
-        ("durability", &["temporary","task","project","long_term","unknown"][..]),
-        ("source_kind", &["manual_cli","manual_mcp","session_text","transcript_file","stdin","agent_observation","codebase_analysis","imported_bundle","unknown"][..]),
+        (
+            "trust_class",
+            &[
+                "direct_user_instruction",
+                "user_correction",
+                "agent_inference",
+                "repository_text",
+                "generated_content",
+                "third_party_documentation",
+                "codebase_analysis",
+                "human_review",
+                "unknown",
+            ][..],
+        ),
+        (
+            "durability",
+            &["temporary", "task", "project", "long_term", "unknown"][..],
+        ),
+        (
+            "source_kind",
+            &[
+                "manual_cli",
+                "manual_mcp",
+                "session_text",
+                "transcript_file",
+                "stdin",
+                "agent_observation",
+                "codebase_analysis",
+                "imported_bundle",
+                "unknown",
+            ][..],
+        ),
     ] {
-        let valid = object.get(key).and_then(Value::as_str).map(|item| allowed.contains(&item)).unwrap_or(false);
-        if !valid { object.insert(key.to_string(), json!("unknown")); }
+        let valid = object
+            .get(key)
+            .and_then(Value::as_str)
+            .map(|item| allowed.contains(&item))
+            .unwrap_or(false);
+        if !valid {
+            object.insert(key.to_string(), json!("unknown"));
+        }
     }
 }
 
-fn normalize_record_value(value: &mut Value, fallback_namespace: &str, fallback_time: DateTime<Utc>) -> Result<()> {
-    let object = value.as_object_mut().context("portable record must be an object")?;
+fn normalize_record_value(
+    value: &mut Value,
+    fallback_namespace: &str,
+    fallback_time: DateTime<Utc>,
+) -> Result<()> {
+    let object = value
+        .as_object_mut()
+        .context("portable record must be an object")?;
     object.entry("schema_version").or_insert(json!(1));
-    object.entry("namespace").or_insert(json!(fallback_namespace));
+    object
+        .entry("namespace")
+        .or_insert(json!(fallback_namespace));
     object.entry("class").or_insert(json!("workflow"));
     object.entry("evidence").or_insert(json!([]));
     object.entry("layer").or_insert(json!("l2_playbook"));
     object.entry("trust_class").or_insert(json!("unknown"));
     object.entry("durability").or_insert(json!("unknown"));
-    object.entry("source_kind").or_insert(json!("imported_bundle"));
-    object.entry("scope").or_insert(json!({"level":"global","key":null}));
+    object
+        .entry("source_kind")
+        .or_insert(json!("imported_bundle"));
+    object
+        .entry("scope")
+        .or_insert(json!({"level":"global","key":null}));
     object.entry("tags").or_insert(json!([]));
     object.entry("supersedes").or_insert(json!([]));
-    if object.get("status").and_then(Value::as_str) == Some("deleted") { object.insert("status".into(), json!("tombstoned")); }
-    if let Some(evidence) = object.get_mut("evidence").and_then(Value::as_array_mut) { for item in evidence { normalize_evidence_value(item); } }
+    if object.get("status").and_then(Value::as_str) == Some("deleted") {
+        object.insert("status".into(), json!("tombstoned"));
+    }
+    if let Some(evidence) = object.get_mut("evidence").and_then(Value::as_array_mut) {
+        for item in evidence {
+            normalize_evidence_value(item);
+        }
+    }
     set_timestamp(object, "created_at", fallback_time)?;
     set_timestamp(object, "updated_at", fallback_time)?;
     Ok(())
 }
 
-fn normalize_patch_value(value: &mut Value, fallback_namespace: &str, project: Option<&str>, fallback_time: DateTime<Utc>) -> Result<()> {
-    let object = value.as_object_mut().context("portable patch must be an object")?;
-    let patch_id = object.get("id").and_then(Value::as_str).context("portable patch is missing id")?.to_string();
+fn normalize_patch_value(
+    value: &mut Value,
+    fallback_namespace: &str,
+    project: Option<&str>,
+    fallback_time: DateTime<Utc>,
+) -> Result<()> {
+    let object = value
+        .as_object_mut()
+        .context("portable patch must be an object")?;
+    let patch_id = object
+        .get("id")
+        .and_then(Value::as_str)
+        .context("portable patch is missing id")?
+        .to_string();
     object.entry("schema_version").or_insert(json!(1));
-    object.entry("namespace").or_insert(json!(fallback_namespace));
+    object
+        .entry("namespace")
+        .or_insert(json!(fallback_namespace));
     object.entry("operation").or_insert(json!("propose_record"));
     object.entry("target_id").or_insert(Value::Null);
     object.entry("contest_resolution").or_insert(Value::Null);
     object.entry("evidence").or_insert(json!([]));
-    object.entry("reason").or_insert(json!("Imported portable patch; review required before application."));
+    object.entry("reason").or_insert(json!(
+        "Imported portable patch; review required before application."
+    ));
     set_timestamp(object, "created_at", fallback_time)?;
     set_timestamp(object, "updated_at", fallback_time)?;
     let is_propose = object.get("operation").and_then(Value::as_str) == Some("propose_record");
-    let has_proposed_record = object.get("proposed_record").map(Value::is_object).unwrap_or(false);
+    let has_proposed_record = object
+        .get("proposed_record")
+        .map(Value::is_object)
+        .unwrap_or(false);
     if is_propose && !has_proposed_record {
-        let claim = object.get("claim").and_then(Value::as_str).unwrap_or("Imported portable candidate").to_string();
-        let class = match object.get("rule_type").and_then(Value::as_str) { Some("correction" | "avoid_pattern") => "correction", Some("preference" | "prefer_pattern") => "preference", Some("convention" | "architecture") => "requirement", _ => "workflow" };
+        let claim = object
+            .get("claim")
+            .and_then(Value::as_str)
+            .unwrap_or("Imported portable candidate")
+            .to_string();
+        let class = match object.get("rule_type").and_then(Value::as_str) {
+            Some("correction" | "avoid_pattern") => "correction",
+            Some("preference" | "prefer_pattern") => "preference",
+            Some("convention" | "architecture") => "requirement",
+            _ => "workflow",
+        };
         let mut record = json!({
             "schema_version":1,"namespace":fallback_namespace,"id":format!("imported_{patch_id}"),"class":class,"claim":claim,
             "evidence":[],"confidence":0.7,"status":"active","layer":object.get("layer").cloned().unwrap_or(json!("l2_playbook")),
@@ -444,62 +641,162 @@ fn normalize_patch_value(value: &mut Value, fallback_namespace: &str, project: O
         });
         normalize_record_value(&mut record, fallback_namespace, fallback_time)?;
         object.insert("proposed_record".into(), record);
-    } else if has_proposed_record { if let Some(record) = object.get_mut("proposed_record") { normalize_record_value(record, fallback_namespace, fallback_time)?; } }
+    } else if has_proposed_record {
+        if let Some(record) = object.get_mut("proposed_record") {
+            normalize_record_value(record, fallback_namespace, fallback_time)?;
+        }
+    }
     Ok(())
 }
 
 fn normalize_portable_bundle(mut value: Value) -> Result<StoreExportBundle> {
-    let object = value.as_object_mut().context("portable bundle must be an object")?;
-    let schema = object.get("schema_version").and_then(Value::as_u64).unwrap_or(1);
-    if schema > CURRENT_SCHEMA_VERSION as u64 { bail!("unsupported_export_schema: bundle schema_version {schema} is newer than current schema_version {CURRENT_SCHEMA_VERSION}"); }
-    let fallback_time = normalize_timestamp(object.get("exported_at").and_then(Value::as_str), Utc::now())?;
+    let object = value
+        .as_object_mut()
+        .context("portable bundle must be an object")?;
+    let schema = object
+        .get("schema_version")
+        .and_then(Value::as_u64)
+        .unwrap_or(1);
+    if schema > CURRENT_SCHEMA_VERSION as u64 {
+        bail!("unsupported_export_schema: bundle schema_version {schema} is newer than current schema_version {CURRENT_SCHEMA_VERSION}");
+    }
+    let fallback_time = normalize_timestamp(
+        object.get("exported_at").and_then(Value::as_str),
+        Utc::now(),
+    )?;
     object.insert("exported_at".into(), json!(fallback_time.to_rfc3339()));
     object.entry("redacted").or_insert(json!(false));
-    object.entry("redaction").or_insert(json!({"enabled":false,"fields_checked":[],"fields_redacted":[],"notes":[]}));
+    object
+        .entry("redaction")
+        .or_insert(json!({"enabled":false,"fields_checked":[],"fields_redacted":[],"notes":[]}));
     object.entry("all_namespaces").or_insert(json!(false));
     object.entry("project").or_insert(Value::Null);
     object.entry("events").or_insert(json!([]));
-    for key in ["evidence","inquiries","sessions","reinforcement","tombstones"] { object.entry(key).or_insert(json!([])); }
-    let namespace = object.get("namespace").and_then(Value::as_str).unwrap_or("default").to_string();
-    let project = object.get("project").and_then(Value::as_str).map(str::to_string);
-    for record in object.entry("records").or_insert(json!([])).as_array_mut().context("records must be an array")? { normalize_record_value(record, &namespace, fallback_time)?; }
-    for patch in object.entry("patches").or_insert(json!([])).as_array_mut().context("patches must be an array")? { normalize_patch_value(patch, &namespace, project.as_deref(), fallback_time)?; }
-    serde_json::from_value(value).context("normalized bundle does not satisfy the pi-governance v1 contract")
+    for key in [
+        "evidence",
+        "inquiries",
+        "sessions",
+        "reinforcement",
+        "tombstones",
+    ] {
+        object.entry(key).or_insert(json!([]));
+    }
+    let namespace = object
+        .get("namespace")
+        .and_then(Value::as_str)
+        .unwrap_or("default")
+        .to_string();
+    let project = object
+        .get("project")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    for record in object
+        .entry("records")
+        .or_insert(json!([]))
+        .as_array_mut()
+        .context("records must be an array")?
+    {
+        normalize_record_value(record, &namespace, fallback_time)?;
+    }
+    for patch in object
+        .entry("patches")
+        .or_insert(json!([]))
+        .as_array_mut()
+        .context("patches must be an array")?
+    {
+        normalize_patch_value(patch, &namespace, project.as_deref(), fallback_time)?;
+    }
+    serde_json::from_value(value)
+        .context("normalized bundle does not satisfy the pi-governance v1 contract")
 }
 
 fn artifact_event(category: &str, value: &Value, namespace: &str) -> Result<StoreEvent> {
-    let object = value.as_object().context("portable auxiliary artifact must be an object")?;
-    let artifact_id = object.get("id").and_then(Value::as_str).context("portable auxiliary artifact is missing id")?;
-    let created = object.get("created_at").or_else(|| object.get("timestamp")).or_else(|| object.get("deleted_at")).and_then(Value::as_str);
-    Ok(StoreEvent { schema_version: CURRENT_SCHEMA_VERSION, namespace: namespace.to_string(), id: format!("interop_{category}_{artifact_id}"), severity:"info".into(), category:format!("interop_{category}"), message:serde_json::to_string(value)?, object_id:Some(artifact_id.to_string()), created_at:normalize_timestamp(created, Utc::now())? })
+    let object = value
+        .as_object()
+        .context("portable auxiliary artifact must be an object")?;
+    let artifact_id = object
+        .get("id")
+        .and_then(Value::as_str)
+        .context("portable auxiliary artifact is missing id")?;
+    let created = object
+        .get("created_at")
+        .or_else(|| object.get("timestamp"))
+        .or_else(|| object.get("deleted_at"))
+        .and_then(Value::as_str);
+    Ok(StoreEvent {
+        schema_version: CURRENT_SCHEMA_VERSION,
+        namespace: namespace.to_string(),
+        id: format!("interop_{category}_{artifact_id}"),
+        severity: "info".into(),
+        category: format!("interop_{category}"),
+        message: serde_json::to_string(value)?,
+        object_id: Some(artifact_id.to_string()),
+        created_at: normalize_timestamp(created, Utc::now())?,
+    })
 }
 
 fn materialize_auxiliary_events(mut bundle: StoreExportBundle) -> Result<StoreExportBundle> {
     let namespace = bundle.namespace.as_deref().unwrap_or("default").to_string();
-    for (category, values) in [("evidence", &bundle.evidence), ("inquiry", &bundle.inquiries), ("session", &bundle.sessions), ("reinforcement", &bundle.reinforcement), ("tombstone", &bundle.tombstones)] {
-        for value in values { bundle.events.push(artifact_event(category, value, &namespace)?); }
+    for (category, values) in [
+        ("evidence", &bundle.evidence),
+        ("inquiry", &bundle.inquiries),
+        ("session", &bundle.sessions),
+        ("reinforcement", &bundle.reinforcement),
+        ("tombstone", &bundle.tombstones),
+    ] {
+        for value in values {
+            bundle
+                .events
+                .push(artifact_event(category, value, &namespace)?);
+        }
     }
-    bundle.evidence.clear(); bundle.inquiries.clear(); bundle.sessions.clear(); bundle.reinforcement.clear(); bundle.tombstones.clear();
+    bundle.evidence.clear();
+    bundle.inquiries.clear();
+    bundle.sessions.clear();
+    bundle.reinforcement.clear();
+    bundle.tombstones.clear();
     Ok(bundle)
 }
 
 fn take_compatibility_events(events: &mut Vec<StoreEvent>, category: &str) -> Vec<Value> {
-    let target = format!("interop_{category}"); let mut values = Vec::new(); let mut retained = Vec::new();
-    for event in events.drain(..) { if event.category == target { if let Ok(value) = serde_json::from_str(&event.message) { values.push(value); } } else { retained.push(event); } }
-    *events = retained; values
+    let target = format!("interop_{category}");
+    let mut values = Vec::new();
+    let mut retained = Vec::new();
+    for event in events.drain(..) {
+        if event.category == target {
+            if let Ok(value) = serde_json::from_str(&event.message) {
+                values.push(value);
+            }
+        } else {
+            retained.push(event);
+        }
+    }
+    *events = retained;
+    values
 }
 
-fn value_references_selected(value: &Value, fields: &[&str], selected_ids: &HashSet<String>) -> bool {
-    let Some(object) = value.as_object() else { return false; };
+fn value_references_selected(
+    value: &Value,
+    fields: &[&str],
+    selected_ids: &HashSet<String>,
+) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
     fields.iter().any(|field| match object.get(*field) {
         Some(Value::String(id)) => selected_ids.contains(id),
-        Some(Value::Array(ids)) => ids.iter().filter_map(Value::as_str).any(|id| selected_ids.contains(id)),
+        Some(Value::Array(ids)) => ids
+            .iter()
+            .filter_map(Value::as_str)
+            .any(|id| selected_ids.contains(id)),
         _ => false,
     })
 }
 
 fn value_matches_project(value: &Value, project: &str) -> bool {
-    let Some(object) = value.as_object() else { return false; };
+    let Some(object) = value.as_object() else {
+        return false;
+    };
     object.get("project").and_then(Value::as_str) == Some(project)
         || (object.get("scope_level").and_then(Value::as_str) == Some("project")
             && object.get("scope_ref").and_then(Value::as_str) == Some(project))
@@ -516,7 +813,10 @@ fn filter_compatibility_values(
     let before = values.len();
     let retained: Vec<Value> = values
         .into_iter()
-        .filter(|value| value_references_selected(value, relation_fields, selected_ids) || value_matches_project(value, project))
+        .filter(|value| {
+            value_references_selected(value, relation_fields, selected_ids)
+                || value_matches_project(value, project)
+        })
         .collect();
     let omitted = before.saturating_sub(retained.len());
     if omitted > 0 {
@@ -526,7 +826,15 @@ fn filter_compatibility_values(
 }
 
 fn redact_portable_values(values: &mut [Value], fields: &[&str]) {
-    for value in values { if let Some(object) = value.as_object_mut() { for field in fields { if object.contains_key(*field) { object.insert((*field).to_string(), json!("redacted")); } } } }
+    for value in values {
+        if let Some(object) = value.as_object_mut() {
+            for field in fields {
+                if object.contains_key(*field) {
+                    object.insert((*field).to_string(), json!("redacted"));
+                }
+            }
+        }
+    }
 }
 
 fn redact_records(records: &mut [Record]) {

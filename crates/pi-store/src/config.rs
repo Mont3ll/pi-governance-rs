@@ -5,13 +5,18 @@ use std::fs;
 use crate::jsonl::JsonlStore;
 
 impl JsonlStore {
-    pub fn config_path(&self) -> std::path::PathBuf { self.root().join("config.json") }
+    pub fn config_path(&self) -> std::path::PathBuf {
+        self.root().join("config.json")
+    }
 
     pub fn load_config(&self) -> Result<PiConfig> {
         self.init()?;
         let path = self.config_path();
-        if !path.exists() { return Ok(PiConfig::default()); }
-        let contents = fs::read_to_string(&path).with_context(|| format!("failed to read {:?}", path))?;
+        if !path.exists() {
+            return Ok(PiConfig::default());
+        }
+        let contents =
+            fs::read_to_string(&path).with_context(|| format!("failed to read {:?}", path))?;
         serde_json::from_str(&contents).with_context(|| format!("failed to parse {:?}", path))
     }
 

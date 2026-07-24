@@ -1,5 +1,6 @@
 use pi_governance_core::{
-    validate_patch, validate_record, ContestResolution, DecisionStatus, EvidenceKind, EvidenceRef, Patch, Record, RecordClass, Scope,
+    validate_patch, validate_record, ContestResolution, DecisionStatus, EvidenceKind, EvidenceRef,
+    Patch, Record, RecordClass, Scope,
 };
 
 #[test]
@@ -10,7 +11,10 @@ fn rejects_claims_that_are_too_short() {
         0.70,
         Scope::global(),
         Vec::new(),
-        vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:test")],
+        vec![EvidenceRef::new(
+            EvidenceKind::Conversation,
+            "conversation:test",
+        )],
     );
 
     let decision = validate_record(&record, &[]);
@@ -26,7 +30,10 @@ fn identity_level_records_require_manual_review() {
         0.90,
         Scope::global(),
         vec!["identity".to_string()],
-        vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:test")],
+        vec![EvidenceRef::new(
+            EvidenceKind::Conversation,
+            "conversation:test",
+        )],
     );
 
     let decision = validate_record(&record, &[]);
@@ -46,7 +53,10 @@ fn tombstone_patches_require_manual_review() {
         0.80,
         Scope::global(),
         vec!["audit".to_string()],
-        vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:test")],
+        vec![EvidenceRef::new(
+            EvidenceKind::Conversation,
+            "conversation:test",
+        )],
     );
 
     let patch = Patch::tombstone_record(
@@ -64,7 +74,6 @@ fn tombstone_patches_require_manual_review() {
         .any(|reason| reason.contains("tombstone requires review")));
 }
 
-
 #[test]
 fn contest_and_resolution_patches_require_manual_review() {
     let record = Record::new(
@@ -73,23 +82,32 @@ fn contest_and_resolution_patches_require_manual_review() {
         0.80,
         Scope::global(),
         vec!["contest".to_string()],
-        vec![EvidenceRef::new(EvidenceKind::Conversation, "conversation:test")],
+        vec![EvidenceRef::new(
+            EvidenceKind::Conversation,
+            "conversation:test",
+        )],
     );
 
     let contest = Patch::contest_record(
         record.id.clone(),
-        vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:contest")],
+        vec![EvidenceRef::new(
+            EvidenceKind::HumanReview,
+            "review:contest",
+        )],
         "human reviewer disputes this record",
     );
 
-    let decision = validate_patch(&contest, &[record.clone()]);
+    let decision = validate_patch(&contest, std::slice::from_ref(&record));
     assert_eq!(decision.status, DecisionStatus::ManualReview);
 
     let resolve = Patch::resolve_contest(
         record.id.clone(),
         ContestResolution::Uphold,
         None,
-        vec![EvidenceRef::new(EvidenceKind::HumanReview, "review:resolve")],
+        vec![EvidenceRef::new(
+            EvidenceKind::HumanReview,
+            "review:resolve",
+        )],
         "review concluded this record should remain active",
     );
 
