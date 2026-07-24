@@ -1,5 +1,7 @@
 use chrono::Utc;
-use pi_governance_core::{EvidenceKind, EvidenceRef, Record, RecordClass, RecordStatus, Scope};
+use pi_governance_core::{
+    EvidenceKind, EvidenceRef, Patch, PatchStatus, Record, RecordClass, RecordStatus, Scope,
+};
 use pi_governance_store::{apply_record_privacy_purge, plan_record_privacy_purge, JsonlStore};
 use std::fs;
 use std::path::PathBuf;
@@ -43,7 +45,7 @@ fn privacy_purge_previews_then_redacts_terminal_record_with_backup_and_report() 
     let before = fs::read(root.join("records.jsonl")).unwrap();
 
     let preview =
-        plan_record_privacy_purge(&store, "alpha", "mem_secret", "privacy cleanup").unwrap();
+        plan_record_privacy_purge(&store, "alpha", "mem_secret", "privacy cleanup", &[]).unwrap();
     assert!(preview.dry_run);
     assert!(!preview.mutation_performed);
     assert!(preview.target_found);
@@ -54,6 +56,7 @@ fn privacy_purge_previews_then_redacts_terminal_record_with_backup_and_report() 
         "alpha",
         "mem_secret",
         "privacy cleanup",
+        &[],
         &preview.fingerprint,
     )
     .unwrap();
@@ -79,8 +82,88 @@ fn privacy_purge_previews_then_redacts_terminal_record_with_backup_and_report() 
     assert!(!canonical.contains("secret-project-token"));
 
     let second =
-        plan_record_privacy_purge(&store, "alpha", "mem_secret", "privacy cleanup").unwrap();
+        plan_record_privacy_purge(&store, "alpha", "mem_secret", "privacy cleanup", &[]).unwrap();
     assert!(second.already_purged);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn privacy_purge_redacts_correlated_historical_patch_payloads_after_record_was_purged() {
+    let root = temp_store_dir();
+    let store = JsonlStore::new(&root);
+    store.init().unwrap();
+    store
+        .append_record(&secret_record(RecordStatus::Active))
+        .unwrap();
+    let first =
+        plan_record_privacy_purge(&store, "alpha", "mem_secret", "privacy cleanup", &[]).unwrap();
+    apply_record_privacy_purge(
+        &store,
+        "alpha",
+        "mem_secret",
+        "privacy cleanup",
+        &[],
+        &first.fingerprint,
+    )
+    .unwrap();
+
+    let mut embedded = secret_record(RecordStatus::Active);
+    embedded.id = "imported_cap_secret".into();
+    let mut patch = Patch::propose_record(embedded, "legacy secret sk-prohibited-value");
+    patch.id = "explicit_patch".into();
+    patch.status = PatchStatus::Applied;
+    store.append_patch(&patch).unwrap();
+    let mut independent_record = secret_record(RecordStatus::Active);
+    independent_record.id = "independent_record".into();
+    independent_record.claim = "independent safe claim".into();
+    let mut independent_patch = Patch::propose_record(independent_record, "independent reason");
+    independent_patch.id = "cap_secret".into();
+    store.append_patch(&independent_patch).unwrap();
+
+    let explicit_patch_ids = vec!["explicit_patch".to_string()];
+    let preview = plan_record_privacy_purge(
+        &store,
+        "alpha",
+        "mem_secret",
+        "privacy cleanup",
+        &explicit_patch_ids,
+    )
+    .unwrap();
+    assert!(!preview.already_purged);
+    let applied = apply_record_privacy_purge(
+        &store,
+        "alpha",
+        "mem_secret",
+        "privacy cleanup",
+        &explicit_patch_ids,
+        &preview.fingerprint,
+    )
+    .unwrap();
+    assert!(applied.mutation_performed);
+    let canonical = fs::read_to_string(root.join("patches.jsonl")).unwrap();
+    assert!(!canonical.contains("sk-prohibited-value"));
+    let patches = store.load_patches().unwrap();
+    let patch = patches
+        .iter()
+        .find(|patch| patch.id == "explicit_patch")
+        .unwrap();
+    assert_eq!(patch.reason, "[privacy purged]");
+    assert!(patch.evidence.is_empty());
+    let proposed = patch.proposed_record.as_ref().unwrap();
+    assert_eq!(proposed.claim, "[privacy purged]");
+    assert_eq!(proposed.status, RecordStatus::Tombstoned);
+    let independent = patches
+        .iter()
+        .find(|patch| patch.id == "cap_secret")
+        .unwrap();
+    assert_eq!(independent.reason, "independent reason");
+    assert_eq!(
+        independent.proposed_record.as_ref().unwrap().claim,
+        "independent safe claim"
+    );
+    assert!(applied.backup.as_ref().is_some_and(|backup| {
+        fs::metadata(PathBuf::from(&backup.backup_dir).join("patches.jsonl")).is_ok()
+    }));
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -93,7 +176,7 @@ fn privacy_purge_rejects_stale_fingerprint_without_mutation() {
         .append_record(&secret_record(RecordStatus::Active))
         .unwrap();
     let preview =
-        plan_record_privacy_purge(&store, "alpha", "mem_secret", "privacy cleanup").unwrap();
+        plan_record_privacy_purge(&store, "alpha", "mem_secret", "privacy cleanup", &[]).unwrap();
     store
         .append_record(&secret_record(RecordStatus::Active))
         .unwrap();
@@ -103,6 +186,7 @@ fn privacy_purge_rejects_stale_fingerprint_without_mutation() {
         "alpha",
         "mem_secret",
         "privacy cleanup",
+        &[],
         &preview.fingerprint
     )
     .is_err());

@@ -1,7 +1,7 @@
 use crate::{create_store_backup_with_label, JsonlStore, StoreBackupReport};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
-use pi_governance_core::{Durability, Record, RecordStatus, Scope, SourceKind, TrustClass};
+use pi_governance_core::{Durability, Patch, Record, RecordStatus, Scope, SourceKind, TrustClass};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -16,6 +16,7 @@ pub struct PrivacyPurgePlan {
     pub target_found: bool,
     pub target_status: Option<RecordStatus>,
     pub already_purged: bool,
+    pub correlated_patches_to_purge: usize,
     pub reason_sha256: String,
 }
 
@@ -43,11 +44,67 @@ fn validate_reason(reason: &str) -> Result<()> {
     Ok(())
 }
 
-fn plan_from_records(
+fn patch_matches(
+    patch: &Patch,
+    namespace: &str,
+    target_id: &str,
+    correlated_patch_ids: &[String],
+) -> bool {
+    patch.namespace == namespace
+        && (correlated_patch_ids.contains(&patch.id)
+            || patch.target_id.as_deref() == Some(target_id)
+            || patch
+                .proposed_record
+                .as_ref()
+                .map(|record| record.id.as_str())
+                == Some(target_id))
+}
+
+fn record_is_purged(record: &Record) -> bool {
+    record.status == RecordStatus::Tombstoned
+        && record.claim == "[privacy purged]"
+        && record.evidence.is_empty()
+        && record.tags.is_empty()
+        && record.supersedes.is_empty()
+        && record.scope == Scope::global()
+        && record.confidence == 0.0
+        && record.trust_class == TrustClass::Unknown
+        && record.durability == Durability::Unknown
+        && record.source_kind == SourceKind::Unknown
+        && record.rule_type.is_none()
+}
+
+fn patch_needs_purge(patch: &Patch) -> bool {
+    patch.reason != "[privacy purged]"
+        || !patch.evidence.is_empty()
+        || patch
+            .proposed_record
+            .as_ref()
+            .is_some_and(|record| !record_is_purged(record))
+}
+
+fn redact_record(record: &mut Record) {
+    record.claim = "[privacy purged]".to_string();
+    record.evidence.clear();
+    record.tags.clear();
+    record.supersedes.clear();
+    record.scope = Scope::global();
+    record.confidence = 0.0;
+    record.status = RecordStatus::Tombstoned;
+    record.trust_class = TrustClass::Unknown;
+    record.durability = Durability::Unknown;
+    record.source_kind = SourceKind::Unknown;
+    record.rule_type = None;
+    record.updated_at = Utc::now();
+}
+
+fn plan_from_state(
     records: &[Record],
+    patches: &[Patch],
     namespace: &str,
     target_id: &str,
     reason: &str,
+    correlated_patch_ids: &[String],
 ) -> Result<PrivacyPurgePlan> {
     validate_reason(reason)?;
     let matches: Vec<&Record> = records
@@ -58,18 +115,32 @@ fn plan_from_records(
         bail!("privacy purge target has duplicate canonical rows; run store-integrity first");
     }
     let record = matches.first().copied();
-    let already_purged = record.is_some_and(|record| {
-        record.status == RecordStatus::Tombstoned
-            && record.claim == "[privacy purged]"
-            && record.evidence.is_empty()
-            && record.tags.is_empty()
-    });
+    for patch_id in correlated_patch_ids {
+        if !patches
+            .iter()
+            .any(|patch| patch.namespace == namespace && patch.id == *patch_id)
+        {
+            bail!(
+                "explicit correlated privacy-purge patch ID was not found in the target namespace"
+            );
+        }
+    }
+    let correlated_patches_to_purge = patches
+        .iter()
+        .filter(|patch| {
+            patch_matches(patch, namespace, target_id, correlated_patch_ids)
+                && patch_needs_purge(patch)
+        })
+        .count();
+    let already_purged = record.is_some_and(record_is_purged) && correlated_patches_to_purge == 0;
     let reason_sha256 = hash(reason.trim());
     let fingerprint = hash(serde_json::to_vec(&(
         namespace,
         target_id,
         &reason_sha256,
         records,
+        patches,
+        correlated_patch_ids,
     ))?);
     Ok(PrivacyPurgePlan {
         dry_run: true,
@@ -80,6 +151,7 @@ fn plan_from_records(
         target_found: record.is_some(),
         target_status: record.map(|record| record.status.clone()),
         already_purged,
+        correlated_patches_to_purge,
         reason_sha256,
     })
 }
@@ -89,8 +161,16 @@ pub fn plan_record_privacy_purge(
     namespace: &str,
     target_id: &str,
     reason: &str,
+    correlated_patch_ids: &[String],
 ) -> Result<PrivacyPurgePlan> {
-    plan_from_records(&store.load_records()?, namespace, target_id, reason)
+    plan_from_state(
+        &store.load_records()?,
+        &store.load_patches()?,
+        namespace,
+        target_id,
+        reason,
+        correlated_patch_ids,
+    )
 }
 
 pub fn apply_record_privacy_purge(
@@ -98,11 +178,20 @@ pub fn apply_record_privacy_purge(
     namespace: &str,
     target_id: &str,
     reason: &str,
+    correlated_patch_ids: &[String],
     expected_fingerprint: &str,
 ) -> Result<PrivacyPurgeApplyResult> {
     let session = store.write_session()?;
     let mut records = session.load_records()?;
-    let plan = plan_from_records(&records, namespace, target_id, reason)?;
+    let mut patches = session.load_patches()?;
+    let plan = plan_from_state(
+        &records,
+        &patches,
+        namespace,
+        target_id,
+        reason,
+        correlated_patch_ids,
+    )?;
     if plan.fingerprint != expected_fingerprint {
         bail!("privacy purge preview is stale; run preview again");
     }
@@ -127,15 +216,18 @@ pub fn apply_record_privacy_purge(
     let backup = create_store_backup_with_label(
         store.root(),
         "privacy-purge-v1",
-        &[("records.jsonl", &store.records_path)],
+        &[
+            ("records.jsonl", &store.records_path),
+            ("patches.jsonl", &store.patches_path),
+        ],
     )?;
     let reports = store.root().join("reports");
     fs::create_dir_all(&reports).with_context(|| format!("failed to create {:?}", reports))?;
-    let report_path = reports.join(format!(
-        "privacy-purge-{}-{}.json",
-        target_id,
-        Utc::now().timestamp_millis()
+    let report_id = hash(format!(
+        "{}:{}:{}",
+        target_id, plan.fingerprint, backup.backup_dir
     ));
+    let report_path = reports.join(format!("privacy-purge-{}.json", &report_id[..24]));
     fs::write(
         &report_path,
         serde_json::to_vec_pretty(
@@ -147,18 +239,21 @@ pub fn apply_record_privacy_purge(
         .iter_mut()
         .find(|record| record.namespace == namespace && record.id == target_id)
         .context("privacy purge target disappeared")?;
-    record.claim = "[privacy purged]".to_string();
-    record.evidence.clear();
-    record.tags.clear();
-    record.supersedes.clear();
-    record.scope = Scope::global();
-    record.confidence = 0.0;
-    record.status = RecordStatus::Tombstoned;
-    record.trust_class = TrustClass::Unknown;
-    record.durability = Durability::Unknown;
-    record.source_kind = SourceKind::Unknown;
-    record.rule_type = None;
-    record.updated_at = Utc::now();
+    redact_record(record);
+    for patch in patches
+        .iter_mut()
+        .filter(|patch| patch_matches(patch, namespace, target_id, correlated_patch_ids))
+    {
+        patch.reason = "[privacy purged]".to_string();
+        patch.evidence.clear();
+        if let Some(proposed_record) = patch.proposed_record.as_mut() {
+            redact_record(proposed_record);
+        }
+        patch.updated_at = Utc::now();
+    }
+    // Purge copied payloads before the record shell so an interrupted multi-file
+    // replacement cannot leave a clean record pointing at a secret-bearing patch.
+    session.overwrite_patches_atomic(&patches)?;
     session.overwrite_records_atomic(&records)?;
 
     let result = PrivacyPurgeApplyResult {

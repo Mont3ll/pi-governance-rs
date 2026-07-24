@@ -25,14 +25,16 @@ pub(crate) fn create_store_backup_with_label(
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .context("system clock is before UNIX_EPOCH")?
-        .as_secs();
+        .as_nanos();
 
     let backup_dir = root
         .join("backups")
         .join(format!("{label}-{timestamp}-pid{}", std::process::id()));
 
-    fs::create_dir_all(&backup_dir)
-        .with_context(|| format!("failed to create backup directory {:?}", backup_dir))?;
+    fs::create_dir_all(root.join("backups"))
+        .with_context(|| format!("failed to create backup root for {:?}", backup_dir))?;
+    fs::create_dir(&backup_dir)
+        .with_context(|| format!("failed to create unique backup directory {:?}", backup_dir))?;
 
     let mut copied_files = Vec::new();
 

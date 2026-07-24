@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- Preview-first `privacy-purge` for secret-bearing active or terminal records, with reviewed fingerprints, explicit force/apply, backups, redacted tombstoned shells, and audit reports.
+- Preview-first `privacy-purge` for secret-bearing active or terminal records, with reviewed fingerprints, explicit force/apply, collision-resistant backups, redacted tombstoned shells, and explicit reviewed historical-patch correlation.
 
 Added:
 - Dry-run-first `store-integrity` preview/apply workflow with reviewed fingerprints, mandatory backups, and audit reports.

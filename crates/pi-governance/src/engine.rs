@@ -730,8 +730,15 @@ impl GovernanceEngine {
         namespace: &str,
         target_id: &str,
         reason: &str,
+        correlated_patch_ids: &[String],
     ) -> Result<PrivacyPurgePlan> {
-        plan_record_privacy_purge(&self.store, namespace, target_id, reason)
+        plan_record_privacy_purge(
+            &self.store,
+            namespace,
+            target_id,
+            reason,
+            correlated_patch_ids,
+        )
     }
 
     pub fn apply_privacy_purge(
@@ -739,13 +746,21 @@ impl GovernanceEngine {
         namespace: &str,
         target_id: &str,
         reason: &str,
+        correlated_patch_ids: &[String],
         fingerprint: &str,
         force: bool,
     ) -> Result<PrivacyPurgeApplyResult> {
         if !force {
             bail!("privacy purge apply requires --force");
         }
-        apply_record_privacy_purge(&self.store, namespace, target_id, reason, fingerprint)
+        apply_record_privacy_purge(
+            &self.store,
+            namespace,
+            target_id,
+            reason,
+            correlated_patch_ids,
+            fingerprint,
+        )
     }
 
     pub fn tombstone_record(

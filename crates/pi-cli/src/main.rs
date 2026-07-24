@@ -248,6 +248,9 @@ enum Commands {
         #[arg(long)]
         force: bool,
 
+        #[arg(long = "correlated-patch-id")]
+        correlated_patch_ids: Vec<String>,
+
         #[arg(long)]
         fingerprint: Option<String>,
 
@@ -2120,6 +2123,7 @@ fn main() -> Result<()> {
             reason,
             apply,
             force,
+            correlated_patch_ids,
             fingerprint,
             json,
         } => {
@@ -2131,6 +2135,7 @@ fn main() -> Result<()> {
                     &namespace,
                     &target_id,
                     &reason,
+                    &correlated_patch_ids,
                     &fingerprint,
                     force,
                 )?;
@@ -2140,7 +2145,12 @@ fn main() -> Result<()> {
                     println!("Privacy purge applied: {}", result.mutation_performed);
                 }
             } else {
-                let result = engine.plan_privacy_purge(&namespace, &target_id, &reason)?;
+                let result = engine.plan_privacy_purge(
+                    &namespace,
+                    &target_id,
+                    &reason,
+                    &correlated_patch_ids,
+                )?;
                 if json {
                     println!("{}", serde_json::to_string_pretty(&result)?);
                 } else {

@@ -229,10 +229,11 @@ Permanently redacts secret-bearing record content while preserving the stable re
 
 ```bash
 pi --store .pi --namespace default privacy-purge <record-id> --reason "privacy cleanup" --json
-pi --store .pi --namespace default privacy-purge <record-id> --reason "privacy cleanup" --apply --force --fingerprint <preview-fingerprint> --json
+pi --store .pi --namespace default privacy-purge <record-id> --reason "privacy cleanup" --correlated-patch-id <reviewed-patch-id> --json
+pi --store .pi --namespace default privacy-purge <record-id> --reason "privacy cleanup" --correlated-patch-id <reviewed-patch-id> --apply --force --fingerprint <preview-fingerprint> --json
 ```
 
-The stored reason is represented by its SHA-256 digest. Previous claim, evidence, tags, and supersession links are excluded from the rewritten record and audit report.
+The stored reason is represented by its SHA-256 digest. Previous claim, evidence, tags, and supersession links are excluded from the rewritten record and audit report. Patches that explicitly target or embed the same stable record ID are correlated automatically. Historical patches with transformed IDs must be supplied explicitly with repeatable `--correlated-patch-id` flags; missing IDs fail the preview. Correlated patch payloads are redacted in the same reviewed operation, and both `records.jsonl` and `patches.jsonl` are included in the mandatory backup. A rerun remains actionable when the record shell is already purged but a reviewed correlated patch still contains durable content.
 
 ## `store-integrity`
 
